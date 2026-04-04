@@ -734,6 +734,16 @@
     return num * 1e6;
   }
 
+  function fmtDiff(v) {
+    const n = parseFloat(v);
+    if (!n && n !== 0) return '–';
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + ' T';
+    if (n >= 1e9)  return (n / 1e9).toFixed(2)  + ' G';
+    if (n >= 1e6)  return (n / 1e6).toFixed(2)  + ' M';
+    if (n >= 1e3)  return (n / 1e3).toFixed(1)  + ' K';
+    return String(Math.round(n));
+  }
+
   function fmtNmHr(kh) {
     const n = parseFloat(kh);
     if (!n && n !== 0) return '–';
@@ -890,7 +900,7 @@
         <td><small class="text-muted">${d.netDiff || '–'}</small></td>
         <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
         <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
-        <td><small>${d.bestDiff || d.best_share || d.bestShare || '–'}</small></td>
+        <td><small>${fmtDiff(d.bestDiff || d.best_share || d.bestShare)}</small></td>
         <td>${d.valid ?? d.hits ?? '–'}</td>
         <td>${fmtTemp(tempRaw, tMax)}</td>
         <td><small class="text-muted">${d.rssi || '–'}</small></td>
@@ -974,8 +984,8 @@
         <td>${fanRpm}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
-        <td><small>${d.bestDiff ?? '–'}</small></td>
-        <td><small class="text-muted">${d.bestSessionDiff ?? '–'}</small></td>
+        <td><small>${fmtDiff(d.bestDiff)}</small></td>
+        <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
         <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
         <td class="max-w">${d.stratumURL || '–'}</td>
         <td style="white-space:nowrap">${actions}</td>
