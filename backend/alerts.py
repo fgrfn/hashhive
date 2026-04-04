@@ -77,26 +77,26 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
 
             # Online/offline transitions
             if prev.get("online", True) and not is_online:
-                new_alerts.append(_make_alert(key, "offline", "critical", f"NMMiner {ip} ist offline"))
+                new_alerts.append(_make_alert(key, "offline", "critical", f"NMMiner {ip} is offline"))
             elif not prev.get("online", True) and is_online:
-                new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} ist wieder online"))
+                new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} is back online"))
 
             if is_online:
                 if temp > temp_max:
                     new_alerts.append(
                         _make_alert(key, "temp_high", "critical",
-                                    f"NMMiner {ip}: Temperatur {temp:.1f}°C > {temp_max:.0f}°C")
+                                    f"NMMiner {ip}: temperature {temp:.1f}°C > {temp_max:.0f}°C")
                     )
                 if hashrate_min > 0 and hashrate < hashrate_min:
                     new_alerts.append(
                         _make_alert(key, "hashrate_low", "warning",
-                                    f"NMMiner {ip}: Hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
+                                    f"NMMiner {ip}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
                     )
                 prev_pool = prev.get("pool", "")
                 if prev_pool and not pool:
-                    new_alerts.append(_make_alert(key, "pool_lost", "critical", f"NMMiner {ip}: Pool-Verbindung verloren"))
+                    new_alerts.append(_make_alert(key, "pool_lost", "critical", f"NMMiner {ip}: pool connection lost"))
                 elif not prev_pool and pool:
-                    new_alerts.append(_make_alert(key, "pool_connected", "info", f"NMMiner {ip}: Pool verbunden"))
+                    new_alerts.append(_make_alert(key, "pool_connected", "info", f"NMMiner {ip}: pool connected"))
 
     # ── AxeOS devices ────────────────────────────────────────────────────────
     for device in axeos_data.get("devices", []):
@@ -119,26 +119,26 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
         prev = previous_state.get(key, {})
 
         if prev.get("online", True) and not is_online:
-            new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) ist offline"))
+            new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) is offline"))
         elif not prev.get("online", True) and is_online:
-            new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) ist wieder online"))
+            new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) is back online"))
 
         if is_online:
             if temp > temp_max:
                 new_alerts.append(
                     _make_alert(key, "temp_high", "critical",
-                                f"{name}: Temperatur {temp:.1f}°C > {temp_max:.0f}°C")
+                                f"{name}: temperature {temp:.1f}°C > {temp_max:.0f}°C")
                 )
             if hashrate_min > 0 and hashrate < hashrate_min:
                 new_alerts.append(
                     _make_alert(key, "hashrate_low", "warning",
-                                f"{name}: Hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
+                                f"{name}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
                 )
             prev_pool = prev.get("pool", "")
             if prev_pool and not pool:
-                new_alerts.append(_make_alert(key, "pool_lost", "critical", f"{name}: Pool-Verbindung verloren"))
+                new_alerts.append(_make_alert(key, "pool_lost", "critical", f"{name}: pool connection lost"))
             elif not prev_pool and pool:
-                new_alerts.append(_make_alert(key, "pool_connected", "info", f"{name}: Pool verbunden"))
+                new_alerts.append(_make_alert(key, "pool_connected", "info", f"{name}: pool connected"))
 
     # ── Persist state & history ───────────────────────────────────────────────
     save_json(DEVICE_STATE_FILE, current_state)
@@ -173,6 +173,7 @@ async def _send_notifications(notifications: dict, alerts: list[dict]) -> None:
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id, "text": f"🐝 HashHive Alert:\n{message}"},
                 )
+
             except Exception:
                 pass
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -158,8 +158,8 @@
     <a id="nav-nmminer"        onclick="showPage('nmminer')">        <span class="nav-icon">⛏️</span> NMMiner</a>
     <a id="nav-axeos"          onclick="showPage('axeos')">          <span class="nav-icon">🔧</span> BitAxe / NerdAxe</a>
     <a id="nav-pool"           onclick="showPage('pool')">           <span class="nav-icon">🌐</span> Pool</a>
-    <a id="nav-settings"       onclick="showPage('settings')">       <span class="nav-icon">⚙️</span> Einstellungen</a>
-    <a id="nav-notifications"  onclick="showPage('notifications')">  <span class="nav-icon">🔔</span> Benachrichtigungen
+    <a id="nav-settings"       onclick="showPage('settings')">       <span class="nav-icon">⚙️</span> Settings</a>
+    <a id="nav-notifications"  onclick="showPage('notifications')">  <span class="nav-icon">🔔</span> Notifications
       <span class="nav-badge" id="alert-badge" style="display:none">0</span>
     </a>
   </nav>
@@ -172,7 +172,7 @@
     <h1 id="page-title">Dashboard</h1>
     <div class="topbar-right">
       <span id="last-update" class="text-muted" style="font-size:12px"></span>
-      <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Aktualisieren</button>
+      <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
     </div>
   </div>
 
@@ -182,24 +182,24 @@
     <div class="page active" id="page-dashboard">
       <div class="stat-grid">
         <div class="stat-card">
-          <div class="stat-label">Gesamt Hashrate</div>
+          <div class="stat-label">Total Hashrate</div>
           <div class="stat-value" id="stat-hashrate">–</div>
           <div class="stat-unit">GH/s</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Geräte Online</div>
+          <div class="stat-label">Devices Online</div>
           <div class="stat-value" id="stat-online">–</div>
-          <div class="stat-unit">von <span id="stat-total">–</span></div>
+          <div class="stat-unit">of <span id="stat-total">–</span></div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Max. Temperatur</div>
+          <div class="stat-label">Max. Temperature</div>
           <div class="stat-value" id="stat-maxtemp">–</div>
           <div class="stat-unit">°C</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Offene Alerts</div>
+          <div class="stat-label">Open Alerts</div>
           <div class="stat-value" id="stat-alerts" style="color:var(--warning)">–</div>
-          <div class="stat-unit">ungelesen</div>
+          <div class="stat-unit">unread</div>
         </div>
       </div>
 
@@ -208,7 +208,7 @@
         <div class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Uptime</th></tr></thead>
-            <tbody id="dash-nm-rows"><tr><td colspan="6" class="empty text-muted">Keine Daten</td></tr></tbody>
+            <tbody id="dash-nm-rows"><tr><td colspan="6" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -218,7 +218,7 @@
         <div class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares OK</th><th>Pool</th></tr></thead>
-            <tbody id="dash-ax-rows"><tr><td colspan="6" class="empty text-muted">Keine Daten</td></tr></tbody>
+            <tbody id="dash-ax-rows"><tr><td colspan="6" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -227,11 +227,11 @@
     <!-- ── NMMINER ── -->
     <div class="page" id="page-nmminer">
       <div class="card">
-        <div class="card-title">NMMiner Geräte</div>
+        <div class="card-title">NMMiner Devices</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th></tr></thead>
-            <tbody id="nm-rows"><tr><td colspan="9" class="empty text-muted">Keine Daten</td></tr></tbody>
+            <tbody id="nm-rows"><tr><td colspan="9" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -240,11 +240,11 @@
     <!-- ── AXEOS ── -->
     <div class="page" id="page-axeos">
       <div class="card">
-        <div class="card-title">BitAxe / NerdAxe Geräte</div>
+        <div class="card-title">BitAxe / NerdAxe Devices</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Typ</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Spannung (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Aktionen</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="12" class="empty text-muted">Keine Daten</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Voltage (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="12" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -253,20 +253,20 @@
     <!-- ── POOL ── -->
     <div class="page" id="page-pool">
       <div class="card">
-        <div class="card-title mb-0">Pool Konfiguration – Alle Geräte</div>
-        <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Übertragung an alle NMMiner und AxeOS-Geräte gleichzeitig.</p>
+        <div class="card-title mb-0">Pool Configuration – All Devices</div>
+        <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Push pool settings to all NMMiner and AxeOS devices simultaneously.</p>
         <div class="form-grid">
-          <div class="form-group"><label>Primär Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333"></div>
-          <div class="form-group"><label>Primär Worker</label><input type="text" id="pool-p-user" placeholder="wallet.worker1"></div>
-          <div class="form-group"><label>Primär Passwort</label><input type="text" id="pool-p-pass" placeholder="x"></div>
+          <div class="form-group"><label>Primary Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333"></div>
+          <div class="form-group"><label>Primary Worker</label><input type="text" id="pool-p-user" placeholder="wallet.worker1"></div>
+          <div class="form-group"><label>Primary Password</label><input type="text" id="pool-p-pass" placeholder="x"></div>
         </div>
         <div class="form-grid">
           <div class="form-group"><label>Fallback Pool URL</label><input type="text" id="pool-s-url" placeholder="stratum+tcp://pool2.example.com:3333"></div>
           <div class="form-group"><label>Fallback Worker</label><input type="text" id="pool-s-user" placeholder="wallet.worker1"></div>
-          <div class="form-group"><label>Fallback Passwort</label><input type="text" id="pool-s-pass" placeholder="x"></div>
+          <div class="form-group"><label>Fallback Password</label><input type="text" id="pool-s-pass" placeholder="x"></div>
         </div>
         <div class="actions-row">
-          <button class="btn btn-primary" onclick="broadcastPool()">🚀 An alle Geräte senden</button>
+          <button class="btn btn-primary" onclick="broadcastPool()">🚀 Push to All Devices</button>
         </div>
       </div>
     </div>
@@ -283,26 +283,26 @@
 
       <div class="card">
         <div class="section-header">
-          <div class="card-title mb-0">BitAxe / NerdAxe Geräte</div>
-          <button class="btn btn-secondary btn-sm" onclick="addAxeDevice()">+ Hinzufügen</button>
+          <div class="card-title mb-0">BitAxe / NerdAxe Devices</div>
+          <button class="btn btn-secondary btn-sm" onclick="addAxeDevice()">+ Add Device</button>
         </div>
         <ul class="device-list" id="axe-device-list">
-          <li class="text-muted" style="padding:8px">Keine Geräte konfiguriert</li>
+          <li class="text-muted" style="padding:8px">No devices configured</li>
         </ul>
       </div>
 
       <div class="card">
-        <div class="card-title">Alert-Schwellenwerte</div>
+        <div class="card-title">Alert Thresholds</div>
         <div class="form-grid">
-          <div class="form-group"><label>Max. Temperatur (°C)</label><input type="number" id="s-temp-max" value="70"></div>
-          <div class="form-group"><label>Min. Hashrate GH/s (0 = aus)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
-          <div class="form-group"><label>Min. Share-Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
-          <div class="form-group"><label>Refresh-Intervall (Sekunden)</label><input type="number" id="s-interval" value="30"></div>
+          <div class="form-group"><label>Max. Temperature (°C)</label><input type="number" id="s-temp-max" value="70"></div>
+          <div class="form-group"><label>Min. Hashrate GH/s (0 = off)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
+          <div class="form-group"><label>Min. Share Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
+          <div class="form-group"><label>Refresh Interval (seconds)</label><input type="number" id="s-interval" value="30"></div>
         </div>
       </div>
 
       <div class="actions-row" style="margin-top:0">
-        <button class="btn btn-primary" onclick="saveSettings()">💾 Speichern</button>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save</button>
       </div>
     </div>
 
@@ -310,7 +310,7 @@
     <div class="page" id="page-notifications">
       <div class="card">
         <div class="card-title">Telegram</div>
-        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-tg-on"><span class="toggle-slider"></span></label></div>
+        <div class="toggle-row"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-tg-on"><span class="toggle-slider"></span></label></div>
         <div class="form-grid" style="margin-top:14px">
           <div class="form-group"><label>Bot Token</label><input type="text" id="n-tg-token" placeholder="123456:ABC-DEF..."></div>
           <div class="form-group"><label>Chat ID</label><input type="text" id="n-tg-chat" placeholder="-1001234567890"></div>
@@ -319,7 +319,7 @@
 
       <div class="card">
         <div class="card-title">Discord</div>
-        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-dc-on"><span class="toggle-slider"></span></label></div>
+        <div class="toggle-row"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-dc-on"><span class="toggle-slider"></span></label></div>
         <div class="form-grid" style="margin-top:14px">
           <div class="form-group"><label>Webhook URL</label><input type="text" id="n-dc-hook" placeholder="https://discord.com/api/webhooks/..."></div>
         </div>
@@ -327,7 +327,7 @@
 
       <div class="card">
         <div class="card-title">Gotify</div>
-        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-go-on"><span class="toggle-slider"></span></label></div>
+        <div class="toggle-row"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-go-on"><span class="toggle-slider"></span></label></div>
         <div class="form-grid" style="margin-top:14px">
           <div class="form-group"><label>Server URL</label><input type="text" id="n-go-url" placeholder="https://gotify.example.com"></div>
           <div class="form-group"><label>App Token</label><input type="text" id="n-go-token" placeholder="Axxxxxx"></div>
@@ -335,20 +335,20 @@
       </div>
 
       <div class="actions-row">
-        <button class="btn btn-primary" onclick="saveNotifications()">💾 Speichern</button>
-        <button class="btn btn-secondary" onclick="testNotification()">📨 Test senden</button>
+        <button class="btn btn-primary" onclick="saveNotifications()">💾 Save</button>
+        <button class="btn btn-secondary" onclick="testNotification()">📨 Send Test</button>
       </div>
 
       <div class="card" style="margin-top:20px">
         <div class="section-header">
-          <div class="card-title mb-0">Alert-Verlauf</div>
+          <div class="card-title mb-0">Alert History</div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-secondary btn-sm" onclick="markAllRead()">✓ Alle gelesen</button>
-            <button class="btn btn-danger btn-sm" onclick="clearAlerts()">🗑 Löschen</button>
+            <button class="btn btn-secondary btn-sm" onclick="markAllRead()">✓ Mark All Read</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAlerts()">🗑 Clear</button>
           </div>
         </div>
         <div id="alert-list">
-          <div class="empty"><div class="empty-icon">🔔</div>Keine Alerts</div>
+          <div class="empty"><div class="empty-icon">🔔</div>No alerts</div>
         </div>
       </div>
     </div>
@@ -368,7 +368,7 @@
 
   const PAGE_TITLES = {
     dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
-    pool: 'Pool Einstellungen', settings: 'Einstellungen', notifications: 'Benachrichtigungen',
+    pool: 'Pool Settings', settings: 'Settings', notifications: 'Notifications',
   };
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -413,7 +413,7 @@
       currentConfig = lastDashboard.config || {};
       renderDashboard(lastDashboard);
       document.getElementById('last-update').textContent =
-        'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+        'Updated: ' + new Date().toLocaleTimeString('en-US');
       const unread = lastDashboard.unread_alerts || 0;
       const badge = document.getElementById('alert-badge');
       const statBadge = document.getElementById('stat-alerts');
@@ -422,7 +422,7 @@
       statBadge.textContent = unread;
       statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
     } catch (e) {
-      toast('Ladefehler: ' + e.message, 'error');
+      toast('Load error: ' + e.message, 'error');
     }
   }
 
@@ -482,7 +482,7 @@
     // NMMiner rows
     const nmBody = document.getElementById('dash-nm-rows');
     if (nmDevs.length === 0) {
-      nmBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Keine NMMiner konfiguriert</td></tr>';
+      nmBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">No NMMiner configured</td></tr>';
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
         const online = d.online !== false;
@@ -504,7 +504,7 @@
     // AxeOS rows
     const axBody = document.getElementById('dash-ax-rows');
     if (axDevs.length === 0) {
-      axBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Keine AxeOS-Geräte konfiguriert</td></tr>';
+      axBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">No AxeOS devices configured</td></tr>';
     } else {
       axBody.innerHTML = axDevs.map(d => {
         const online = d._online !== false;
@@ -536,7 +536,7 @@
 
   async function loadNmPage() {
     const tbody = document.getElementById('nm-rows');
-    tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Lade…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/nmminer/swarm');
       const devs = Array.isArray(data) ? data : (data.devices || []);
@@ -550,7 +550,7 @@
     const tMax = currentConfig.thresholds?.temp_max || 70;
     const tbody = document.getElementById('nm-rows');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Keine Daten</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">No data</td></tr>';
       return;
     }
     tbody.innerHTML = devs.map(d => {
@@ -575,7 +575,7 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Lade…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
@@ -588,7 +588,7 @@
     const tMax = currentConfig.thresholds?.temp_max || 70;
     const tbody = document.getElementById('ax-rows');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Keine Geräte konfiguriert</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">No devices configured</td></tr>';
       return;
     }
     tbody.innerHTML = devs.map(d => {
@@ -616,12 +616,12 @@
   }
 
   async function restartDevice(ip) {
-    if (!confirm(`Gerät ${ip} neu starten?`)) return;
+    if (!confirm(`Restart device ${ip}?`)) return;
     try {
       await fetch(`http://${ip}/api/system/restart`);
-      toast(`Neustart von ${ip} ausgelöst`, 'success');
+      toast(`Restart triggered for ${ip}`, 'success');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 
@@ -629,7 +629,7 @@
 
   async function broadcastPool() {
     const url = document.getElementById('pool-p-url').value.trim();
-    if (!url) { toast('Bitte Pool-URL eingeben', 'error'); return; }
+    if (!url) { toast('Please enter a pool URL', 'error'); return; }
 
     const payload = {
       stratumURL:              url,
@@ -656,7 +656,7 @@
       ok = false;
     }
 
-    if (ok) toast('Pool-Config übertragen', 'success');
+    if (ok) toast('Pool config pushed to all devices', 'success');
   }
 
   // ── Settings form ──────────────────────────────────────────────────────────
@@ -672,20 +672,20 @@
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
-      toast('Einstellungen konnten nicht geladen werden', 'error');
+      toast('Failed to load settings', 'error');
     }
   }
 
   function renderAxeDeviceList(devs) {
     const list = document.getElementById('axe-device-list');
     if (devs.length === 0) {
-      list.innerHTML = '<li class="text-muted" style="padding:8px">Keine Geräte konfiguriert</li>';
+      list.innerHTML = '<li class="text-muted" style="padding:8px">No devices configured</li>';
       return;
     }
     list.innerHTML = devs.map((d, i) => `
       <li class="device-item">
         <div class="device-item-info">
-          <span class="device-item-name">${d.name || 'Unbekannt'}</span>
+          <span class="device-item-name">${d.name || 'Unknown'}</span>
           <span class="device-item-ip">${d.ip} · ${d.type || 'bitaxe'}</span>
         </div>
         <button class="btn btn-danger btn-sm" onclick="removeAxeDevice(${i})">✕</button>
@@ -693,9 +693,9 @@
   }
 
   function addAxeDevice() {
-    const ip   = prompt('IP-Adresse:');     if (!ip) return;
+    const ip   = prompt('IP address:');     if (!ip) return;
     const name = prompt('Name:') || ip;
-    const type = prompt('Typ (bitaxe / nerdaxe):', 'bitaxe') || 'bitaxe';
+    const type = prompt('Type (bitaxe / nerdaxe):', 'bitaxe') || 'bitaxe';
     const devs = (currentConfig.axeos_devices || []);
     devs.push({ ip: ip.trim(), name: name.trim(), type: type.trim() });
     currentConfig.axeos_devices = devs;
@@ -723,9 +723,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentConfig),
       });
-      toast('Einstellungen gespeichert', 'success');
+      toast('Settings saved', 'success');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 
@@ -766,9 +766,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentConfig),
       });
-      toast('Benachrichtigungen gespeichert', 'success');
+      toast('Notifications saved', 'success');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 
@@ -777,9 +777,9 @@
       const data = await apiFetch('/api/notifications/test', { method: 'POST' });
       const res = data.results || {};
       const parts = Object.entries(res).map(([k, v]) => `${k}: ${v ? '✓' : '✗'}`);
-      toast(parts.length ? parts.join(' · ') : 'Kein Dienst aktiviert', 'info');
+      toast(parts.length ? parts.join(' · ') : 'No service enabled', 'info');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 
@@ -798,7 +798,7 @@
   function renderAlerts(alerts) {
     const el = document.getElementById('alert-list');
     if (!alerts || alerts.length === 0) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div>Keine Alerts</div>';
+      el.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div>No alerts</div>';
       return;
     }
     const sorted = [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -808,7 +808,7 @@
         <div class="alert-sev">${icons[a.severity] || '⚪'}</div>
         <div class="alert-content">
           <div class="alert-message sev-${a.severity}">${a.message}</div>
-          <div class="alert-meta">${new Date(a.timestamp).toLocaleString('de-DE')} · ${a.kind}</div>
+          <div class="alert-meta">${new Date(a.timestamp).toLocaleString('en-US')} · ${a.kind}</div>
         </div>
       </div>`).join('');
   }
@@ -818,21 +818,21 @@
       await apiFetch('/api/alerts/read-all', { method: 'POST' });
       await loadAlerts();
       document.getElementById('alert-badge').style.display = 'none';
-      toast('Alle Alerts als gelesen markiert', 'success');
+      toast('All alerts marked as read', 'success');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 
   async function clearAlerts() {
-    if (!confirm('Alle Alerts löschen?')) return;
+    if (!confirm('Delete all alerts?')) return;
     try {
       await apiFetch('/api/alerts', { method: 'DELETE' });
       await loadAlerts();
       document.getElementById('alert-badge').style.display = 'none';
-      toast('Alerts gelöscht', 'success');
+      toast('Alerts cleared', 'success');
     } catch (e) {
-      toast('Fehler: ' + e.message, 'error');
+      toast('Error: ' + e.message, 'error');
     }
   }
 

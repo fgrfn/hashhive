@@ -21,9 +21,10 @@ fi
 echo "✓  $(python3 --version)"
 
 # ── python3-venv sicherstellen ────────────────────────────────────────────────
-if ! python3 -m venv --help &>/dev/null; then
-    echo "python3-venv nicht gefunden – installiere via apt..."
+if ! python3 -m ensurepip --version &>/dev/null; then
+    echo "python3-venv / ensurepip nicht gefunden – installiere via apt..."
     sudo apt-get update -qq
+    sudo apt-get install -y "python3-venv" "python3.$(python3 -c 'import sys; print(sys.version_info.minor)')-venv" 2>/dev/null || \
     sudo apt-get install -y python3-venv
 fi
 
