@@ -189,30 +189,68 @@ async def post_settings(data: dict) -> dict:
 async def get_nmminer_swarm():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("nmminer_master", "")
-    if not master:
+    # Prefer master (returns aggregated swarm stats in one request)
+    if master:
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(f"http://{master}/swarm")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception:
+                pass  # fall through to per-device queries
+    # Fallback: query each known device individually
+    devices = config.get("nmminer_devices", [])
+    if not devices:
         return {"devices": []}
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            resp = await client.get(f"http://{master}/swarm")
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+    results = []
+    async with httpx.AsyncClient(timeout=5) as client:
+        async def _fetch(ip: str):
+            try:
+                r = await client.get(f"http://{ip}/swarm")
+                r.raise_for_status()
+                data = r.json()
+                devs = data if isinstance(data, list) else data.get("devices", [data])
+                results.extend(devs)
+            except Exception:
+                results.append({"ip": ip, "online": False})
+        await asyncio.gather(*[_fetch(d["ip"]) for d in devices if d.get("ip")])
+    return {"devices": results}
 
 
 @app.get("/api/nmminer/config")
 async def get_nmminer_config():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("nmminer_master", "")
-    if not master:
-        return {}
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            resp = await client.get(f"http://{master}/config")
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+    # Prefer master (returns all device configs at once)
+    if master:
+        async with httpx.AsyncClient(timeout=10) as client:
+            try:
+                resp = await client.get(f"http://{master}/config")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception:
+                pass  # fall through to per-device queries
+    # Fallback: query each known device individually
+    devices = config.get("nmminer_devices", [])
+    if not devices:
+        return {"configs": []}
+    configs = []
+    async with httpx.AsyncClient(timeout=5) as client:
+        async def _fetch_cfg(ip: str):
+            try:
+                r = await client.get(f"http://{ip}/config")
+                r.raise_for_status()
+                data = r.json()
+                entries = data.get("configs", []) if isinstance(data, dict) else []
+                for e in entries:
+                    if e.get("ip") == ip:
+                        configs.append(e)
+                        return
+                configs.append({"ip": ip, "config": data})
+            except Exception:
+                pass
+        await asyncio.gather(*[_fetch_cfg(d["ip"]) for d in devices if d.get("ip")])
+    return {"configs": configs}
 
 
 @app.post("/api/nmminer/broadcast-config")
@@ -232,13 +270,10 @@ async def broadcast_nmminer_config(data: dict):
 
 @app.get("/api/nmminer/device-config")
 async def get_nmminer_device_config(ip: str):
-    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
-    if not master:
-        raise HTTPException(status_code=400, detail="No NMMiner master configured")
+    # Query device directly — no master needed for individual config reads
     async with httpx.AsyncClient(timeout=10) as client:
         try:
-            resp = await client.get(f"http://{master}/config?ip={ip}")
+            resp = await client.get(f"http://{ip}/config")
             resp.raise_for_status()
             data = resp.json()
             # Unwrap {"configs": [{"ip": "...", "config": {...}}, ...]} format
@@ -257,27 +292,16 @@ async def get_nmminer_device_config(ip: str):
 
 @app.post("/api/nmminer/device-config")
 async def post_nmminer_device_config(data: dict):
-    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
-    if not master:
-        raise HTTPException(status_code=400, detail="No NMMiner master configured")
     device_ip = data.get("ip")
     if not device_ip:
         raise HTTPException(status_code=400, detail="ip field required in body")
+    # Push directly to the device — master is only needed for discovery, not for writes
     async with httpx.AsyncClient(timeout=15) as client:
-        # broadcast-config is the correct write endpoint (POST /config returns 404)
-        last_exc: Exception | None = None
-        for url, method, payload in [
-            (f"http://{master}/broadcast-config",      "POST", data),
-            (f"http://{device_ip}/broadcast-config",   "POST", data),
-        ]:
-            try:
-                resp = await client.post(url, json=payload)
-                if resp.status_code < 500:
-                    return {"status": resp.status_code, "detail": resp.text[:200]}
-            except Exception as exc:
-                last_exc = exc
-        raise HTTPException(status_code=502, detail=str(last_exc))
+        try:
+            resp = await client.post(f"http://{device_ip}/broadcast-config", json=data)
+            return {"status": resp.status_code, "detail": resp.text[:200]}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
 
 
 # ── AxeOS ─────────────────────────────────────────────────────────────────────

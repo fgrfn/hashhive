@@ -478,9 +478,12 @@
           <button class="btn btn-secondary btn-sm" onclick="discoverNmDevices()" id="btn-discover">🔍 Discover Devices</button>
         </div>
         <div class="form-group" style="max-width:340px;margin-top:12px">
-          <label>Master IP</label>
+          <label>Master IP <span class="text-muted" style="font-size:11px;font-weight:400">(nur für Discovery)</span></label>
           <input type="text" id="s-nmminer-master" placeholder="10.10.40.182">
         </div>
+        <ul class="device-list" id="nm-device-list" style="margin-top:8px">
+          <li class="text-muted" style="padding:8px">No devices configured</li>
+        </ul>
         <div id="nm-discover-list" style="margin-top:8px"></div>
       </div>
 
@@ -1451,13 +1454,45 @@
       document.getElementById('s-hr-min').value     = cfg.thresholds?.hashrate_min ?? 0;
       document.getElementById('s-share-min').value  = cfg.thresholds?.share_rate_min ?? 80;
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
+      renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
       toast('Failed to load settings', 'error');
     }
   }
 
+  function renderNmDeviceList(devs) {
+    const list = document.getElementById('nm-device-list');
+    if (!list) return;
+    if (devs.length === 0) {
+      list.innerHTML = '<li class="text-muted" style="padding:8px">No devices configured</li>';
+      return;
+    }
+    list.innerHTML = devs.map((d, i) => `
+      <li class="device-item">
+        <div class="device-item-info">
+          <span class="device-item-name">${d.name || d.ip}</span>
+          <span class="device-item-ip">${d.ip}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeNmDevice(${i})">✕</button>
+      </li>`).join('');
+  }
+
+  function removeNmDevice(i) {
+    const devs = currentConfig.nmminer_devices || [];
+    devs.splice(i, 1);
+    currentConfig.nmminer_devices = devs;
+    renderNmDeviceList(devs);
+  }
+
   async function discoverNmDevices() {
+    const master = document.getElementById('s-nmminer-master').value.trim();
+    if (!master) { toast('Master IP eingeben', 'error'); return; }
+    // Save master IP temporarily so the backend can use it for discovery
+    const savedMaster = currentConfig.nmminer_master;
+    currentConfig.nmminer_master = master;
+    await apiFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(currentConfig) }).catch(() => {});
+
     const btn = document.getElementById('btn-discover');
     const out = document.getElementById('nm-discover-list');
     btn.disabled = true;
@@ -1470,34 +1505,37 @@
         out.innerHTML = '<p class="text-muted" style="font-size:13px">No devices found in swarm.</p>';
         return;
       }
-      out.innerHTML = `<p class="text-muted" style="font-size:12px;margin-bottom:6px">Found ${devs.length} device(s) — already configured ones are skipped on import.</p>` +
+      const existingIps = new Set((currentConfig.nmminer_devices || []).map(d => d.ip));
+      out.innerHTML = `<p class="text-muted" style="font-size:12px;margin-bottom:6px">Found ${devs.length} device(s) — already saved ones are pre-checked.</p>` +
         devs.map(d => {
           const ip = d.ip || '';
           const name = d.hostname || d.name || ip;
-          const already = (currentConfig.axeos_devices || []).find(x => x.ip === ip);
+          const already = existingIps.has(ip);
           return `<div class="pool-dev-item" style="margin-bottom:4px">
-            <input type="checkbox" id="disc-${ip}" value="${ip}" ${already ? 'disabled' : 'checked'}>
+            <input type="checkbox" id="disc-${ip}" value="${ip}" data-name="${name}" checked>
             <label for="disc-${ip}" style="flex:1">${name}
-              <span class="pool-dev-meta">${ip}</span>
+              <span class="pool-dev-meta">${ip}${already ? ' · already saved' : ''}</span>
             </label>
           </div>`;
         }).join('');
       const importBtn = document.createElement('button');
       importBtn.className = 'btn btn-primary btn-sm';
       importBtn.style.marginTop = '10px';
-      importBtn.textContent = '⬇ Import Selected into NMMiner config';
-      importBtn.onclick = () => {
-        // NMMiner devices are implicitly managed via the swarm — no separate list needed.
-        // We just confirm the master IP is set.
-        const master = document.getElementById('s-nmminer-master').value.trim();
-        if (!master) { toast('Set a Master IP first', 'error'); return; }
-        toast(`NMMiner swarm uses master IP ${master} — ${devs.length} device(s) auto-fetched on each refresh.`, 'info');
-        out.querySelectorAll('input[type=checkbox]:checked').forEach(cb => {
-          const ip = cb.value;
-          const d = devs.find(x => x.ip === ip);
-          if (!d) return;
-          // highlight the device in the table if we're on NMMiner page
+      importBtn.textContent = '⬇ Import Selected';
+      importBtn.onclick = async () => {
+        const checked = [...out.querySelectorAll('input[type=checkbox]:checked')];
+        const existing = currentConfig.nmminer_devices || [];
+        const seen = new Set(existing.map(d => d.ip));
+        checked.forEach(cb => {
+          if (!seen.has(cb.value)) {
+            existing.push({ ip: cb.value, name: cb.dataset.name || cb.value });
+            seen.add(cb.value);
+          }
         });
+        currentConfig.nmminer_devices = existing;
+        renderNmDeviceList(existing);
+        out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${existing.length} device(s) saved. Click 💾 Save to persist.</p>`;
+        toast(`${checked.length} device(s) imported`, 'success');
       };
       out.appendChild(importBtn);
     } catch (e) {
