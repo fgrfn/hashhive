@@ -1595,6 +1595,7 @@
   // ── NMMiner device config modal ───────────────────────────────────────────
 
   let _nmEditIP = null;
+  let _nmEditRawConfig = null;
 
   async function openNmEdit(ip) {
     _nmEditIP = ip;
@@ -1609,6 +1610,7 @@
     overlay.classList.add('open');
     try {
       const cfg = await apiFetch(`/api/nmminer/device-config?ip=${encodeURIComponent(ip)}`);
+      _nmEditRawConfig = cfg;
       _fillNmForm(cfg);
       loading.style.display = 'none';
       form.style.display = 'block';
@@ -1626,52 +1628,56 @@
       const opt = [...el.options].find(o => String(o.value) === String(v));
       if (opt) el.value = opt.value; else if (el.options.length) el.value = el.options[0].value;
     };
-    s('nme-hostname',      c.hostname || '');
-    s('nme-ssid',          c.ssid || c.wifiSSID || '');
-    s('nme-wifipass',      c.wifiPassword || c.wifiPass || c.wifi_password || '');
-    s('nme-p-url',         c.stratumURL || c.pool_url || c.poolURL || '');
-    s('nme-p-user',        c.stratumUser || c.walletAddress || c.pool_user || '');
-    s('nme-p-pass',        c.stratumPassword || c.pool_password || 'x');
-    s('nme-s-url',         c.fallbackStratumURL || c.backup_pool_url || c.secondaryPoolURL || '');
-    s('nme-s-user',        c.fallbackStratumUser || c.backup_pool_user || c.secondaryPoolUser || '');
-    s('nme-s-pass',        c.fallbackStratumPassword || c.backup_pool_password || 'x');
-    s('nme-timezone',      c.timezone ?? c.timeZone ?? 0);
-    sel('nme-timeformat',  c.timeFormat || c.time_format || '24h');
-    sel('nme-dateformat',  c.dateFormat || c.date_format || 'DD-MM-YYYY');
-    s('nme-uirefresh',     c.uiRefresh ?? c.ui_refresh ?? 2);
-    s('nme-screentimeout', c.screenTimeout ?? c.screen_timeout ?? 60);
-    s('nme-brightness',    c.brightness ?? 50);
-    sel('nme-savehistory', (c.saveHistory ?? c.save_history) ? 'yes' : 'no');
-    sel('nme-led',         (c.ledEnable ?? c.led_enable ?? true) ? 'yes' : 'no');
-    sel('nme-rotate',      String(c.rotateScreen ?? c.rotate_screen ?? 0));
-    sel('nme-autobright',  (c.autoBrightness ?? c.auto_brightness) ? 'yes' : 'no');
+    s('nme-hostname',      c.Hostname || c.hostname || '');
+    s('nme-ssid',          c.WiFiSSID || c.ssid || c.wifiSSID || '');
+    s('nme-wifipass',      c.WiFiPWD || c.wifiPassword || c.wifiPass || c.wifi_password || '');
+    s('nme-p-url',         c.PrimaryPool || c.stratumURL || c.pool_url || c.poolURL || '');
+    s('nme-p-user',        c.PrimaryAddress || c.stratumUser || c.walletAddress || c.pool_user || '');
+    s('nme-p-pass',        c.PrimaryPassword || c.stratumPassword || c.pool_password || 'x');
+    s('nme-s-url',         c.SecondaryPool || c.fallbackStratumURL || c.backup_pool_url || c.secondaryPoolURL || '');
+    s('nme-s-user',        c.SecondaryAddress || c.fallbackStratumUser || c.backup_pool_user || c.secondaryPoolUser || '');
+    s('nme-s-pass',        c.SecondaryPassword || c.fallbackStratumPassword || c.backup_pool_password || 'x');
+    s('nme-timezone',      c.Timezone ?? c.timezone ?? c.timeZone ?? 0);
+    const _tFmt = c.TimeFormat ?? c.timeFormat ?? c.time_format;
+    sel('nme-timeformat',  _tFmt === 24 || _tFmt === '24' ? '24h' : _tFmt === 12 || _tFmt === '12' ? '12h (AM/PM)' : String(_tFmt || '24h'));
+    sel('nme-dateformat',  c.DateFormat || c.dateFormat || c.date_format || 'DD-MM-YYYY');
+    s('nme-uirefresh',     c.UIRefresh ?? c.uiRefresh ?? c.ui_refresh ?? 2);
+    s('nme-screentimeout', c.ScreenTimeout ?? c.screenTimeout ?? c.screen_timeout ?? 60);
+    s('nme-brightness',    c.Brightness ?? c.brightness ?? 50);
+    sel('nme-savehistory', (c.SaveUptime ?? c.saveHistory ?? c.save_history) ? 'yes' : 'no');
+    sel('nme-led',         (c.LedEnable ?? c.ledEnable ?? c.led_enable ?? true) ? 'yes' : 'no');
+    sel('nme-rotate',      String(c.RotateScreen ?? c.rotateScreen ?? c.rotate_screen ?? 0));
+    sel('nme-autobright',  (c.AutoBrightness ?? c.autoBrightness ?? c.auto_brightness) ? 'yes' : 'no');
   }
 
   async function saveNmEdit() {
     const v = id => document.getElementById(id)?.value ?? '';
     const b = id => document.getElementById(id)?.value === 'yes';
     const n = id => parseInt(document.getElementById(id)?.value) || 0;
+    const _tfStr = v('nme-timeformat');
     const payload = {
-      ip:                     _nmEditIP,
-      hostname:               v('nme-hostname'),
-      ssid:                   v('nme-ssid'),
-      wifiPassword:           v('nme-wifipass'),
-      stratumURL:             v('nme-p-url'),
-      stratumUser:            v('nme-p-user'),
-      stratumPassword:        v('nme-p-pass'),
-      fallbackStratumURL:     v('nme-s-url'),
-      fallbackStratumUser:    v('nme-s-user'),
-      fallbackStratumPassword: v('nme-s-pass'),
-      timezone:               n('nme-timezone'),
-      timeFormat:             v('nme-timeformat'),
-      dateFormat:             v('nme-dateformat'),
-      uiRefresh:              n('nme-uirefresh') || 2,
-      screenTimeout:          n('nme-screentimeout'),
-      brightness:             n('nme-brightness'),
-      saveHistory:            b('nme-savehistory'),
-      ledEnable:              b('nme-led'),
-      rotateScreen:           n('nme-rotate'),
-      autoBrightness:         b('nme-autobright'),
+      ...(_nmEditRawConfig || {}),
+      ip:               _nmEditIP,
+      IP:               _nmEditIP,
+      Hostname:         v('nme-hostname'),
+      WiFiSSID:         v('nme-ssid'),
+      WiFiPWD:          v('nme-wifipass'),
+      PrimaryPool:      v('nme-p-url'),
+      PrimaryAddress:   v('nme-p-user'),
+      PrimaryPassword:  v('nme-p-pass'),
+      SecondaryPool:    v('nme-s-url'),
+      SecondaryAddress: v('nme-s-user'),
+      SecondaryPassword: v('nme-s-pass'),
+      Timezone:         n('nme-timezone'),
+      TimeFormat:       _tfStr.startsWith('12') ? 12 : 24,
+      DateFormat:       v('nme-dateformat'),
+      UIRefresh:        n('nme-uirefresh') || 2,
+      ScreenTimeout:    n('nme-screentimeout'),
+      Brightness:       n('nme-brightness'),
+      SaveUptime:       b('nme-savehistory') ? 1 : 0,
+      LedEnable:        b('nme-led') ? 1 : 0,
+      RotateScreen:     n('nme-rotate'),
+      AutoBrightness:   b('nme-autobright') ? 1 : 0,
     };
     try {
       await apiFetch('/api/nmminer/device-config', {
@@ -1690,6 +1696,7 @@
   function closeNmEdit() {
     document.getElementById('nmedit-overlay').classList.remove('open');
     _nmEditIP = null;
+    _nmEditRawConfig = null;
   }
 
   // ── AxeOS device config modal ─────────────────────────────────────────────
