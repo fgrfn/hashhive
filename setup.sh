@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# HashHive Setup-Skript für Linux / macOS
+# HashHive Setup script for Linux / macOS
 set -e
+
+# Use sudo only when not running as root
+if [ "$(id -u)" -eq 0 ]; then
+    APT="apt-get"
+    SUDO=""
+else
+    APT="sudo apt-get"
+    SUDO="sudo"
+fi
 
 echo ""
 echo "══════════════════════════════════"
@@ -12,40 +21,40 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 VENV_DIR="$SCRIPT_DIR/.venv"
 
-# ── Python prüfen ─────────────────────────────────────────────────────────────
+# ── Check Python ─────────────────────────────────────────────────────────────
 if ! command -v python3 &>/dev/null; then
-    echo "✗  Python3 nicht gefunden. Bitte Python 3.10+ installieren."
+    echo "✗  Python3 not found. Please install Python 3.10+."
     exit 1
 fi
 
 echo "✓  $(python3 --version)"
 
-# ── python3-venv sicherstellen ────────────────────────────────────────────────
+# ── Ensure python3-venv ──────────────────────────────────────────────────────
 if ! python3 -m ensurepip --version &>/dev/null; then
-    echo "python3-venv / ensurepip nicht gefunden – installiere via apt..."
-    sudo apt-get update -qq
-    sudo apt-get install -y "python3-venv" "python3.$(python3 -c 'import sys; print(sys.version_info.minor)')-venv" 2>/dev/null || \
-    sudo apt-get install -y python3-venv
+    echo "python3-venv not found – installing via apt..."
+    $APT update -qq
+    $APT install -y "python3-venv" "python3.$(python3 -c 'import sys; print(sys.version_info.minor)')-venv" 2>/dev/null || \
+    $APT install -y python3-venv
 fi
 
-# ── Virtualenv erstellen / wiederverwenden ────────────────────────────────────
+# ── Create / reuse virtualenv ────────────────────────────────────────────────
 if [ ! -d "$VENV_DIR" ]; then
-    echo "Erstelle virtualenv in .venv ..."
+    echo "Creating virtualenv in .venv ..."
     python3 -m venv "$VENV_DIR"
 fi
 PIP="$VENV_DIR/bin/pip"
 UVICORN="$VENV_DIR/bin/uvicorn"
 
-# ── Abhängigkeiten installieren ───────────────────────────────────────────────
+# ── Install dependencies ─────────────────────────────────────────────────────
 echo ""
-echo "Installiere Abhängigkeiten..."
+echo "Installing dependencies..."
 "$PIP" install --quiet --upgrade pip
 "$PIP" install --quiet -r "$BACKEND_DIR/requirements.txt"
-echo "✓  Abhängigkeiten installiert."
+echo "✓  Dependencies installed."
 
-# ── Autostart abfragen ────────────────────────────────────────────────────────
+# ── Autostart ────────────────────────────────────────────────────────────────
 echo ""
-read -rp "Autostart als systemd-Service aktivieren? [j/N] " answer
+read -rp "Enable autostart as systemd service? [y/N] " answer
 
 if [[ "$answer" =~ ^[jJyY] ]]; then
     USER_NAME="$(whoami)"
@@ -66,27 +75,28 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target"
 
-    echo "$SERVICE_CONTENT" | sudo tee "$SERVICE_FILE" > /dev/null
-    sudo systemctl daemon-reload
-    sudo systemctl enable hashhive
+    echo "$SERVICE_CONTENT" | $SUDO tee "$SERVICE_FILE" > /dev/null
+    SYSTEMCTL="$(command -v systemctl)"
+    $SUDO $SYSTEMCTL daemon-reload
+    $SUDO $SYSTEMCTL enable hashhive
 
-    echo "✓  systemd-Service 'hashhive' aktiviert (startet beim Booten)."
+    echo "✓  systemd service 'hashhive' enabled (starts on boot)."
 
-    read -rp "Jetzt starten? [j/N] " startNow
+    read -rp "Start now? [y/N] " startNow
     if [[ "$startNow" =~ ^[jJyY] ]]; then
-        sudo systemctl start hashhive
-        echo "✓  HashHive gestartet."
-        echo "   Status: sudo systemctl status hashhive"
-        echo "   Logs:   sudo journalctl -u hashhive -f"
+        $SUDO $SYSTEMCTL start hashhive
+        echo "✓  HashHive started."
+        echo "   Status: systemctl status hashhive"
+        echo "   Logs:   journalctl -u hashhive -f"
     fi
 else
-    echo "  Kein Autostart eingerichtet."
+    echo "  No autostart configured."
 fi
 
-# ── Fertig ────────────────────────────────────────────────────────────────────
+# ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " Manuell starten:"
+echo " Start manually:"
 echo "   cd backend"
 echo "   ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 echo ""
