@@ -167,6 +167,19 @@
     .modal-section-title{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
     .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
 
+    /* ── Group summary bar ── */
+    .group-summary{display:flex;align-items:center;gap:24px;padding:12px 0 16px;flex-wrap:wrap}
+    .sum-chip{display:flex;flex-direction:column;gap:1px}
+    .sum-chip-val{font-size:22px;font-weight:700;color:var(--accent);line-height:1.15}
+    .sum-chip-val.sum-ok{color:var(--success)}
+    .sum-chip-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
+
+    /* ── Log tabs ── */
+    .log-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:8px}
+    .log-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:5px 14px 7px;cursor:pointer;font-size:12px;font-weight:500;transition:.15s;margin-bottom:-1px;white-space:nowrap}
+    .log-tab:hover{color:var(--text)}
+    .log-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
     /* ── Misc ── */
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
@@ -253,9 +266,15 @@
       </div>
 
       <div class="card" style="margin-bottom:0">
-        <div class="section-header" style="margin-bottom:10px">
+        <div class="section-header" style="margin-bottom:6px">
           <div class="card-title mb-0">🖥 Live Log</div>
           <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">✕ Clear</button>
+        </div>
+        <div class="log-tabs">
+          <button class="log-tab active" id="ltab-all"     onclick="setLogTab('all')">All</button>
+          <button class="log-tab"        id="ltab-nmminer" onclick="setLogTab('nmminer')">NMMiner</button>
+          <button class="log-tab"        id="ltab-axeos"   onclick="setLogTab('axeos')">BitAxe / NerdAxe</button>
+          <button class="log-tab"        id="ltab-system"  onclick="setLogTab('system')">HashHive</button>
         </div>
         <div class="log-panel" id="live-log-panel">
           <div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">Waiting for data…</span></div>
@@ -267,9 +286,13 @@
     <div class="page" id="page-nmminer">
       <div class="card">
         <div class="card-title">NMMiner Devices</div>
+        <div id="nm-summary" class="group-summary" style="display:none">
+          <div class="sum-chip"><div class="sum-chip-val" id="nm-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
+          <div class="sum-chip"><div class="sum-chip-val sum-ok" id="nm-sum-online">–</div><div class="sum-chip-label">Online</div></div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
+            <thead><tr><th>IP</th><th>Hostname</th><th>Status</th><th>Hashrate</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="10" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -280,6 +303,10 @@
     <div class="page" id="page-axeos">
       <div class="card">
         <div class="card-title">BitAxe / NerdAxe Devices</div>
+        <div id="ax-summary" class="group-summary" style="display:none">
+          <div class="sum-chip"><div class="sum-chip-val" id="ax-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
+          <div class="sum-chip"><div class="sum-chip-val sum-ok" id="ax-sum-online">–</div><div class="sum-chip-label">Online</div></div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th>Temp (°C)</th><th>VR Temp</th><th>Power (W)</th><th>Voltage (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Fan RPM</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Actions</th></tr></thead>
@@ -576,7 +603,8 @@
   let currentConfig = {};
   let _offlineTracked = new Set();
   const _MAX_LOG = 60;
-  let _liveLog = [];
+  const _liveLogs = { all: [], nmminer: [], axeos: [], system: [] };
+  let _activeLogTab = 'all';
 
   const PAGE_TITLES = {
     dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
@@ -624,7 +652,7 @@
       lastDashboard = await apiFetch('/api/dashboard');
       currentConfig = lastDashboard.config || {};
       const _s = renderDashboard(lastDashboard);
-      appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`);
+      appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`, 'system');
       document.getElementById('last-update').textContent =
         'Updated: ' + new Date().toLocaleTimeString('en-US');
       const unread = lastDashboard.unread_alerts || 0;
@@ -635,7 +663,7 @@
       statBadge.textContent = unread;
       statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
     } catch (e) {
-      appendLog('critical', 'Load error: ' + e.message);
+      appendLog('critical', 'Load error: ' + e.message, 'system');
       toast('Load error: ' + e.message, 'error');
     }
   }
@@ -722,8 +750,8 @@
         if (online) { totalHr += hrMh / 1000; onlineCnt++; }  // MH/s → GH/s for total
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
-        if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline'); _offlineTracked.add(_nk); }
-        else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online'); _offlineTracked.delete(_nk); }
+        if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
+        else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online', 'nmminer'); _offlineTracked.delete(_nk); }
         return `<tr>
           <td>${d.name || d.ip || '–'}</td>
           <td>${fmtStatus(online)}</td>
@@ -747,8 +775,8 @@
         if (online) { totalHr += hr; onlineCnt++; }
         if (temp > maxTemp) maxTemp = temp;
         const _ak = 'ax_' + d._ip;
-        if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline'); _offlineTracked.add(_ak); }
-        else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online'); _offlineTracked.delete(_ak); }
+        if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); }
+        else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); }
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
@@ -790,18 +818,22 @@
 
   function renderNmRows(devs) {
     const tMax = currentConfig.thresholds?.temp_max || 70;
-    const tbody = document.getElementById('nm-rows');
+    const tbody   = document.getElementById('nm-rows');
+    const summary = document.getElementById('nm-summary');
     if (!devs || devs.length === 0) {
       tbody.innerHTML = '<tr><td colspan="10" class="empty text-muted">No data</td></tr>';
+      if (summary) summary.style.display = 'none';
       return;
     }
+    let totalMh = 0, onlineCnt = 0;
     tbody.innerHTML = devs.map(d => {
       const online = d.online !== false;
       const hr = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
       const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
+      if (online) { totalMh += hr; onlineCnt++; }
       return `<tr>
         <td>${d.ip || '–'}</td>
-        <td>${d.name || '–'}</td>
+        <td>${d.hostname || d.name || '–'}</td>
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
         <td>${fmtTemp(temp, tMax)}</td>
@@ -812,6 +844,11 @@
         <td><button class="btn btn-secondary btn-sm" onclick="openNmEdit('${d.ip}')">✏ Edit</button></td>
       </tr>`;
     }).join('');
+    if (summary) {
+      document.getElementById('nm-sum-hr').textContent      = fmtNmHr(totalMh);
+      document.getElementById('nm-sum-online').textContent  = `${onlineCnt} / ${devs.length}`;
+      summary.style.display = 'flex';
+    }
   }
 
   // ── AxeOS detail page ──────────────────────────────────────────────────────
@@ -828,15 +865,19 @@
   }
 
   function renderAxRows(devs) {
-    const tMax = currentConfig.thresholds?.temp_max || 70;
-    const tbody = document.getElementById('ax-rows');
+    const tMax    = currentConfig.thresholds?.temp_max || 70;
+    const tbody   = document.getElementById('ax-rows');
+    const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
       tbody.innerHTML = '<tr><td colspan="18" class="empty text-muted">No devices configured</td></tr>';
+      if (summary) summary.style.display = 'none';
       return;
     }
+    let totalGh = 0, onlineCnt = 0;
     tbody.innerHTML = devs.map(d => {
       const online = d._online !== false;
       const hr = parseFloat(d.hashRate || 0);
+      if (online) { totalGh += hr; onlineCnt++; }
       const hr1m = parseFloat(d.hashRate_1m || 0);
       const expHr = parseFloat(d.expectedHashrate || 0);
       const errPct = d.errorPercentage != null ? parseFloat(d.errorPercentage).toFixed(2) + '%' : '–';
@@ -880,6 +921,11 @@
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('');
+    if (summary) {
+      document.getElementById('ax-sum-hr').textContent     = fmtHr(totalGh);
+      document.getElementById('ax-sum-online').textContent = `${onlineCnt} / ${devs.length}`;
+      summary.style.display = 'flex';
+    }
   }
 
   async function restartDevice(ip) {
@@ -1343,27 +1389,40 @@
 
   // ── Live log ────────────────────────────────────────────────────────────────
 
-  function appendLog(severity, message) {
-    _liveLog.unshift({ ts: new Date().toLocaleTimeString('en-US'), severity, message });
-    if (_liveLog.length > _MAX_LOG) _liveLog.length = _MAX_LOG;
+  function appendLog(severity, message, source = 'system') {
+    const entry = { ts: new Date().toLocaleTimeString('en-US'), severity, message };
+    _liveLogs.all.unshift(entry);
+    if (_liveLogs.all.length > _MAX_LOG) _liveLogs.all.length = _MAX_LOG;
+    const bucket = _liveLogs[source] || _liveLogs.system;
+    bucket.unshift(entry);
+    if (bucket.length > _MAX_LOG) bucket.length = _MAX_LOG;
+    _renderLiveLog();
+  }
+
+  function setLogTab(tab) {
+    _activeLogTab = tab;
+    document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+    const btn = document.getElementById('ltab-' + tab);
+    if (btn) btn.classList.add('active');
     _renderLiveLog();
   }
 
   function _renderLiveLog() {
     const panel = document.getElementById('live-log-panel');
     if (!panel) return;
-    if (_liveLog.length === 0) {
+    const entries = _liveLogs[_activeLogTab] || [];
+    if (entries.length === 0) {
       panel.innerHTML = '<div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">No entries yet</span></div>';
       return;
     }
-    panel.innerHTML = _liveLog.map(e => {
+    panel.innerHTML = entries.map(e => {
       const cls = e.severity === 'critical' ? 'log-critical' : e.severity === 'warning' ? 'log-warning' : e.severity === 'ok' ? 'log-ok' : 'log-info';
       return `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${cls}">${e.message}</span></div>`;
     }).join('');
   }
 
   function clearLiveLog() {
-    _liveLog = [];
+    Object.keys(_liveLogs).forEach(k => _liveLogs[k] = []);
     _renderLiveLog();
   }
 
@@ -1375,11 +1434,15 @@
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, 20)
         .map(a => ({
-          ts: new Date(a.timestamp).toLocaleTimeString('en-US'),
+          ts:       new Date(a.timestamp).toLocaleTimeString('en-US'),
           severity: a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'info',
-          message: a.message,
+          message:  a.message,
+          source:   a.device?.startsWith('nmminer:') ? 'nmminer' : a.device?.startsWith('axeos:') ? 'axeos' : 'system',
         }));
-      _liveLog = [..._liveLog, ...history].slice(0, _MAX_LOG);
+      history.forEach(e => {
+        _liveLogs.all.push(e);
+        (_liveLogs[e.source] || _liveLogs.system).push(e);
+      });
       _renderLiveLog();
     } catch (_) {}
   }
