@@ -470,7 +470,6 @@ async def _fetch_nmminer_safe(
     # Fallback: query each known device individually
     if nm_devices:
         all_devs: list = []
-        errors: list = []
 
         async def _fetch_one(ip: str):
             try:
@@ -479,9 +478,8 @@ async def _fetch_nmminer_safe(
                 data = r.json()
                 devs = data if isinstance(data, list) else data.get("devices", [data])
                 all_devs.extend(devs if isinstance(devs, list) else [devs])
-            except Exception as exc:
+            except Exception:
                 all_devs.append({"ip": ip, "online": False})
-                errors.append(str(exc))
 
         await asyncio.gather(*[_fetch_one(d["ip"]) for d in nm_devices if d.get("ip")])
         return {"devices": all_devs}

@@ -971,10 +971,11 @@
     const nmBody = document.getElementById('dash-nm-rows');
     if (nmDevs.length === 0) {
       const hasMaster = currentConfig.nmminer_master;
+      const hasNmDevices = (currentConfig.nmminer_devices || []).length > 0;
       const hasErr = data.nmminer?._error;
-      let msg = 'No NMMiner configured – set Master IP in Settings';
-      if (hasMaster && hasErr) msg = `NMMiner unreachable: ${data.nmminer._error}`;
-      else if (hasMaster) msg = 'NMMiner master configured but returned no devices';
+      let msg = 'No NMMiner configured – use „Auto Scan Network“ in Settings';
+      if ((hasMaster || hasNmDevices) && hasErr) msg = `NMMiner unreachable: ${data.nmminer._error}`;
+      else if (hasMaster || hasNmDevices) msg = 'NMMiner configured but returned no devices';
       nmBody.innerHTML = `<tr><td colspan="7" class="empty text-muted">${msg}</td></tr>`;
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
