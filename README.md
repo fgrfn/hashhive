@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" width="100" alt="HashHive">
-
-# HashHive
+<img src="assets/logo.png" width="500" alt="HashHive">
 
 **Unified mining dashboard for NMMiner, BitAxe and NerdAxe**
 
