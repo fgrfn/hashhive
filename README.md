@@ -1,25 +1,6 @@
 <div align="center">
 
-<svg width="72" height="84" viewBox="0 0 38 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="hxGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fbbf24"/>
-      <stop offset="100%" stop-color="#d97706"/>
-    </linearGradient>
-  </defs>
-  <path d="M19 1 L37 11 L37 33 L19 43 L1 33 L1 11 Z" fill="url(#hxGrad)" stroke="#92400e" stroke-width="1"/>
-  <ellipse cx="19" cy="26" rx="5.5" ry="7.5" fill="#1a1a10" stroke="#92400e" stroke-width=".8"/>
-  <rect x="13.5" y="24" width="11" height="2" rx="1" fill="#fbbf24"/>
-  <rect x="13.5" y="27.5" width="11" height="2" rx="1" fill="#fbbf24"/>
-  <circle cx="19" cy="18" r="4" fill="#1a1a10"/>
-  <line x1="17" y1="14.5" x2="14" y2="11" stroke="#1a1a10" stroke-width="1.2" stroke-linecap="round"/>
-  <circle cx="13.5" cy="10.5" r="1" fill="#1a1a10"/>
-  <line x1="21" y1="14.5" x2="24" y2="11" stroke="#1a1a10" stroke-width="1.2" stroke-linecap="round"/>
-  <circle cx="24.5" cy="10.5" r="1" fill="#1a1a10"/>
-  <ellipse cx="12" cy="22" rx="5.5" ry="3" fill="rgba(255,255,255,0.55)" transform="rotate(-20 12 22)"/>
-  <ellipse cx="26" cy="22" rx="5.5" ry="3" fill="rgba(255,255,255,0.55)" transform="rotate(20 26 22)"/>
-  <text x="19" y="30" text-anchor="middle" font-size="5.5" font-weight="900" fill="#fbbf24" font-family="monospace">#</text>
-</svg>
+<img src="assets/logo.png" width="100" alt="HashHive">
 
 # HashHive
 
