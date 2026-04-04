@@ -299,8 +299,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>IP</th><th>Hostname</th><th>Status</th><th>Hashrate</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
-            <tbody id="nm-rows"><tr><td colspan="10" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>IP</th><th>Hostname</th><th>Board</th><th>Status</th><th>Hashrate</th><th>Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th>BestDiff</th><th>Hits</th><th>Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th>Actions</th></tr></thead>
+            <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -316,8 +316,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th>Temp (°C)</th><th>VR Temp</th><th>Power (W)</th><th>Voltage (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Fan RPM</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="18" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th>Temp</th><th>VR Temp</th><th>Power</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Shares OK</th><th>Shares Err</th><th>Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="21" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -849,17 +849,17 @@
 
   async function loadNmPage() {
     const tbody = document.getElementById('nm-rows');
-    tbody.innerHTML = '<tr><td colspan="10" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="19" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/nmminer/swarm');
       const devs = Array.isArray(data) ? data : (data.devices || []);
       if (devs.length === 0 && data._error) {
-        tbody.innerHTML = `<tr><td colspan="10" class="empty" style="color:var(--danger)">NMMiner unreachable: ${data._error}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">NMMiner unreachable: ${data._error}</td></tr>`;
         return;
       }
       renderNmRows(devs);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="10" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
     }
   }
 
@@ -868,7 +868,7 @@
     const tbody   = document.getElementById('nm-rows');
     const summary = document.getElementById('nm-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="empty text-muted">No data</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="19" class="empty text-muted">No data</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -876,18 +876,28 @@
     tbody.innerHTML = devs.map(d => {
       const online = d.online !== false;
       const hr = nmHrToKh(d);
-      const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
+      // NMMiner returns temp as string like "45.6°C" – strip unit
+      const tempRaw = parseFloat(String(d.temp || d.temperature || d.chipTemp || '0'));
       if (online) { totalMh += hr; onlineCnt++; }
       return `<tr>
         <td>${d.ip || '–'}</td>
         <td>${d.hostname || d.name || '–'}</td>
+        <td><small class="text-muted">${d.boardtype || d.boardType || d.board || '–'}</small></td>
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
-        <td>${fmtTemp(temp, tMax)}</td>
-        <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
-        <td>${d.worker || d.stratumUser || d.user || '–'}</td>
-        <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
-        <td>${d.bestShare || d.best_share || d.bestDiff || '–'}</td>
+        <td><small>${d.share || d.shares || '–'}</small></td>
+        <td class="max-w"><small>${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</small></td>
+        <td><small class="text-muted">${d.netDiff || '–'}</small></td>
+        <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
+        <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
+        <td><small>${d.bestDiff || d.best_share || d.bestShare || '–'}</small></td>
+        <td>${d.valid ?? d.hits ?? '–'}</td>
+        <td>${fmtTemp(tempRaw, tMax)}</td>
+        <td><small class="text-muted">${d.rssi || '–'}</small></td>
+        <td><small class="text-muted">${d.memory || '–'}</small></td>
+        <td><small>${fmtUptime(d.uptime || d.uptimeSeconds)}</small></td>
+        <td><small class="text-muted">${d.version || '–'}</small></td>
+        <td><small class="text-muted">${d.lastconn || d.lastseen || '–'}</small></td>
         <td><button class="btn btn-secondary btn-sm" onclick="openNmEdit('${d.ip}')">✏ Edit</button></td>
       </tr>`;
     }).join('');
@@ -902,12 +912,12 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="21" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="12" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="21" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
     }
   }
 
@@ -964,6 +974,9 @@
         <td>${fanRpm}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
+        <td><small>${d.bestDiff ?? '–'}</small></td>
+        <td><small class="text-muted">${d.bestSessionDiff ?? '–'}</small></td>
+        <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
         <td class="max-w">${d.stratumURL || '–'}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
@@ -1411,9 +1424,7 @@
     form.style.display = 'none';
     overlay.classList.add('open');
     try {
-      const resp = await fetch(`http://${ip}/api/system/info`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const cfg = await resp.json();
+      const cfg = await apiFetch(`/api/axeos/info/${ip}`);
       _fillAxForm(cfg);
       loading.style.display = 'none';
       form.style.display = 'block';
@@ -1474,12 +1485,11 @@
     const tgt   = n('axe-temptarget'); if (tgt  != null) payload.temptarget  = tgt;
 
     try {
-      const resp = await fetch(`http://${_axEditIP}/api/system`, {
+      const result = await apiFetch(`/api/axeos/config/${_axEditIP}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       toast(`Config saved for ${_axEditIP}`, 'success');
       closeAxEdit();
       loadAxPage();

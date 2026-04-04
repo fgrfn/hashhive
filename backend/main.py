@@ -226,6 +226,14 @@ async def patch_axeos_config_all(data: dict):
     return {"results": results}
 
 
+@app.get("/api/axeos/info/{ip}")
+async def get_axeos_info(ip: str):
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(f"http://{ip}/api/system/info")
+        resp.raise_for_status()
+        return resp.json()
+
+
 @app.patch("/api/axeos/config/{ip}")
 async def patch_axeos_config_one(ip: str, data: dict):
     async with httpx.AsyncClient(timeout=15) as client:
