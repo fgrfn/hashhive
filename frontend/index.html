@@ -236,6 +236,7 @@
     <h1 id="page-title">Dashboard</h1>
     <div class="topbar-right">
       <span id="last-update" class="text-muted" style="font-size:12px"></span>
+      <span id="refresh-countdown" class="text-muted" style="font-size:12px;display:none">↻ in <span id="refresh-secs">–</span>s</span>
       <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
     </div>
   </div>
@@ -265,14 +266,19 @@
           <div class="stat-value" id="stat-alerts" style="color:var(--warning)">–</div>
           <div class="stat-unit">unread</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Power</div>
+          <div class="stat-value" id="stat-power">–</div>
+          <div class="stat-unit">W</div>
+        </div>
       </div>
 
       <div class="card card-nm">
         <div class="card-title">NMMiner</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Uptime</th></tr></thead>
-            <tbody id="dash-nm-rows"><tr><td colspan="6" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares</th><th>Pool</th><th>Uptime</th></tr></thead>
+            <tbody id="dash-nm-rows"><tr><td colspan="7" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -281,8 +287,8 @@
         <div class="card-title">BitAxe / NerdAxe</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares OK</th><th>Pool</th></tr></thead>
-            <tbody id="dash-ax-rows"><tr><td colspan="6" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp</th><th>Power</th><th>Eff.</th><th>Shares OK</th><th>Pool</th></tr></thead>
+            <tbody id="dash-ax-rows"><tr><td colspan="8" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -331,8 +337,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="23" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="24" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -704,21 +710,40 @@
       badge.style.display = unread > 0 ? '' : 'none';
       statBadge.textContent = unread;
       statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
+      // reset countdown after each successful load
+      const secsEl = document.getElementById('refresh-secs');
+      if (secsEl) secsEl.textContent = currentConfig.refresh_interval || 30;
     } catch (e) {
       appendLog('critical', 'Load error: ' + e.message, 'system');
       toast('Load error: ' + e.message, 'error');
     }
   }
 
+  let _countdownTimer = null;
+
   function startAutoRefresh() {
     loadDashboard();
     stopAutoRefresh();
     const interval = (currentConfig.refresh_interval || 30) * 1000;
     refreshTimer = setInterval(loadDashboard, interval);
+    // countdown indicator
+    const cdEl = document.getElementById('refresh-countdown');
+    const secsEl = document.getElementById('refresh-secs');
+    if (cdEl) cdEl.style.display = '';
+    let remaining = Math.round(interval / 1000);
+    if (secsEl) secsEl.textContent = remaining;
+    _countdownTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) remaining = Math.round(interval / 1000);
+      if (secsEl) secsEl.textContent = remaining;
+    }, 1000);
   }
 
   function stopAutoRefresh() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+    const cdEl = document.getElementById('refresh-countdown');
+    if (cdEl) cdEl.style.display = 'none';
   }
 
   function refreshCurrent() {
@@ -807,7 +832,7 @@
     const nmDevs = Array.isArray(data.nmminer) ? data.nmminer : (data.nmminer?.devices || []);
     const axDevs = data.axeos?.devices || [];
 
-    let totalHr = 0, onlineCnt = 0, maxTemp = 0;
+    let totalHr = 0, onlineCnt = 0, maxTemp = 0, totalPower = 0;
 
     // NMMiner rows
     const nmBody = document.getElementById('dash-nm-rows');
@@ -817,7 +842,7 @@
       let msg = 'No NMMiner configured – set Master IP in Settings';
       if (hasMaster && hasErr) msg = `NMMiner unreachable: ${data.nmminer._error}`;
       else if (hasMaster) msg = 'NMMiner master configured but returned no devices';
-      nmBody.innerHTML = `<tr><td colspan="6" class="empty text-muted">${msg}</td></tr>`;
+      nmBody.innerHTML = `<tr><td colspan="7" class="empty text-muted">${msg}</td></tr>`;
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
         const online = d.online !== false;
@@ -828,11 +853,16 @@
         const _nk = 'nm_' + d.ip;
         if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
         else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online', 'nmminer'); _offlineTracked.delete(_nk); }
+        const shareStr = d.share || d.shares || '';
+        const sharePct = (() => { const m = String(shareStr).match(/(\d+(?:\.\d+))%/); return m ? parseFloat(m[1]) : null; })();
+        const shareMin = currentConfig?.thresholds?.share_rate_min || 80;
+        const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
         return `<tr>
           <td>${d.hostname || d.name || d.ip || '–'}<br><small class="text-muted">${d.ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
           <td>${fmtNmHr(hrKh)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
+          <td><small style="${shareColor}">${shareStr || '–'}</small></td>
           <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
           <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
         </tr>`;
@@ -842,22 +872,26 @@
     // AxeOS rows
     const axBody = document.getElementById('dash-ax-rows');
     if (axDevs.length === 0) {
-      axBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">No AxeOS devices configured</td></tr>';
+      axBody.innerHTML = '<tr><td colspan="8" class="empty text-muted">No AxeOS devices configured</td></tr>';
     } else {
       axBody.innerHTML = axDevs.map(d => {
         const online = d._online !== false;
         const hr = parseFloat(d.hashRate || 0);
         const temp = parseFloat(d.temp || 0);
-        if (online) { totalHr += hr; onlineCnt++; }
+        const pw = d.power != null ? parseFloat(d.power) : null;
+        if (online) { totalHr += hr; onlineCnt++; if (pw != null) totalPower += pw; }
         if (temp > maxTemp) maxTemp = temp;
         const _ak = 'ax_' + d._ip;
         if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); }
         else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); }
+        const effVal = pw != null && hr > 0 ? (pw / (hr / 1000)).toFixed(1) : null;
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
-          <td>${fmtHr(hr)}</td>
+          <td>${hr > 0 ? hr.toFixed(2) : '–'}</td>
           <td>${fmtTemp(temp, tMax)}</td>
+          <td>${pw != null ? pw.toFixed(1) + ' W' : '–'}</td>
+          <td>${effVal != null ? effVal + ' J/TH' : '–'}</td>
           <td>${d.sharesAccepted ?? '–'}</td>
           <td class="max-w">${d.stratumURL ? d.stratumURL + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
         </tr>`;
@@ -881,6 +915,11 @@
       : maxTemp >= tMax ? 'var(--danger)'
       : maxTemp >= tMax * 0.9 ? 'var(--warning)'
       : 'var(--success)';
+    const powerEl = document.getElementById('stat-power');
+    if (powerEl) {
+      powerEl.textContent = totalPower > 0 ? totalPower.toFixed(1) : '–';
+      powerEl.style.color = 'var(--accent)';
+    }
     return { totalHr, onlineCnt, total };
   }
 
@@ -955,12 +994,12 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="21" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="24" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="21" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="24" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
     }
   }
 
@@ -969,7 +1008,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="23" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="24" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -983,7 +1022,10 @@
       const errPct = d.errorPercentage != null ? parseFloat(d.errorPercentage).toFixed(2) + '%' : '–';
       const temp = parseFloat(d.temp || 0);
       const vrTemp = d.vrTemp != null ? parseFloat(d.vrTemp).toFixed(1) + '°C' : '–';
-      const power = d.power != null ? parseFloat(d.power).toFixed(1) + ' W' : '–';
+      const powerW = d.power != null ? parseFloat(d.power) : null;
+      const power = powerW != null ? powerW.toFixed(1) + ' W' : '–';
+      const effVal = powerW != null && hr > 0 ? (powerW / (hr / 1000)).toFixed(1) : null;
+      const eff = effVal != null ? effVal + ' J/TH' : '–';
       const freq = d.actualFrequency ?? d.frequency ?? d.freqMHz ?? '–';
       const fanRpm = d.fanrpm ?? '–';
       const paused = d.miningPaused;
@@ -1013,6 +1055,7 @@
         <td>${fmtTemp(temp, tMax)}</td>
         <td>${vrTemp}</td>
         <td>${power}</td>
+        <td>${eff}</td>
         <td>${d.voltage ?? '–'}</td>
         <td>${freq}</td>
         <td>${d.fanspeed ?? '–'}</td>
