@@ -787,7 +787,15 @@
 
   function fmtUptime(s) {
     if (!s && s !== 0) return '–';
-    if (typeof s === 'string') return s;  // already formatted by device
+    if (typeof s === 'string') {
+      const part = s.split('/')[0].trim(); // NMMiner: "001d 17:15:55/156d 13:16:00" → take current part
+      const m1 = part.match(/^(\d+)d\s+(\d+):(\d+)/); // "001d 17:15:55"
+      if (m1) {
+        const d = parseInt(m1[1]), h = parseInt(m1[2]), m = parseInt(m1[3]);
+        return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
+      }
+      return part; // "1d 14h" or other pre-formatted strings
+    }
     const n = parseInt(s, 10);
     if (!n && n !== 0) return '–';
     const h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60);
