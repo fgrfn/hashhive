@@ -491,6 +491,80 @@
   </div>
 </div>
 
+<!-- ════════════ AXEOS DEVICE CONFIG MODAL ════════════ -->
+<div class="modal-overlay" id="axedit-overlay" onclick="if(event.target===this)closeAxEdit()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        ⚙ Device Configuration
+        <small id="axedit-ip-title"></small>
+      </div>
+      <button class="modal-close" onclick="closeAxEdit()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="axedit-loading" class="empty text-muted" style="padding:24px">Loading…</div>
+      <div id="axedit-form" style="display:none">
+
+        <div class="modal-section">
+          <div class="modal-section-title">📡 Network</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Hostname</label><input type="text" id="axe-hostname" placeholder="bitaxe"></div>
+            <div class="form-group"><label>WiFi SSID</label><input type="text" id="axe-ssid" placeholder="MyWiFi"></div>
+          </div>
+          <div class="form-group" style="max-width:340px"><label>WiFi Password</label><input type="password" id="axe-wifipass" placeholder="••••••••"></div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🔵 Primary Pool</div>
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1"><label>Pool URL</label><input type="text" id="axe-p-url" placeholder="stratum+tcp://pool.example.com"></div>
+            <div class="form-group"><label>Port</label><input type="number" id="axe-p-port" placeholder="3333" min="1" max="65535"></div>
+            <div class="form-group"><label>Worker</label><input type="text" id="axe-p-user" placeholder="wallet.worker"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="axe-p-pass" placeholder="x"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🟣 Fallback Pool</div>
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1"><label>Pool URL</label><input type="text" id="axe-s-url" placeholder="stratum+tcp://backup.example.com"></div>
+            <div class="form-group"><label>Port</label><input type="number" id="axe-s-port" placeholder="3333" min="1" max="65535"></div>
+            <div class="form-group"><label>Worker</label><input type="text" id="axe-s-user" placeholder="wallet.worker"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="axe-s-pass" placeholder="x"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">⚡ Performance</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Frequency (MHz)</label><input type="number" id="axe-freq" min="100" max="900" step="1"></div>
+            <div class="form-group"><label>Core Voltage (mV)</label><input type="number" id="axe-voltage" min="1000" max="1400" step="10"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🌡 Fan &amp; Temperature</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Fan Control</label>
+              <select id="axe-autofan">
+                <option value="1">Auto</option>
+                <option value="0">Manual</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Fan Speed % (manual)</label><input type="number" id="axe-fanspeed" min="0" max="100"></div>
+            <div class="form-group"><label>Target Temp °C (auto)</label><input type="number" id="axe-temptarget" min="30" max="90"></div>
+          </div>
+        </div>
+
+      </div><!-- /axedit-form -->
+    </div><!-- /modal-body -->
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAxEdit()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAxEdit()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <script>
@@ -775,13 +849,16 @@
       const statusCell = online
         ? (paused ? '<span class="dot-offline">Paused</span>' : '<span class="dot-online">Online</span>')
         : '<span class="dot-offline">Offline</span>';
-      const actions = online ? [
-        paused
-          ? `<button class="btn btn-secondary btn-sm" onclick="resumeDevice('${d._ip}')">▶ Resume</button>`
-          : `<button class="btn btn-secondary btn-sm" onclick="pauseDevice('${d._ip}')">⏸ Pause</button>`,
-        `<button class="btn btn-secondary btn-sm" onclick="restartDevice('${d._ip}')">↺ Restart</button>`,
-        `<button class="btn btn-secondary btn-sm" onclick="identifyDevice('${d._ip}')">💡 ID</button>`,
-      ].join(' ') : '';
+      const actions = [
+        `<button class="btn btn-secondary btn-sm" onclick="openAxEdit('${d._ip}','${(d._name||d._ip).replace(/'/g,'')}')">✏ Edit</button>`,
+        ...(online ? [
+          paused
+            ? `<button class="btn btn-secondary btn-sm" onclick="resumeDevice('${d._ip}')">▶ Resume</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="pauseDevice('${d._ip}')">⏸ Pause</button>`,
+          `<button class="btn btn-secondary btn-sm" onclick="restartDevice('${d._ip}')">↺ Restart</button>`,
+          `<button class="btn btn-secondary btn-sm" onclick="identifyDevice('${d._ip}')">💡 ID</button>`,
+        ] : []),
+      ].join(' ');
       return `<tr>
         <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
         <td>${d._type || '–'}</td>
@@ -1153,6 +1230,104 @@
   function closeNmEdit() {
     document.getElementById('nmedit-overlay').classList.remove('open');
     _nmEditIP = null;
+  }
+
+  // ── AxeOS device config modal ─────────────────────────────────────────────
+
+  let _axEditIP = null;
+
+  async function openAxEdit(ip, name) {
+    _axEditIP = ip;
+    const overlay  = document.getElementById('axedit-overlay');
+    const loading  = document.getElementById('axedit-loading');
+    const form     = document.getElementById('axedit-form');
+    document.getElementById('axedit-ip-title').textContent = name ? `${name} (${ip})` : ip;
+    loading.style.color = 'var(--text-muted)';
+    loading.textContent = 'Loading…';
+    loading.style.display = 'block';
+    form.style.display = 'none';
+    overlay.classList.add('open');
+    try {
+      const resp = await fetch(`http://${ip}/api/system/info`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const cfg = await resp.json();
+      _fillAxForm(cfg);
+      loading.style.display = 'none';
+      form.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error loading config: ' + e.message;
+      loading.style.color = 'var(--danger)';
+    }
+  }
+
+  function _fillAxForm(c) {
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    const sel = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const opt = [...el.options].find(o => String(o.value) === String(v));
+      if (opt) el.value = opt.value;
+    };
+    s('axe-hostname',   c.hostname   || '');
+    s('axe-ssid',       c.ssid       || '');
+    s('axe-wifipass',   '');                   // never pre-fill password
+    s('axe-p-url',      c.stratumURL  || '');
+    s('axe-p-port',     c.stratumPort  ?? '');
+    s('axe-p-user',     c.stratumUser  || '');
+    s('axe-p-pass',     c.stratumPassword || '');
+    s('axe-s-url',      c.fallbackStratumURL  || '');
+    s('axe-s-port',     c.fallbackStratumPort  ?? '');
+    s('axe-s-user',     c.fallbackStratumUser  || '');
+    s('axe-s-pass',     c.fallbackStratumPassword || '');
+    s('axe-freq',       c.frequency   ?? '');
+    s('axe-voltage',    c.coreVoltage ?? '');
+    sel('axe-autofan',  c.autofanspeed ?? 1);
+    s('axe-fanspeed',   c.fanspeed    ?? '');
+    s('axe-temptarget', c.temptarget  ?? '');
+  }
+
+  async function saveAxEdit() {
+    const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const n = id => { const val = document.getElementById(id)?.value; return val !== '' && val != null ? Number(val) : undefined; };
+
+    const payload = {};
+    const addIf = (key, val) => { if (val !== '' && val != null) payload[key] = val; };
+
+    addIf('hostname',               v('axe-hostname'));
+    addIf('ssid',                   v('axe-ssid'));
+    if (v('axe-wifipass')) payload.wifiPass = v('axe-wifipass');
+    addIf('stratumURL',             v('axe-p-url'));
+    const pPort = n('axe-p-port');  if (pPort != null) payload.stratumPort = pPort;
+    addIf('stratumUser',            v('axe-p-user'));
+    addIf('stratumPassword',        v('axe-p-pass'));
+    addIf('fallbackStratumURL',     v('axe-s-url'));
+    const sPort = n('axe-s-port');  if (sPort != null) payload.fallbackStratumPort = sPort;
+    addIf('fallbackStratumUser',    v('axe-s-user'));
+    addIf('fallbackStratumPassword',v('axe-s-pass'));
+    const freq  = n('axe-freq');    if (freq  != null) payload.frequency    = freq;
+    const volts = n('axe-voltage'); if (volts != null) payload.coreVoltage  = volts;
+    payload.autofanspeed = parseInt(document.getElementById('axe-autofan').value);
+    const fan   = n('axe-fanspeed');    if (fan  != null) payload.fanspeed    = fan;
+    const tgt   = n('axe-temptarget'); if (tgt  != null) payload.temptarget  = tgt;
+
+    try {
+      const resp = await fetch(`http://${_axEditIP}/api/system`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      toast(`Config saved for ${_axEditIP}`, 'success');
+      closeAxEdit();
+      loadAxPage();
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  function closeAxEdit() {
+    document.getElementById('axedit-overlay').classList.remove('open');
+    _axEditIP = null;
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────
