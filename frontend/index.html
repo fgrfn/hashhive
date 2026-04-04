@@ -356,8 +356,8 @@
         <div class="card-title">BitAxe / NerdAxe</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp</th><th>Power</th><th>Eff.</th><th>Shares OK</th><th>Pool</th></tr></thead>
-            <tbody id="dash-ax-rows"><tr><td colspan="8" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Power</th><th>Eff.</th><th>Shares</th><th>Pool</th><th>Uptime</th></tr></thead>
+            <tbody id="dash-ax-rows"><tr><td colspan="9" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1120,7 +1120,7 @@
     // AxeOS rows
     const axBody = document.getElementById('dash-ax-rows');
     if (axDevs.length === 0) {
-      axBody.innerHTML = '<tr><td colspan="8" class="empty text-muted">No AxeOS devices configured</td></tr>';
+      axBody.innerHTML = '<tr><td colspan="9" class="empty text-muted">No AxeOS devices configured</td></tr>';
     } else {
       axBody.innerHTML = axDevs.map(d => {
         const online = d._online !== false;
@@ -1133,15 +1133,19 @@
         if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); _saveTracked(); }
         else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); _saveTracked(); }
         const effVal = pw != null && hr > 0 ? (pw / (hr / 1000)).toFixed(1) : null;
+        const acc = d.sharesAccepted ?? '–';
+        const rej = d.sharesRejected;
+        const sharesStr = rej != null && rej > 0 ? `${acc} / <span style="color:var(--danger)">${rej} err</span>` : String(acc);
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
-          <td>${hr > 0 ? hr.toFixed(2) : '–'}</td>
+          <td>${hr > 0 ? fmtHr(hr) : '–'}</td>
           <td>${fmtTemp(temp, tMax)}</td>
           <td>${pw != null ? pw.toFixed(1) + ' W' : '–'}</td>
           <td>${effVal != null ? effVal + ' J/TH' : '–'}</td>
-          <td>${d.sharesAccepted ?? '–'}</td>
+          <td><small>${sharesStr}</small></td>
           <td class="max-w">${d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
+          <td>${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</td>
         </tr>`;
       }).join('');
     }
