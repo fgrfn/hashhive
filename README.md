@@ -1,5 +1,7 @@
 <div align="center">
-<img src="assets/logo.png" width="500" alt="HashHive">
+
+<img src="assets/logo.png" width="" alt="HashHive">
+
 **Unified mining dashboard for NMMiner, BitAxe and NerdAxe**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
