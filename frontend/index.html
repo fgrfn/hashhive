@@ -269,7 +269,7 @@
         <div class="card-title">NMMiner Devices</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
+            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="10" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -593,6 +593,15 @@
     return n.toFixed(2) + ' GH/s';
   }
 
+  // NMMiner hashrate values are in MH/s (ESP32 devices)
+  function fmtNmHr(v) {
+    const n = parseFloat(v);
+    if (!n && n !== 0) return '–';
+    if (n >= 1000) return (n / 1000).toFixed(3) + ' GH/s';
+    if (n < 1)     return (n * 1000).toFixed(2) + ' KH/s';
+    return n.toFixed(3) + ' MH/s';
+  }
+
   function fmtTemp(v, max) {
     const n = parseFloat(v);
     if (!n) return '–';
@@ -634,9 +643,9 @@
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
         const online = d.online !== false;
-        const hr = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
+        const hrMh = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
         const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
-        if (online) { totalHr += hr; onlineCnt++; }
+        if (online) { totalHr += hrMh / 1000; onlineCnt++; }  // MH/s → GH/s for total
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
         if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline'); _offlineTracked.add(_nk); }
@@ -644,7 +653,7 @@
         return `<tr>
           <td>${d.name || d.ip || '–'}</td>
           <td>${fmtStatus(online)}</td>
-          <td>${fmtHr(hr)}</td>
+          <td>${fmtNmHr(hrMh)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
           <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
           <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
@@ -720,7 +729,7 @@
         <td>${d.ip || '–'}</td>
         <td>${d.name || '–'}</td>
         <td>${fmtStatus(online)}</td>
-        <td>${hr.toFixed(2)}</td>
+        <td>${fmtNmHr(hr)}</td>
         <td>${fmtTemp(temp, tMax)}</td>
         <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
         <td>${d.worker || d.stratumUser || d.user || '–'}</td>
