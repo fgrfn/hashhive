@@ -154,7 +154,17 @@ async def get_nmminer_device_config(ip: str):
         try:
             resp = await client.get(f"http://{master}/config?ip={ip}")
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Unwrap {"configs": [{"ip": "...", "config": {...}}, ...]} format
+            if isinstance(data, dict) and "configs" in data:
+                for entry in data["configs"]:
+                    if entry.get("ip") == ip:
+                        return entry.get("config", entry)
+                # fallback: first entry
+                if data["configs"]:
+                    first = data["configs"][0]
+                    return first.get("config", first)
+            return data
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
 
