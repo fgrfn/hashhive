@@ -721,9 +721,9 @@
   function fmtNmHr(v) {
     const n = parseFloat(v);
     if (!n && n !== 0) return '–';
-    if (n >= 1000) return (n / 1000).toFixed(2) + ' GH/s';
-    if (n < 1)     return Math.round(n * 1000) + ' KH/s';
-    return Math.round(n) + ' MH/s';
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + ' GH/s';
+    if (n >= 1000)    return (n / 1000).toFixed(1) + ' MH/s';
+    return Math.round(n) + ' KH/s';
   }
 
   function fmtTemp(v, max) {
@@ -769,7 +769,7 @@
         const online = d.online !== false;
         const hrMh = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
         const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
-        if (online) { totalHr += hrMh / 1000; onlineCnt++; }  // MH/s → GH/s for total
+        if (online) { totalHr += hrMh / 1000000; onlineCnt++; }  // KH/s → GH/s for total
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
         if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
