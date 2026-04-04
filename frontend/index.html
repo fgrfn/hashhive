@@ -305,6 +305,7 @@
     <div class="topbar-right">
       <span id="last-update" class="text-muted" style="font-size:12px"></span>
       <span id="refresh-countdown" class="text-muted" style="font-size:12px;display:none">↻ in <span id="refresh-secs">–</span>s</span>
+      <span id="ws-status" title="WebSocket" style="font-size:12px;display:none"></span>
       <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
     </div>
   </div>
@@ -871,23 +872,116 @@
 
   let _countdownTimer = null;
 
+  // ── WebSocket (replaces polling when available) ───────────────────────────
+
+  let _ws = null;
+  let _wsReconnectTimer = null;
+  let _wsReconnectDelay = 2000;
+  let _wsActive = false;           // true once first WS message received
+
+  function _wsUrl() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${location.host}/ws`;
+  }
+
+  function _wsSetStatus(connected) {
+    const el = document.getElementById('ws-status');
+    if (!el) return;
+    if (connected) {
+      el.textContent = '⬤ Live';
+      el.style.color = 'var(--success)';
+      el.title = 'WebSocket connected — live updates active';
+      el.style.display = '';
+    } else {
+      el.textContent = '⬤ Reconnecting…';
+      el.style.color = 'var(--warning)';
+      el.title = 'WebSocket disconnected — reconnecting';
+      el.style.display = '';
+    }
+  }
+
+  function _handleWsMessage(raw) {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
+    if (msg.type !== 'dashboard') return;
+    currentConfig = msg.config || {};
+    const _s = renderDashboard(msg);
+    appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`, 'system');
+    document.getElementById('last-update').textContent =
+      'Updated: ' + new Date().toLocaleTimeString('en-US');
+    const unread = msg.unread_alerts || 0;
+    const badge = document.getElementById('alert-badge');
+    const statBadge = document.getElementById('stat-alerts');
+    badge.textContent = unread;
+    badge.style.display = unread > 0 ? '' : 'none';
+    statBadge.textContent = unread;
+    statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
+    // Show server-side interval as "live" indicator instead of countdown
+    const cdEl = document.getElementById('refresh-countdown');
+    if (cdEl) cdEl.style.display = 'none';
+  }
+
+  function _wsConnect() {
+    if (_ws && (_ws.readyState === WebSocket.CONNECTING || _ws.readyState === WebSocket.OPEN)) return;
+    try {
+      _ws = new WebSocket(_wsUrl());
+    } catch {
+      _wsScheduleReconnect();
+      return;
+    }
+    _ws.onopen = () => {
+      _wsActive = true;
+      _wsReconnectDelay = 2000;
+      _wsSetStatus(true);
+      if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
+      // Stop polling fallback if it was running
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+      if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+    };
+    _ws.onmessage = e => _handleWsMessage(e.data);
+    _ws.onclose = _ws.onerror = () => {
+      _wsSetStatus(false);
+      _wsScheduleReconnect();
+      // Fall back to polling if WS drops and we're on dashboard
+      if (currentPage === 'dashboard' && !refreshTimer) {
+        const interval = (currentConfig.refresh_interval || 30) * 1000;
+        refreshTimer = setInterval(loadDashboard, interval);
+      }
+    };
+  }
+
+  function _wsScheduleReconnect() {
+    if (_wsReconnectTimer) return;
+    _wsReconnectTimer = setTimeout(() => {
+      _wsReconnectTimer = null;
+      _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000);
+      _wsConnect();
+    }, _wsReconnectDelay);
+  }
+
   function startAutoRefresh() {
     stopAutoRefresh();
+    // Try WebSocket first
+    _wsConnect();
+    // Always do an immediate HTTP load so data appears instantly
+    loadDashboard();
+    // Polling fallback — will be cleared once WS connects
     const interval = (currentConfig.refresh_interval || 30) * 1000;
-    // load first, then start timers so countdown starts in sync
-    loadDashboard().then(() => {
-      refreshTimer = setInterval(loadDashboard, interval);
-      const cdEl = document.getElementById('refresh-countdown');
-      const secsEl = document.getElementById('refresh-secs');
-      if (cdEl) cdEl.style.display = '';
-      let remaining = Math.round(interval / 1000);
+    refreshTimer = setInterval(() => {
+      // Only poll if WebSocket is not open
+      if (!_ws || _ws.readyState !== WebSocket.OPEN) loadDashboard();
+    }, interval);
+    const cdEl = document.getElementById('refresh-countdown');
+    const secsEl = document.getElementById('refresh-secs');
+    if (cdEl && !_wsActive) cdEl.style.display = '';
+    let remaining = Math.round(interval / 1000);
+    if (secsEl) secsEl.textContent = remaining;
+    _countdownTimer = setInterval(() => {
+      if (_ws && _ws.readyState === WebSocket.OPEN) return; // WS active — no countdown needed
+      remaining--;
+      if (remaining <= 0) remaining = Math.round(interval / 1000);
       if (secsEl) secsEl.textContent = remaining;
-      _countdownTimer = setInterval(() => {
-        remaining--;
-        if (remaining <= 0) remaining = Math.round(interval / 1000);
-        if (secsEl) secsEl.textContent = remaining;
-      }, 1000);
-    });
+    }, 1000);
   }
 
   function stopAutoRefresh() {

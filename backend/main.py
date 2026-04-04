@@ -7,7 +7,7 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -142,6 +142,77 @@ def save_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# ── WebSocket connection manager ──────────────────────────────────────────────
+
+class _WSManager:
+    def __init__(self):
+        self._clients: set[WebSocket] = set()
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self._clients.add(ws)
+
+    def disconnect(self, ws: WebSocket):
+        self._clients.discard(ws)
+
+    async def broadcast(self, payload: str):
+        dead: list[WebSocket] = []
+        for ws in list(self._clients):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self._clients.discard(ws)
+
+    @property
+    def count(self) -> int:
+        return len(self._clients)
+
+
+_ws_manager = _WSManager()
+
+
+async def _dashboard_broadcast_loop():
+    """Background task: fetch dashboard data and push to all WS clients."""
+    while True:
+        try:
+            config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+            interval = max(5, int(config.get("refresh_interval", 30)))
+            if _ws_manager.count > 0:
+                # Re-use the same logic as GET /api/dashboard
+                master = config.get("nmminer_master", "")
+                nm_devices = config.get("nmminer_devices", [])
+                axeos_devices = config.get("axeos_devices", [])
+                has_nmminer = bool(master or nm_devices)
+                async with httpx.AsyncClient(timeout=10) as client:
+                    coros = []
+                    if has_nmminer:
+                        coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+                    coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
+                    results = await asyncio.gather(*coros) if coros else []
+                nmminer_data = results[0] if (has_nmminer and results) else {"devices": []}
+                axeos_results = list(results[1:]) if has_nmminer else list(results)
+                axeos_data = {"devices": axeos_results}
+                try:
+                    await check_alerts(config, nmminer_data, axeos_data)
+                except Exception:
+                    pass
+                today_entries = _read_day(_today())
+                unread = sum(1 for a in today_entries if not a.get("read", False))
+                payload = json.dumps({
+                    "type": "dashboard",
+                    "nmminer": nmminer_data,
+                    "axeos": axeos_data,
+                    "unread_alerts": unread,
+                    "config": config,
+                })
+                await _ws_manager.broadcast(payload)
+        except Exception:
+            pass
+        await asyncio.sleep(interval)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -150,7 +221,13 @@ async def lifespan(app: FastAPI):
     load_json(DEVICE_STATE_FILE, {})
     _migrate_legacy()
     _cleanup_old_logs()
+    task = asyncio.create_task(_dashboard_broadcast_loop())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="HashHive", version="1.0.0", lifespan=lifespan)
@@ -169,6 +246,43 @@ async def root():
     if index.exists():
         return FileResponse(str(index))
     return JSONResponse({"status": "HashHive API running. Frontend not found."})
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await _ws_manager.connect(ws)
+    try:
+        # Send current data immediately on connect so the client doesn't wait
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        master = config.get("nmminer_master", "")
+        nm_devices = config.get("nmminer_devices", [])
+        axeos_devices = config.get("axeos_devices", [])
+        has_nmminer = bool(master or nm_devices)
+        async with httpx.AsyncClient(timeout=10) as client:
+            coros = []
+            if has_nmminer:
+                coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+            coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
+            results = await asyncio.gather(*coros) if coros else []
+        nmminer_data = results[0] if (has_nmminer and results) else {"devices": []}
+        axeos_results = list(results[1:]) if has_nmminer else list(results)
+        axeos_data = {"devices": axeos_results}
+        today_entries = _read_day(_today())
+        unread = sum(1 for a in today_entries if not a.get("read", False))
+        await ws.send_text(json.dumps({
+            "type": "dashboard",
+            "nmminer": nmminer_data,
+            "axeos": axeos_data,
+            "unread_alerts": unread,
+            "config": config,
+        }))
+        # Keep alive — wait for client to close
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _ws_manager.disconnect(ws)
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────
