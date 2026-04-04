@@ -200,10 +200,14 @@
     .prev-row code.warn{color:var(--warning)}
     .prev-row code.ok{color:var(--success)}
     .prev-devices{grid-column:1/-1;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-    .prev-devices-hd{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:5px 10px;background:var(--surface2);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border)}
-    .prev-dev-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:4px 10px;font-size:12px;border-bottom:1px solid var(--border)}
+    .prev-devices-hd{display:grid;grid-template-columns:minmax(80px,1fr) 34px minmax(90px,1.4fr) minmax(90px,1.4fr);gap:4px;padding:5px 10px;background:var(--surface2);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border)}
+    .prev-dev-row{display:grid;grid-template-columns:minmax(80px,1fr) 34px minmax(90px,1.4fr) minmax(90px,1.4fr);gap:4px;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--border);align-items:center}
     .prev-dev-row:last-child{border-bottom:none}
     .prev-dev-row:nth-child(even){background:var(--surface2)}
+    .prev-dev-row code{font-family:monospace;font-size:11px}
+    .prev-dev-row code.new{color:var(--accent)}
+    .prev-dev-row code.unchanged{color:var(--text-muted)}
+    .prev-dev-row .cur{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .prev-dev-row code{font-family:monospace;color:var(--accent);font-size:11px}
     .prev-warn{grid-column:1/-1;color:var(--warning);font-size:12px;padding:4px 0 0}
 
@@ -1221,10 +1225,23 @@
     const list = document.getElementById('pool-device-list');
     list.innerHTML = '<div class="text-muted" style="padding:8px;font-size:13px">Loading…</div>';
 
+    // Set default worker templates if fields are empty
+    const pUserEl = document.getElementById('pool-p-user');
+    const sUserEl = document.getElementById('pool-s-user');
+    if (pUserEl && !pUserEl.value) pUserEl.value = '.{suffix}';
+    if (sUserEl && !sUserEl.value) sUserEl.value = '.{suffix}';
+
     let nmDevs = [];
     try {
       const data = await apiFetch('/api/nmminer/swarm');
       nmDevs = Array.isArray(data) ? data : (data.devices || []);
+    } catch (_) {}
+
+    // Fetch live AxeOS data to get current pool/worker
+    let axLive = {};
+    try {
+      const axData = await apiFetch('/api/axeos/devices');
+      (axData.devices || []).forEach(d => { if (d._ip) axLive[d._ip] = d; });
     } catch (_) {}
 
     const axDevs = (currentConfig && currentConfig.axeos_devices) || [];
@@ -1241,8 +1258,10 @@
         const ip = d.ip || '';
         const hostname = d.hostname || d.name || ip;
         const suffix = hostname.replace(/\s+/g,'_');
+        const curPool   = d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
+        const curWorker = d.worker || d.stratumUser || d.user || '';
         html += `<div class="pool-dev-item">
-          <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" checked onchange="updatePoolPreview()">
+          <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
           <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span></label>
         </div>`;
       });
@@ -1251,8 +1270,11 @@
       html += '<div class="form-section-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:10px 0 6px">BitAxe / NerdAxe</div>';
       axDevs.forEach(d => {
         const suffix = (d.name || d.ip).replace(/\s+/g,'_');
+        const live = axLive[d.ip] || {};
+        const curPool   = live.stratumURL || '';
+        const curWorker = live.stratumUser || '';
         html += `<div class="pool-dev-item">
-          <input type="checkbox" id="pdev-ax-${d.ip}" data-type="axeos" data-ip="${d.ip}" data-suffix="${suffix}" checked onchange="updatePoolPreview()">
+          <input type="checkbox" id="pdev-ax-${d.ip}" data-type="axeos" data-ip="${d.ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
           <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}</span></label>
         </div>`;
       });
@@ -1932,7 +1954,6 @@
 
   // ── Pool live preview ──────────────────────────────────────────────────────
   function updatePoolPreview() {
-    // also alias the old name
     const pUrl  = document.getElementById('pool-p-url')?.value.trim() || '';
     const pUser = document.getElementById('pool-p-user')?.value.trim() || '';
     const pPass = document.getElementById('pool-p-pass')?.value.trim() || '';
@@ -1948,49 +1969,55 @@
 
     const pp = parsePoolUrl(pUrl);
     const fp = parsePoolUrl(fUrl);
-    const devices = [...document.querySelectorAll('#pool-device-list input[type=checkbox]')];
+    // Only selected (checked) devices appear in preview
+    const devices = [...document.querySelectorAll('#pool-device-list input[type=checkbox]:checked')];
     const hasSuffix = pUser.includes('{suffix}') || fUser.includes('{suffix}');
+    const exSuffix = devices[0]?.dataset.suffix || 'Device';
 
     function poolBlock(label, parsed, rawUrl, user, pass, isFallback) {
       if (!rawUrl) return `<div class="prev-section${isFallback ? ' fallback' : ''}">
         <div class="prev-section-lbl">${label}</div>
-        <div class="prev-row"><span class="lbl">—</span><code class="warn">nicht konfiguriert</code></div>
+        <div class="prev-row"><span class="lbl">—</span><code class="warn">not configured</code></div>
       </div>`;
       const portWarn = parsed.port == null;
       return `<div class="prev-section${isFallback ? ' fallback' : ''}">
         <div class="prev-section-lbl">${label}</div>
-        <div class="prev-row"><span class="lbl">NMMiner URL</span><code>${rawUrl || '—'}</code></div>
+        <div class="prev-row"><span class="lbl">NMMiner URL</span><code>${rawUrl}</code></div>
         <div class="prev-row"><span class="lbl">AxeOS Host</span><code class="${parsed.host ? 'ok' : 'warn'}">${parsed.host || '—'}</code></div>
-        <div class="prev-row"><span class="lbl">AxeOS Port</span><code class="${portWarn ? 'warn' : 'ok'}">${parsed.port ?? '⚠ kein Port erkannt!'}</code></div>
-        ${user ? `<div class="prev-row"><span class="lbl">Worker${hasSuffix ? ' (Beispiel)' : ''}</span><code>${applyWorker(user, devices[0]?.dataset.suffix || 'DeviceName') || '—'}</code></div>` : ''}
-        ${pass ? `<div class="prev-row"><span class="lbl">Passwort</span><code>${pass}</code></div>` : ''}
+        <div class="prev-row"><span class="lbl">AxeOS Port</span><code class="${portWarn ? 'warn' : 'ok'}">${parsed.port ?? '⚠ no port found!'}</code></div>
+        ${user ? `<div class="prev-row"><span class="lbl">Worker${hasSuffix ? ' (example)' : ''}</span><code>${applyWorker(user, exSuffix) || '—'}</code></div>` : ''}
+        ${pass ? `<div class="prev-row"><span class="lbl">Password</span><code>${pass}</code></div>` : ''}
       </div>`;
     }
 
-    let html = poolBlock('Primär', pp, pUrl, pUser, pPass, false)
+    let html = poolBlock('Primary', pp, pUrl, pUser, pPass, false)
              + poolBlock('Fallback', fp, fUrl, fUser, fPass, true);
 
-    // Per-device worker table when {suffix} is used
-    if (hasSuffix && devices.length > 0) {
+    // Per-device before/after table for all selected devices
+    if (devices.length > 0) {
       const rows = devices.map(cb => {
-        const s = cb.dataset.suffix || cb.dataset.ip;
-        const t = cb.dataset.type === 'nmminer' ? 'NM' : 'AX';
-        const w = applyWorker(pUser, s) || '—';
+        const s          = cb.dataset.suffix || cb.dataset.ip;
+        const t          = cb.dataset.type === 'nmminer' ? 'NM' : 'AX';
+        const newWorker  = applyWorker(pUser, s) || '—';
+        const curWorker  = cb.dataset.currentWorker || '';
+        const unchanged  = curWorker && curWorker === newWorker;
         return `<div class="prev-dev-row">
-          <span>${cb.dataset.ip}</span>
+          <span style="font-size:11px">${cb.dataset.ip}</span>
           <span style="color:var(--text-muted);font-size:11px">${t}</span>
-          <code>${w}</code>
+          <span class="cur" title="${curWorker || 'unknown'}">${curWorker || '<em style="opacity:.4">—</em>'}</span>
+          <code class="${unchanged ? 'unchanged' : 'new'}">${newWorker}</code>
         </div>`;
       }).join('');
       html += `<div class="prev-devices">
-        <div class="prev-devices-hd"><span>Gerät</span><span>Typ</span><span>Worker</span></div>
+        <div class="prev-devices-hd"><span>Device</span><span>Type</span><span>Current worker</span><span>New worker</span></div>
         ${rows}
       </div>`;
     }
 
-    // Warn if no port in primary
-    if (pp.port == null) {
-      html += `<div class="prev-warn">⚠ Primär URL enthält keinen Port — AxeOS benötigt einen Port (z.B. :3337).</div>`;
+    // Warn if no port and AxeOS devices are selected
+    const hasAxeos = devices.some(cb => cb.dataset.type === 'axeos');
+    if (hasAxeos && pp.port == null) {
+      html += `<div class="prev-warn">⚠ Primary URL has no port — AxeOS requires a port (e.g. :3337).</div>`;
     }
 
     body.innerHTML = html;
