@@ -108,7 +108,6 @@ DEFAULT_CONFIG: dict = {
     "nmminer_master": "",
     "nmminer_devices": [],
     "axeos_devices": [],
-    "scan_subnets": [],
     "refresh_interval": 30,
     "thresholds": {
         "temp_max": 70,
@@ -592,25 +591,16 @@ async def scan_axeos_devices():
     """Scan local /24 subnet(s) for AxeOS devices (BitAxe/NerdAxe). No IP required."""
     import socket as _socket
     # Determine subnets to scan: configured extras + auto-detected local
-    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    extra_subnets: list[str] = config.get("scan_subnets", [])
-
     subnets: list[str] = []
     try:
+        import socket as _socket
         s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
         subnets.append(".".join(local_ip.split(".")[:3]))
     except Exception:
-        local_ip = None
-
-    for sub in extra_subnets:
-        parts = sub.strip().split(".")
-        if len(parts) >= 3:
-            prefix = ".".join(parts[:3])
-            if prefix not in subnets:
-                subnets.append(prefix)
+        pass
 
     if not subnets:
         raise HTTPException(status_code=500, detail="Could not determine any subnet to scan")

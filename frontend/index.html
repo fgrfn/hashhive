@@ -513,18 +513,6 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Additional Scan Subnets</div>
-        <p class="text-muted" style="font-size:12px;margin-bottom:10px">Auto-detected local /24 is always included. Add more subnets to scan (e.g. for VLANs).</p>
-        <ul class="device-list" id="subnet-list">
-          <li class="text-muted" style="padding:8px">No extra subnets configured</li>
-        </ul>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input type="text" id="s-new-subnet" placeholder="192.168.2.0" style="flex:1;max-width:220px">
-          <button class="btn btn-secondary btn-sm" onclick="addSubnet()">+ Add</button>
-        </div>
-      </div>
-
-      <div class="card">
         <div class="card-title">Alert Thresholds</div>
         <div class="form-grid">
           <div class="form-group"><label>Max. Temperature (°C)</label><input type="number" id="s-temp-max" value="70"></div>
@@ -1610,7 +1598,6 @@
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
-      renderSubnetList(cfg.scan_subnets || []);
     } catch (e) {
       toast('Failed to load settings', 'error');
     }
@@ -1777,40 +1764,6 @@
     devs.splice(i, 1);
     currentConfig.axeos_devices = devs;
     renderAxeDeviceList(devs);
-  }
-
-  function renderSubnetList(subnets) {
-    const list = document.getElementById('subnet-list');
-    if (!list) return;
-    if (subnets.length === 0) {
-      list.innerHTML = '<li class="text-muted" style="padding:8px">No extra subnets configured</li>';
-      return;
-    }
-    list.innerHTML = subnets.map((s, i) => `
-      <li class="device-item">
-        <div class="device-item-info">
-          <span class="device-item-name">${s}</span>
-          <span class="device-item-ip">/24 subnet</span>
-        </div>
-        <button class="btn btn-danger btn-sm" onclick="removeSubnet(${i})">✕</button>
-      </li>`).join('');
-  }
-
-  function addSubnet() {
-    const val = document.getElementById('s-new-subnet').value.trim();
-    if (!val) return;
-    const subnets = currentConfig.scan_subnets || [];
-    if (!subnets.includes(val)) subnets.push(val);
-    currentConfig.scan_subnets = subnets;
-    renderSubnetList(subnets);
-    document.getElementById('s-new-subnet').value = '';
-  }
-
-  function removeSubnet(i) {
-    const subnets = currentConfig.scan_subnets || [];
-    subnets.splice(i, 1);
-    currentConfig.scan_subnets = subnets;
-    renderSubnetList(subnets);
   }
 
   async function scanAxeNetwork() {
