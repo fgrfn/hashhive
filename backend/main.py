@@ -265,12 +265,11 @@ async def post_nmminer_device_config(data: dict):
     if not device_ip:
         raise HTTPException(status_code=400, detail="ip field required in body")
     async with httpx.AsyncClient(timeout=15) as client:
-        # Try master-proxied per-device config endpoint first, then direct
+        # broadcast-config is the correct write endpoint (POST /config returns 404)
         last_exc: Exception | None = None
         for url, method, payload in [
-            (f"http://{master}/config?ip={device_ip}", "POST", data),
-            (f"http://{master}/config",                "POST", data),
-            (f"http://{device_ip}/config",             "POST", data),
+            (f"http://{master}/broadcast-config",      "POST", data),
+            (f"http://{device_ip}/broadcast-config",   "POST", data),
         ]:
             try:
                 resp = await client.post(url, json=payload)

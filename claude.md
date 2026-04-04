@@ -130,12 +130,11 @@ sudo journalctl -u hashhive -f   # Logs
 }
 ```
 
-### `/api/nmminer/device-config` POST-Fallback-Kette
+### `/api/nmminer/device-config` POST-Endpunkt
 Das Backend versucht der Reihe nach:
-1. `POST http://{master}/config?ip={device_ip}`
-2. `POST http://{master}/config`
-3. `POST http://{device_ip}/config`
-→ Erster HTTP-Status < 500 wird zurückgegeben.
+1. `POST http://{master}/broadcast-config`
+2. `POST http://{device_ip}/broadcast-config`
+→ `POST /config` existiert nicht (gibt 404). Nur `broadcast-config` funktioniert.
 
 ---
 
@@ -178,10 +177,10 @@ Alle Anfragen laufen über die **Master-IP** (ein NMMiner fungiert als Swarm-Mas
 | Methode | Endpunkt | Beschreibung |
 |---|---|---|
 | GET | `http://{master}/swarm` | Alle Geräte-Stats |
-| GET | `http://{master}/config` | Alle Konfigurationen |
+| GET | `http://{master}/config` | Alle Konfigurationen (Response: `{"configs":[{"ip":"...","config":{...}}]}`) |
 | GET | `http://{master}/config?ip={device_ip}` | Einzelne Gerätekonfiguration |
-| POST | `http://{master}/config?ip={device_ip}` | Einzelne Gerätekonfiguration speichern |
-| POST | `http://{master}/broadcast-config` | Config an alle Geräte pushen (JSON body) |
+| POST | `http://{master}/broadcast-config` | Config pushen (einziger funktionierender Write-Endpunkt!) |
+| POST | `http://{device_ip}/broadcast-config` | Config direkt ans Gerät pushen |
 
 **Bekannte Response-Formate von `/swarm`** (werden im Backend normalisiert):
 - Flat Array: `[{ip, hashrate, ...}, ...]`
@@ -231,7 +230,9 @@ Alle Anfragen laufen über die **Master-IP** (ein NMMiner fungiert als Swarm-Mas
 }
 ```
 
-**Wichtig:** Alle booleschen Felder (`SaveUptime`, `LedEnable`, `AutoBrightness`) sind `1`/`0` (integer), nicht `true`/`false`. `RotateScreen` ist ein integer: `0`, `90`, `180` oder `270`. `TimeFormat` ist `24` oder `12` (integer). Pool-URLs müssen das Schema enthalten: `stratum+tcp://host:port` — `nmPoolUrl()` im Frontend ergänzt fehlende Schemata automatisch.
+**Wichtig:** `SaveUptime`, `LedEnable`, `AutoBrightness` sind `1`/`0` integers (nicht `true`/`false`). `RotateScreen` ist `0` (0°) oder `2` (180°) — nur diese zwei Werte. `TimeFormat` ist `24` oder `12` (integer). Pool-URLs müssen das Schema enthalten: `stratum+tcp://host:port` — `nmPoolUrl()` im Frontend ergänzt fehlende Schemata automatisch.
+
+**GET `/config` liefert booleans** (`"SaveUptime": true`), POST erwartet integers (`1`/`0`). Das Gerät akzeptiert beides.
 
 ### BitAxe / NerdAxe (AxeOS)
 Firmware-Repo: https://github.com/bitaxeorg/ESP-Miner  

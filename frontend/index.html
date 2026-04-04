@@ -641,7 +641,7 @@
               <select id="nme-led"><option value="yes">Yes</option><option value="no">No</option></select>
             </div>
             <div class="form-group"><label>Rotate Screen</label>
-              <select id="nme-rotate"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
+              <select id="nme-rotate"><option value="0">0°</option><option value="2">180°</option></select>
             </div>
             <div class="form-group"><label>Auto Brightness</label>
               <select id="nme-autobright"><option value="no">No</option><option value="yes">Yes</option></select>
@@ -1730,7 +1730,7 @@
     s('nme-brightness',    c.Brightness ?? c.brightness ?? 50);
     sel('nme-savehistory', (c.SaveUptime ?? c.saveHistory ?? c.save_history) ? 'yes' : 'no');
     sel('nme-led',         (c.LedEnable ?? c.ledEnable ?? c.led_enable ?? true) ? 'yes' : 'no');
-    sel('nme-rotate',      String(c.RotateScreen ?? c.rotateScreen ?? 0));
+    sel('nme-rotate',      (c.RotateScreen === true || c.RotateScreen === 2 || c.RotateScreen === '2') ? '2' : '0');
     sel('nme-autobright',  (c.AutoBrightness ?? c.autoBrightness ?? c.auto_brightness) ? 'yes' : 'no');
   }
 
