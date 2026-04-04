@@ -1065,7 +1065,7 @@
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
         <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-        <td class="max-w"><small>${fmtPool(d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</small></td>
+        <td class="max-w"><small>${fmtPool(d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</small></td>
         <td><small class="text-muted">${d.netDiff || '–'}</small></td>
         <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
         <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
@@ -1258,8 +1258,8 @@
         const ip = d.ip || '';
         const hostname = d.hostname || d.name || ip;
         const suffix = hostname.replace(/\s+/g,'_');
-        const curPool   = d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
-        const curWorker = d.worker || d.stratumUser || d.user || '';
+        const curPool   = d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
+        const curWorker = d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
           <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span></label>
@@ -1320,16 +1320,20 @@
       const resolvedFbUser = applyWorker(fbUser, suffix);
       try {
         if (type === 'nmminer') {
+          // Fetch full current config first so we don't overwrite non-pool settings
+          let rawNmCfg = {};
+          try { rawNmCfg = await apiFetch(`/api/nmminer/device-config?ip=${ip}`); } catch (_) {}
           await apiFetch('/api/nmminer/device-config', { method: 'POST', headers: hdr,
             body: JSON.stringify({
+              ...rawNmCfg,
               ip,
               IP:               ip,
               PrimaryPool:      baseUrl,
               PrimaryAddress:   resolvedUser,
-              PrimaryPassword:  basePass,
+              PrimaryPassword:  basePass || 'x',
               SecondaryPool:    fbUrl,
               SecondaryAddress: resolvedFbUser,
-              SecondaryPassword: fbPass,
+              SecondaryPassword: fbPass || 'x',
             }) });
         } else {
           // AxeOS requires URL (host only, no port) and port as separate fields
