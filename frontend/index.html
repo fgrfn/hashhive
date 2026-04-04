@@ -203,7 +203,13 @@
     .log-tab:hover{color:var(--text)}
     .log-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-    /* ── Misc ── */
+    /* ── Table filter bar ── */
+    .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .filter-bar input{flex:1;max-width:280px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px;transition:.15s}
+    .filter-bar input:focus{outline:none;border-color:var(--accent)}
+    .filter-bar input::placeholder{color:var(--text-muted)}
+    .filter-bar .filter-count{font-size:12px;color:var(--text-muted)}
+    tr.filter-hidden{display:none}
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
     .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -345,6 +351,11 @@
           <div class="sum-chip"><div class="sum-chip-val" id="nm-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
           <div class="sum-chip"><div class="sum-chip-val sum-ok" id="nm-sum-online">–</div><div class="sum-chip-label">Online</div></div>
         </div>
+        <div class="filter-bar">
+          <input type="search" id="nm-filter" placeholder="Filter by IP, hostname, pool…" oninput="filterTable('nm-rows','nm-filter','nm-filter-count')">
+          <span class="filter-count" id="nm-filter-count"></span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('nm-filter').value='';filterTable('nm-rows','nm-filter','nm-filter-count')">✕</button>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th>Actions</th></tr></thead>
@@ -361,6 +372,11 @@
         <div id="ax-summary" class="group-summary" style="display:none">
           <div class="sum-chip"><div class="sum-chip-val" id="ax-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
           <div class="sum-chip"><div class="sum-chip-val sum-ok" id="ax-sum-online">–</div><div class="sum-chip-label">Online</div></div>
+        </div>
+        <div class="filter-bar">
+          <input type="search" id="ax-filter" placeholder="Filter by name, IP, ASIC, pool…" oninput="filterTable('ax-rows','ax-filter','ax-filter-count')">
+          <span class="filter-count" id="ax-filter-count"></span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ax-filter').value='';filterTable('ax-rows','ax-filter','ax-filter-count')">✕</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -701,8 +717,8 @@
 
     switch (name) {
       case 'dashboard':    startAutoRefresh(); break;
-      case 'nmminer':      loadNmPage(); break;
-      case 'axeos':        loadAxPage(); break;
+      case 'nmminer':      document.getElementById('nm-filter').value=''; loadNmPage(); break;
+      case 'axeos':        document.getElementById('ax-filter').value=''; loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
       case 'pool':          loadPoolPage().then(updateWorkerPreview); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
@@ -1683,6 +1699,24 @@
 
   function copyIP(ip) {
     navigator.clipboard.writeText(ip).then(() => toast(`Copied: ${ip}`, 'success')).catch(() => toast('Copy failed', 'error'));
+  }
+
+  // ── Table filter ───────────────────────────────────────────────────────────
+
+  function filterTable(tbodyId, inputId, countId) {
+    const q = (document.getElementById(inputId)?.value || '').trim().toLowerCase();
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const rows = [...tbody.querySelectorAll('tr')];
+    let visible = 0;
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const show = !q || text.includes(q);
+      row.classList.toggle('filter-hidden', !show);
+      if (show) visible++;
+    });
+    const countEl = document.getElementById(countId);
+    if (countEl) countEl.textContent = q ? `${visible} / ${rows.length} shown` : '';
   }
 
   // ── Sortable tables ────────────────────────────────────────────────────────
