@@ -829,7 +829,7 @@
         if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
         else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online', 'nmminer'); _offlineTracked.delete(_nk); }
         return `<tr>
-          <td>${d.name || d.ip || '–'}</td>
+          <td>${d.hostname || d.name || d.ip || '–'}<br><small class="text-muted">${d.ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
           <td>${fmtNmHr(hrKh)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
