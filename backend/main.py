@@ -144,6 +144,47 @@ async def broadcast_nmminer_config(data: dict):
             raise HTTPException(status_code=502, detail=str(exc))
 
 
+@app.get("/api/nmminer/device-config")
+async def get_nmminer_device_config(ip: str):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    master = config.get("nmminer_master", "")
+    if not master:
+        raise HTTPException(status_code=400, detail="No NMMiner master configured")
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            resp = await client.get(f"http://{master}/config?ip={ip}")
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/nmminer/device-config")
+async def post_nmminer_device_config(data: dict):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    master = config.get("nmminer_master", "")
+    if not master:
+        raise HTTPException(status_code=400, detail="No NMMiner master configured")
+    device_ip = data.get("ip")
+    if not device_ip:
+        raise HTTPException(status_code=400, detail="ip field required in body")
+    async with httpx.AsyncClient(timeout=15) as client:
+        # Try master-proxied per-device config endpoint first, then direct
+        last_exc: Exception | None = None
+        for url, method, payload in [
+            (f"http://{master}/config?ip={device_ip}", "POST", data),
+            (f"http://{master}/config",                "POST", data),
+            (f"http://{device_ip}/config",             "POST", data),
+        ]:
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code < 500:
+                    return {"status": resp.status_code, "detail": resp.text[:200]}
+            except Exception as exc:
+                last_exc = exc
+        raise HTTPException(status_code=502, detail=str(last_exc))
+
+
 # ── AxeOS ─────────────────────────────────────────────────────────────────────
 
 async def _fetch_axeos_device(client: httpx.AsyncClient, device: dict) -> dict:
@@ -191,9 +232,27 @@ async def _fetch_nmminer_safe(client: httpx.AsyncClient, master: str) -> dict:
     try:
         resp = await client.get(f"http://{master}/swarm")
         resp.raise_for_status()
-        return resp.json()
-    except Exception:
-        return {"devices": [], "_error": True}
+        data = resp.json()
+        # Normalize to {devices: [...]} regardless of API format
+        if isinstance(data, list):
+            return {"devices": data}
+        if isinstance(data, dict):
+            # Already has devices key
+            if "devices" in data and isinstance(data["devices"], list):
+                return data
+            # Try other common list keys (miners, workers, peers, swarm)
+            for key in ("miners", "workers", "peers", "swarm", "data"):
+                if key in data and isinstance(data[key], list):
+                    return {"devices": data[key]}
+            # Dict keyed by IP (e.g. {"10.0.0.1": {...}})
+            values = list(data.values())
+            if values and isinstance(values[0], dict) and any(
+                k in values[0] for k in ("ip", "hashrate", "GHs", "temp", "pool")
+            ):
+                return {"devices": [{"ip": k, **v} for k, v in data.items() if isinstance(v, dict)]}
+        return {"devices": [], "_error": "unknown_format"}
+    except Exception as exc:
+        return {"devices": [], "_error": str(exc)}
 
 
 @app.get("/api/dashboard")

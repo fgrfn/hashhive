@@ -153,6 +153,20 @@
     .log-info{color:var(--info)}
     .log-ok{color:var(--success)}
 
+    /* ── Modal ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(580px,100%);max-height:88vh;display:flex;flex-direction:column}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .modal-title{font-weight:600;font-size:15px}
+    .modal-title small{display:block;font-size:11px;font-weight:400;color:var(--text-muted);margin-top:1px}
+    .modal-close{background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+    .modal-close:hover{color:var(--text)}
+    .modal-body{overflow-y:auto;padding:20px;flex:1}
+    .modal-section{margin-bottom:20px}
+    .modal-section-title{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+    .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+
     /* ── Misc ── */
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
@@ -255,8 +269,8 @@
         <div class="card-title">NMMiner Devices</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th></tr></thead>
-            <tbody id="nm-rows"><tr><td colspan="9" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th><th>Actions</th></tr></thead>
+            <tbody id="nm-rows"><tr><td colspan="10" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -381,6 +395,102 @@
   </div><!-- /content -->
 </div><!-- /main -->
 
+<!-- ════════════ NMMINER DEVICE CONFIG MODAL ════════════ -->
+<div class="modal-overlay" id="nmedit-overlay" onclick="if(event.target===this)closeNmEdit()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        ⚙ Device Configuration
+        <small id="nmedit-ip-title"></small>
+      </div>
+      <button class="modal-close" onclick="closeNmEdit()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="nmedit-loading" class="empty text-muted" style="padding:24px">Loading…</div>
+      <div id="nmedit-form" style="display:none">
+
+        <div class="modal-section">
+          <div class="modal-section-title">📶 WiFi Configuration</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Hostname</label><input type="text" id="nme-hostname" placeholder="NMMiner1_abc"></div>
+            <div class="form-group"><label>WiFi SSID</label><input type="text" id="nme-ssid" placeholder="MyWiFi"></div>
+          </div>
+          <div class="form-group" style="max-width:340px"><label>WiFi Password</label><input type="password" id="nme-wifipass" placeholder="••••••••"></div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🔵 Primary Pool Settings</div>
+          <div class="form-group"><label>Pool URL</label><input type="text" id="nme-p-url" placeholder="stratum+tcp://pool.example.com:3337"></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Wallet / Worker</label><input type="text" id="nme-p-user" placeholder="wallet.worker"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="nme-p-pass" placeholder="x"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🟣 Secondary Pool Settings</div>
+          <div class="form-group"><label>Pool URL</label><input type="text" id="nme-s-url" placeholder="stratum+tcp://backup.example.com:3333"></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Wallet / Worker</label><input type="text" id="nme-s-user" placeholder="wallet.worker"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="nme-s-pass" placeholder="x"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🌐 Region Settings</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Timezone (UTC offset)</label><input type="number" id="nme-timezone" placeholder="0" min="-12" max="14"></div>
+            <div class="form-group"><label>Time Format</label>
+              <select id="nme-timeformat">
+                <option value="24h">24h</option>
+                <option value="12h (AM/PM)">12h (AM/PM)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Date Format</label>
+              <select id="nme-dateformat">
+                <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+                <option value="MM-DD-YYYY">MM-DD-YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🖥 Display &amp; System</div>
+          <div class="form-grid">
+            <div class="form-group"><label>UI Refresh (s)</label><input type="number" id="nme-uirefresh" min="1" max="60"></div>
+            <div class="form-group"><label>Screen Timeout (s)</label><input type="number" id="nme-screentimeout" min="0"></div>
+            <div class="form-group"><label>Brightness (0–100)</label><input type="number" id="nme-brightness" min="0" max="100"></div>
+            <div class="form-group"><label>Save History</label>
+              <select id="nme-savehistory"><option value="yes">Yes</option><option value="no">No</option></select>
+            </div>
+            <div class="form-group"><label>LED Enable</label>
+              <select id="nme-led"><option value="yes">Yes</option><option value="no">No</option></select>
+            </div>
+            <div class="form-group"><label>Rotate Screen</label>
+              <select id="nme-rotate">
+                <option value="0">0°</option>
+                <option value="90">90°</option>
+                <option value="180">180°</option>
+                <option value="270">270°</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Auto Brightness</label>
+              <select id="nme-autobright"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /nmedit-form -->
+    </div><!-- /modal-body -->
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeNmEdit()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNmEdit()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <script>
@@ -497,8 +607,11 @@
   }
 
   function fmtUptime(s) {
-    if (!s) return '–';
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    if (!s && s !== 0) return '–';
+    if (typeof s === 'string') return s;  // already formatted by device
+    const n = parseInt(s, 10);
+    if (!n && n !== 0) return '–';
+    const h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60);
     return `${h}h ${m}m`;
   }
 
@@ -512,12 +625,17 @@
     // NMMiner rows
     const nmBody = document.getElementById('dash-nm-rows');
     if (nmDevs.length === 0) {
-      nmBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">No NMMiner configured</td></tr>';
+      const hasMaster = currentConfig.nmminer_master;
+      const hasErr = data.nmminer?._error;
+      let msg = 'No NMMiner configured – set Master IP in Settings';
+      if (hasMaster && hasErr) msg = `NMMiner unreachable: ${data.nmminer._error}`;
+      else if (hasMaster) msg = 'NMMiner master configured but returned no devices';
+      nmBody.innerHTML = `<tr><td colspan="6" class="empty text-muted">${msg}</td></tr>`;
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
         const online = d.online !== false;
-        const hr = parseFloat(d.GHs5s || d.hashrate || 0);
-        const temp = parseFloat(d.temp || d.temperature || 0);
+        const hr = parseFloat(d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.hashrate || d.currentHashrate || d.mhsAv && d.mhsAv / 1000 || 0);
+        const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
         if (online) { totalHr += hr; onlineCnt++; }
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
@@ -528,7 +646,7 @@
           <td>${fmtStatus(online)}</td>
           <td>${fmtHr(hr)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
-          <td class="max-w">${d.pool || d.stratumURL || '–'}</td>
+          <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
           <td>${fmtUptime(d.uptime)}</td>
         </tr>`;
       }).join('');
@@ -573,13 +691,17 @@
 
   async function loadNmPage() {
     const tbody = document.getElementById('nm-rows');
-    tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/nmminer/swarm');
       const devs = Array.isArray(data) ? data : (data.devices || []);
+      if (devs.length === 0 && data._error) {
+        tbody.innerHTML = `<tr><td colspan="10" class="empty" style="color:var(--danger)">NMMiner unreachable: ${data._error}</td></tr>`;
+        return;
+      }
       renderNmRows(devs);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
     }
   }
 
@@ -587,23 +709,24 @@
     const tMax = currentConfig.thresholds?.temp_max || 70;
     const tbody = document.getElementById('nm-rows');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">No data</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="empty text-muted">No data</td></tr>';
       return;
     }
     tbody.innerHTML = devs.map(d => {
       const online = d.online !== false;
-      const hr = parseFloat(d.GHs5s || d.hashrate || 0);
-      const temp = parseFloat(d.temp || d.temperature || 0);
+      const hr = parseFloat(d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
+      const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
       return `<tr>
         <td>${d.ip || '–'}</td>
         <td>${d.name || '–'}</td>
         <td>${fmtStatus(online)}</td>
         <td>${hr.toFixed(2)}</td>
         <td>${fmtTemp(temp, tMax)}</td>
-        <td class="max-w">${d.pool || '–'}</td>
-        <td>${d.worker || '–'}</td>
-        <td>${fmtUptime(d.uptime)}</td>
-        <td>${d.bestShare || '–'}</td>
+        <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
+        <td>${d.worker || d.stratumUser || d.user || '–'}</td>
+        <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
+        <td>${d.bestShare || d.best_share || d.bestDiff || '–'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openNmEdit('${d.ip}')">✏ Edit</button></td>
       </tr>`;
     }).join('');
   }
@@ -921,6 +1044,106 @@
     } catch (e) {
       toast('Error: ' + e.message, 'error');
     }
+  }
+
+  // ── NMMiner device config modal ───────────────────────────────────────────
+
+  let _nmEditIP = null;
+
+  async function openNmEdit(ip) {
+    _nmEditIP = ip;
+    const overlay = document.getElementById('nmedit-overlay');
+    const loading = document.getElementById('nmedit-loading');
+    const form    = document.getElementById('nmedit-form');
+    document.getElementById('nmedit-ip-title').textContent = ip;
+    loading.style.color = 'var(--text-muted)';
+    loading.textContent = 'Loading…';
+    loading.style.display = 'block';
+    form.style.display = 'none';
+    overlay.classList.add('open');
+    try {
+      const cfg = await apiFetch(`/api/nmminer/device-config?ip=${encodeURIComponent(ip)}`);
+      _fillNmForm(cfg);
+      loading.style.display = 'none';
+      form.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error loading config: ' + e.message;
+      loading.style.color = 'var(--danger)';
+    }
+  }
+
+  function _fillNmForm(c) {
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    const sel = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const opt = [...el.options].find(o => String(o.value) === String(v));
+      if (opt) el.value = opt.value; else if (el.options.length) el.value = el.options[0].value;
+    };
+    s('nme-hostname',      c.hostname || '');
+    s('nme-ssid',          c.ssid || c.wifiSSID || '');
+    s('nme-wifipass',      c.wifiPassword || c.wifiPass || c.wifi_password || '');
+    s('nme-p-url',         c.stratumURL || c.pool_url || c.poolURL || '');
+    s('nme-p-user',        c.stratumUser || c.walletAddress || c.pool_user || '');
+    s('nme-p-pass',        c.stratumPassword || c.pool_password || 'x');
+    s('nme-s-url',         c.fallbackStratumURL || c.backup_pool_url || c.secondaryPoolURL || '');
+    s('nme-s-user',        c.fallbackStratumUser || c.backup_pool_user || c.secondaryPoolUser || '');
+    s('nme-s-pass',        c.fallbackStratumPassword || c.backup_pool_password || 'x');
+    s('nme-timezone',      c.timezone ?? c.timeZone ?? 0);
+    sel('nme-timeformat',  c.timeFormat || c.time_format || '24h');
+    sel('nme-dateformat',  c.dateFormat || c.date_format || 'DD-MM-YYYY');
+    s('nme-uirefresh',     c.uiRefresh ?? c.ui_refresh ?? 2);
+    s('nme-screentimeout', c.screenTimeout ?? c.screen_timeout ?? 60);
+    s('nme-brightness',    c.brightness ?? 50);
+    sel('nme-savehistory', (c.saveHistory ?? c.save_history) ? 'yes' : 'no');
+    sel('nme-led',         (c.ledEnable ?? c.led_enable ?? true) ? 'yes' : 'no');
+    sel('nme-rotate',      String(c.rotateScreen ?? c.rotate_screen ?? 0));
+    sel('nme-autobright',  (c.autoBrightness ?? c.auto_brightness) ? 'yes' : 'no');
+  }
+
+  async function saveNmEdit() {
+    const v = id => document.getElementById(id)?.value ?? '';
+    const b = id => document.getElementById(id)?.value === 'yes';
+    const n = id => parseInt(document.getElementById(id)?.value) || 0;
+    const payload = {
+      ip:                     _nmEditIP,
+      hostname:               v('nme-hostname'),
+      ssid:                   v('nme-ssid'),
+      wifiPassword:           v('nme-wifipass'),
+      stratumURL:             v('nme-p-url'),
+      stratumUser:            v('nme-p-user'),
+      stratumPassword:        v('nme-p-pass'),
+      fallbackStratumURL:     v('nme-s-url'),
+      fallbackStratumUser:    v('nme-s-user'),
+      fallbackStratumPassword: v('nme-s-pass'),
+      timezone:               n('nme-timezone'),
+      timeFormat:             v('nme-timeformat'),
+      dateFormat:             v('nme-dateformat'),
+      uiRefresh:              n('nme-uirefresh') || 2,
+      screenTimeout:          n('nme-screentimeout'),
+      brightness:             n('nme-brightness'),
+      saveHistory:            b('nme-savehistory'),
+      ledEnable:              b('nme-led'),
+      rotateScreen:           n('nme-rotate'),
+      autoBrightness:         b('nme-autobright'),
+    };
+    try {
+      await apiFetch('/api/nmminer/device-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      toast(`Config saved for ${_nmEditIP}`, 'success');
+      closeNmEdit();
+      loadNmPage();
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  function closeNmEdit() {
+    document.getElementById('nmedit-overlay').classList.remove('open');
+    _nmEditIP = null;
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────
