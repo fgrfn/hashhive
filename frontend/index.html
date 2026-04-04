@@ -1271,9 +1271,10 @@
         const nmCfg = nmCfgMap[ip] || {};
         const curPool   = nmCfg.PrimaryPool || d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
         const curWorker = nmCfg.PrimaryAddress || d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
+        const nmPoolDisplay = curPool.replace(/^[a-z+]+:\/\//i, '');
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
-          <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span>${curPool ? `<span class="pool-dev-meta" style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px">${curPool}${curWorker ? ' · ' + curWorker : ''}</span>` : ''}</label>
+          <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span>${nmPoolDisplay ? `<span class="pool-dev-meta">${nmPoolDisplay}${curWorker ? ' · ' + curWorker : ''}</span>` : ''}</label>
         </div>`;
       });
     }
@@ -1287,7 +1288,7 @@
         const axPoolDisplay = curPool ? `${curPool}:${live.stratumPort || ''}` : '';
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-ax-${d.ip}" data-type="axeos" data-ip="${d.ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
-          <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}</span>${axPoolDisplay ? `<span class="pool-dev-meta" style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px">${axPoolDisplay}${curWorker ? ' · ' + curWorker : ''}</span>` : ''}</label>
+          <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}</span>${axPoolDisplay ? `<span class="pool-dev-meta">${axPoolDisplay}${curWorker ? ' · ' + curWorker : ''}</span>` : ''}</label>
         </div>`;
       });
     }
