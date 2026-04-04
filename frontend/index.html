@@ -1237,6 +1237,16 @@
       nmDevs = Array.isArray(data) ? data : (data.devices || []);
     } catch (_) {}
 
+    // Fetch per-device config for each NMMiner to get PrimaryAddress (worker)
+    const nmCfgMap = {};
+    await Promise.allSettled(nmDevs.map(async d => {
+      if (!d.ip) return;
+      try {
+        const cfg = await apiFetch(`/api/nmminer/device-config?ip=${d.ip}`);
+        nmCfgMap[d.ip] = cfg;
+      } catch (_) {}
+    }));
+
     // Fetch live AxeOS data to get current pool/worker
     let axLive = {};
     try {
@@ -1258,8 +1268,9 @@
         const ip = d.ip || '';
         const hostname = d.hostname || d.name || ip;
         const suffix = hostname.replace(/\s+/g,'_');
-        const curPool   = d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
-        const curWorker = d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
+        const nmCfg = nmCfgMap[ip] || {};
+        const curPool   = nmCfg.PrimaryPool || d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
+        const curWorker = nmCfg.PrimaryAddress || d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
           <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span></label>
