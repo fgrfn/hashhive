@@ -407,7 +407,14 @@
     <!-- ── AXEOS ── -->
     <div class="page" id="page-axeos">
       <div class="card">
-        <div class="card-title">BitAxe / NerdAxe Devices</div>
+        <div class="section-header">
+          <div class="card-title mb-0">BitAxe / NerdAxe Devices</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="batchAxeAction('pause')">⏸ Pause All</button>
+            <button class="btn btn-secondary btn-sm" onclick="batchAxeAction('resume')">▶ Resume All</button>
+            <button class="btn btn-danger btn-sm"    onclick="batchAxeAction('restart')">↺ Restart All</button>
+          </div>
+        </div>
         <div id="ax-summary" class="group-summary" style="display:none">
           <div class="sum-chip"><div class="sum-chip-val" id="ax-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
           <div class="sum-chip"><div class="sum-chip-val sum-ok" id="ax-sum-online">–</div><div class="sum-chip-label">Online</div></div>
@@ -493,11 +500,27 @@
       <div class="card">
         <div class="section-header">
           <div class="card-title mb-0">BitAxe / NerdAxe Devices</div>
-          <button class="btn btn-secondary btn-sm" onclick="addAxeDevice()">+ Add Device</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="addAxeDevice()">+ Add Device</button>
+            <button class="btn btn-secondary btn-sm" onclick="scanAxeNetwork()" id="btn-axe-scan">📶 Auto Scan Network</button>
+          </div>
         </div>
         <ul class="device-list" id="axe-device-list">
           <li class="text-muted" style="padding:8px">No devices configured</li>
         </ul>
+        <div id="axe-discover-list" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Additional Scan Subnets</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:10px">Auto-detected local /24 is always included. Add more subnets to scan (e.g. for VLANs).</p>
+        <ul class="device-list" id="subnet-list">
+          <li class="text-muted" style="padding:8px">No extra subnets configured</li>
+        </ul>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="s-new-subnet" placeholder="192.168.2.0" style="flex:1;max-width:220px">
+          <button class="btn btn-secondary btn-sm" onclick="addSubnet()">+ Add</button>
+        </div>
       </div>
 
       <div class="card">
@@ -1268,6 +1291,30 @@
     }
   }
 
+  async function batchAxeAction(action) {
+    const label = { restart: 'Restart', pause: 'Pause', resume: 'Resume' }[action] || action;
+    const devs = currentConfig?.axeos_devices || [];
+    if (devs.length === 0) { toast('No AxeOS devices configured', 'error'); return; }
+    if (action === 'restart' && !confirm(`Restart all ${devs.length} AxeOS device(s)?`)) return;
+    toast(`${label} All — sending…`, 'info');
+    try {
+      const result = await apiFetch('/api/axeos/action/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const ok  = (result.results || []).filter(r => r.status && r.status < 400).length;
+      const err = (result.results || []).filter(r => r.error || (r.status && r.status >= 400)).length;
+      const msg = `${label} All — ${ok} ok${err ? ', ' + err + ' failed' : ''}`;
+      appendLog(err ? 'warning' : 'ok', msg, 'axeos');
+      toast(msg, err ? 'warning' : 'success');
+      setTimeout(() => loadAxPage(), 2000);
+    } catch (e) {
+      appendLog('critical', `Batch ${action} failed: ${e.message}`, 'axeos');
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
   // ── Pool page ──────────────────────────────────────────────────────────────
 
   async function loadPoolPage() {
@@ -1460,6 +1507,7 @@
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
+      renderSubnetList(cfg.scan_subnets || []);
     } catch (e) {
       toast('Failed to load settings', 'error');
     }
@@ -1626,6 +1674,93 @@
     devs.splice(i, 1);
     currentConfig.axeos_devices = devs;
     renderAxeDeviceList(devs);
+  }
+
+  function renderSubnetList(subnets) {
+    const list = document.getElementById('subnet-list');
+    if (!list) return;
+    if (subnets.length === 0) {
+      list.innerHTML = '<li class="text-muted" style="padding:8px">No extra subnets configured</li>';
+      return;
+    }
+    list.innerHTML = subnets.map((s, i) => `
+      <li class="device-item">
+        <div class="device-item-info">
+          <span class="device-item-name">${s}</span>
+          <span class="device-item-ip">/24 subnet</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeSubnet(${i})">✕</button>
+      </li>`).join('');
+  }
+
+  function addSubnet() {
+    const val = document.getElementById('s-new-subnet').value.trim();
+    if (!val) return;
+    const subnets = currentConfig.scan_subnets || [];
+    if (!subnets.includes(val)) subnets.push(val);
+    currentConfig.scan_subnets = subnets;
+    renderSubnetList(subnets);
+    document.getElementById('s-new-subnet').value = '';
+  }
+
+  function removeSubnet(i) {
+    const subnets = currentConfig.scan_subnets || [];
+    subnets.splice(i, 1);
+    currentConfig.scan_subnets = subnets;
+    renderSubnetList(subnets);
+  }
+
+  async function scanAxeNetwork() {
+    const btn = document.getElementById('btn-axe-scan');
+    const out = document.getElementById('axe-discover-list');
+    btn.disabled = true;
+    btn.textContent = '⏳ Scanning…';
+    out.innerHTML = '<p class="text-muted" style="font-size:12px">Scanning subnet(s) — this takes up to 10 seconds…</p>';
+    try {
+      const result = await apiFetch('/api/axeos/scan');
+      const found = result.found || [];
+      const subnets = result.subnets || [];
+      if (found.length === 0) {
+        out.innerHTML = `<p class="text-muted" style="font-size:13px">No AxeOS devices found on ${subnets.join(', ')}.0/24</p>`;
+        return;
+      }
+      const existingIps = new Set((currentConfig.axeos_devices || []).map(d => d.ip));
+      out.innerHTML = `<p class="text-muted" style="font-size:12px;margin-bottom:6px">Found ${found.length} device(s) on ${subnets.map(s => s+'.0/24').join(', ')}:</p>` +
+        found.map(d => {
+          const already = existingIps.has(d.ip);
+          return `<div class="pool-dev-item" style="margin-bottom:4px">
+            <input type="checkbox" id="axdisc-${d.ip}" value="${d.ip}" data-name="${d.name}" data-type="${d.type}" checked>
+            <label for="axdisc-${d.ip}" style="flex:1">${d.name}
+              <span class="pool-dev-meta">${d.ip} · ${d.asic || d.type}${already ? ' · already saved' : ''}</span>
+            </label>
+          </div>`;
+        }).join('');
+      const importBtn = document.createElement('button');
+      importBtn.className = 'btn btn-primary btn-sm';
+      importBtn.style.marginTop = '10px';
+      importBtn.textContent = '⬇ Import Selected';
+      importBtn.onclick = () => {
+        const checked = [...out.querySelectorAll('input[type=checkbox]:checked')];
+        const existing = currentConfig.axeos_devices || [];
+        const seen = new Set(existing.map(d => d.ip));
+        checked.forEach(cb => {
+          if (!seen.has(cb.value)) {
+            existing.push({ ip: cb.value, name: cb.dataset.name || cb.value, type: cb.dataset.type || 'bitaxe' });
+            seen.add(cb.value);
+          }
+        });
+        currentConfig.axeos_devices = existing;
+        renderAxeDeviceList(existing);
+        out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${existing.length} device(s) added. Click 💾 Save to persist.</p>`;
+        toast(`${checked.length} device(s) imported`, 'success');
+      };
+      out.appendChild(importBtn);
+    } catch (e) {
+      out.innerHTML = `<p style="color:var(--danger);font-size:13px">Error: ${e.message}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📶 Auto Scan Network';
+    }
   }
 
   async function saveSettings() {
