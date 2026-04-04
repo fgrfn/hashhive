@@ -174,6 +174,21 @@
     .pool-dev-item label{flex:1;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
     .pool-dev-meta{font-size:11px;color:var(--text-muted)}
 
+    /* ── Sortable table headers ── */
+    th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+    th.sortable:hover{color:var(--text)}
+    th.sortable::after{content:' ↕';opacity:.35;font-size:10px}
+    th.sortable.asc::after{content:' ↑';opacity:1;color:var(--accent)}
+    th.sortable.desc::after{content:' ↓';opacity:1;color:var(--accent)}
+
+    /* ── Copy IP ── */
+    .copy-ip{cursor:pointer;border-bottom:1px dashed var(--border)}
+    .copy-ip:hover{color:var(--accent);border-bottom-color:var(--accent)}
+
+    /* ── Worker preview ── */
+    .worker-preview{margin-top:8px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-muted)}
+    .worker-preview b{color:var(--text);font-family:monospace}
+
     /* ── Group summary bar ── */
     .group-summary{display:flex;align-items:center;gap:24px;padding:12px 0 16px;flex-wrap:wrap}
     .sum-chip{display:flex;flex-direction:column;gap:1px}
@@ -233,7 +248,7 @@
         <div class="stat-card">
           <div class="stat-label">Total Hashrate</div>
           <div class="stat-value" id="stat-hashrate">–</div>
-          <div class="stat-unit">GH/s</div>
+          <div class="stat-unit" id="stat-hashrate-unit">GH/s</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Devices Online</div>
@@ -299,7 +314,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>IP</th><th>Hostname</th><th>Board</th><th>Status</th><th>Hashrate</th><th>Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th>BestDiff</th><th>Hits</th><th>Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th>Actions</th></tr></thead>
+            <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th>Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -316,8 +331,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th>Temp</th><th>VR Temp</th><th>Power</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Shares OK</th><th>Shares Err</th><th>Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="21" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="23" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -331,9 +346,10 @@
 
         <div class="form-grid">
           <div class="form-group"><label>Primary Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333"></div>
-          <div class="form-group"><label>Primary Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-p-user" placeholder="wallet.{suffix}"></div>
+          <div class="form-group"><label>Primary Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-p-user" placeholder="wallet.{suffix}" oninput="updateWorkerPreview()"></div>
           <div class="form-group"><label>Primary Password</label><input type="text" id="pool-p-pass" placeholder="x"></div>
         </div>
+        <div id="pool-worker-preview" class="worker-preview" style="display:none"></div>
         <div class="form-grid">
           <div class="form-group"><label>Fallback Pool URL</label><input type="text" id="pool-s-url" placeholder="stratum+tcp://pool2.example.com:3333"></div>
           <div class="form-group"><label>Fallback Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-s-user" placeholder="wallet.{suffix}"></div>
@@ -655,7 +671,7 @@
       case 'nmminer':      loadNmPage(); break;
       case 'axeos':        loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
-      case 'pool':          loadPoolPage(); break;
+      case 'pool':          loadPoolPage().then(updateWorkerPreview); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
     }
   }
@@ -844,6 +860,7 @@
     document.getElementById('stat-hashrate').textContent = totalHr >= 1000
       ? (totalHr / 1000).toFixed(3) + ' TH'
       : totalHr.toFixed(2);
+    document.getElementById('stat-hashrate-unit').textContent = totalHr >= 1000 ? 'TH/s' : 'GH/s';
     document.getElementById('stat-online').textContent = onlineCnt;
     document.getElementById('stat-total').textContent = total;
     const onlineEl = document.getElementById('stat-online');
@@ -893,13 +910,18 @@
       // NMMiner returns temp as string like "45.6°C" – strip unit
       const tempRaw = parseFloat(String(d.temp || d.temperature || d.chipTemp || '0'));
       if (online) { totalMh += hr; onlineCnt++; }
+      // Parse share string like "80/3393/98.1%" or "80/3393"
+      const shareStr = d.share || d.shares || '';
+      const sharePct = (() => { const m = String(shareStr).match(/(\d+(?:\.\d+))%/); return m ? parseFloat(m[1]) : null; })();
+      const shareMin = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.share_rate_min) || 80;
+      const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
       return `<tr>
-        <td>${d.ip || '–'}</td>
+        <td><span class="copy-ip" onclick="copyIP('${d.ip}')" title="Copy IP">${d.ip || '–'}</span></td>
         <td>${d.hostname || d.name || '–'}</td>
         <td><small class="text-muted">${d.boardtype || d.boardType || d.board || '–'}</small></td>
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
-        <td><small>${d.share || d.shares || '–'}</small></td>
+        <td><small style="${shareColor}">${shareStr || '–'}</small></td>
         <td class="max-w"><small>${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</small></td>
         <td><small class="text-muted">${d.netDiff || '–'}</small></td>
         <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
@@ -920,9 +942,7 @@
       document.getElementById('nm-sum-online').textContent  = `${onlineCnt} / ${devs.length}`;
       summary.style.display = 'flex';
     }
-  }
-
-  // ── AxeOS detail page ──────────────────────────────────────────────────────
+    initSortable('nm-rows'); ──────────────────────────────────────────────────────
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
@@ -940,7 +960,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="18" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="23" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -973,7 +993,8 @@
         ] : []),
       ].join(' ');
       return `<tr>
-        <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
+        <td><span class="copy-ip" onclick="copyIP('${d._ip}')" title="Copy IP">${d._name || d._ip || '–'}</span><br><small class="text-muted">${d._ip || ''}</small></td>
+        <td><small>${d.ASICModel || '–'}${d.boardVersion ? '<br><span class="text-muted">'+d.boardVersion+'</span>' : ''}</small></td>
         <td>${d._type || '–'}</td>
         <td>${statusCell}</td>
         <td>${hr.toFixed(2)}</td>
@@ -987,6 +1008,7 @@
         <td>${freq}</td>
         <td>${d.fanspeed ?? '–'}</td>
         <td>${fanRpm}</td>
+        <td>${d.fan2rpm ?? '–'}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
         <td><small>${fmtDiff(d.bestDiff)}</small></td>
@@ -1003,9 +1025,7 @@
       document.getElementById('ax-sum-online').textContent = `${onlineCnt} / ${devs.length}`;
       summary.style.display = 'flex';
     }
-  }
-
-  async function restartDevice(ip) {
+    initSortable('ax-rows');(ip) {
     if (!confirm(`Restart device ${ip}?`)) return;
     try {
       await fetch(`http://${ip}/api/system/restart`, { method: 'POST' });
@@ -1087,6 +1107,7 @@
       });
     }
     list.innerHTML = html;
+    updateWorkerPreview();
   }
 
   function poolSelectAll(checked) {
@@ -1575,6 +1596,58 @@
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────
+
+  // ── Copy IP ────────────────────────────────────────────────────────────────
+
+  function copyIP(ip) {
+    navigator.clipboard.writeText(ip).then(() => toast(`Copied: ${ip}`, 'success')).catch(() => toast('Copy failed', 'error'));
+  }
+
+  // ── Sortable tables ────────────────────────────────────────────────────────
+
+  const _sortState = {};
+
+  function initSortable(tableId) {
+    const table = document.getElementById(tableId)?.closest('table');
+    if (!table) return;
+    table.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = parseInt(th.dataset.col);
+        const key = tableId + ':' + col;
+        const asc = _sortState[key] !== true;
+        _sortState[key] = asc;
+        table.querySelectorAll('th.sortable').forEach(h => { h.classList.remove('asc','desc'); });
+        th.classList.add(asc ? 'asc' : 'desc');
+        const tbody = table.querySelector('tbody');
+        const rows = [...tbody.querySelectorAll('tr')];
+        rows.sort((a, b) => {
+          const ta = a.cells[col]?.textContent.trim() || '';
+          const tb = b.cells[col]?.textContent.trim() || '';
+          const na = parseFloat(ta.replace(/[^\d.\-]/g,'')), nb = parseFloat(tb.replace(/[^\d.\-]/g,''));
+          const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : ta.localeCompare(tb);
+          return asc ? cmp : -cmp;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+      });
+    });
+  }
+
+  // ── Worker preview ─────────────────────────────────────────────────────────
+
+  function updateWorkerPreview() {
+    const tpl = document.getElementById('pool-p-user')?.value.trim();
+    const prev = document.getElementById('pool-worker-preview');
+    if (!prev) return;
+    if (!tpl || !tpl.includes('{suffix}')) { prev.style.display = 'none'; return; }
+    const items = [...(document.querySelectorAll('#pool-device-list input[type=checkbox]') || [])];
+    if (items.length === 0) { prev.style.display = 'none'; return; }
+    const examples = items.slice(0, 4).map(cb => {
+      const w = tpl.replace(/\{suffix\}/g, cb.dataset.suffix || cb.dataset.ip);
+      return `<b>${w}</b> <span style="color:var(--text-muted);font-size:11px">(${cb.dataset.ip})</span>`;
+    });
+    prev.style.display = 'block';
+    prev.innerHTML = '👁 Preview: ' + examples.join(' &nbsp;·&nbsp; ') + (items.length > 4 ? ` <span class="text-muted">…+${items.length-4} more</span>` : '');
+  }
 
   function toast(msg, type = 'info') {
     const c = document.getElementById('toast-container');
