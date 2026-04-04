@@ -433,7 +433,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>Pool</th><th>Actions</th></tr></thead>
+            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th></th>Pool</th><th>Actions</th></tr></thead>
             <tbody id="ax-rows"><tr><td colspan="24" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -1140,6 +1140,14 @@
     return `<span style="color:${col}">${n.toFixed(1)} J/TH</span>`;
   }
 
+  function fmtRssi(val) {
+    if (val == null) return '–';
+    const n = parseInt(val);
+    if (!isFinite(n)) return '–';
+    const col = n >= -60 ? 'var(--success)' : n >= -75 ? 'var(--warning)' : 'var(--danger)';
+    return `<small style="color:${col}">${n} dBm</small>`;
+  }
+
   function fmtOfflineSince(isoStr) {
     if (!isoStr) return '';
     try {
@@ -1370,7 +1378,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="24" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="25" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -1429,6 +1437,7 @@
         <td><small>${fmtDiff(d.bestDiff)}</small></td>
         <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
         <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
+        <td>${fmtRssi(d.wifiRSSI)}</td>
         <td class="max-w">${fmtPoolCell(d, 'axeos')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
