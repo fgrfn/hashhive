@@ -138,6 +138,21 @@
     .toast.info{border-color:var(--info);color:var(--info)}
     @keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 
+    /* ── Miner card accents ── */
+    .card-nm{border-top:3px solid var(--accent)}
+    .card-ax{border-top:3px solid #38bdf8}
+
+    /* ── Live log ── */
+    .log-panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;height:200px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px}
+    .log-entry{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6;align-items:baseline}
+    .log-entry:last-child{border-bottom:none}
+    .log-ts{color:var(--text-muted);flex-shrink:0;font-size:11px}
+    .log-msg{flex:1;word-break:break-word}
+    .log-critical{color:var(--danger)}
+    .log-warning{color:var(--warning)}
+    .log-info{color:var(--info)}
+    .log-ok{color:var(--success)}
+
     /* ── Misc ── */
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
@@ -203,7 +218,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card-nm">
         <div class="card-title">NMMiner</div>
         <div class="table-wrap">
           <table>
@@ -213,13 +228,23 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card-ax">
         <div class="card-title">BitAxe / NerdAxe</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares OK</th><th>Pool</th></tr></thead>
             <tbody id="dash-ax-rows"><tr><td colspan="6" class="empty text-muted">No data</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:0">
+        <div class="section-header" style="margin-bottom:10px">
+          <div class="card-title mb-0">🖥 Live Log</div>
+          <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">✕ Clear</button>
+        </div>
+        <div class="log-panel" id="live-log-panel">
+          <div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">Waiting for data…</span></div>
         </div>
       </div>
     </div>
@@ -243,8 +268,8 @@
         <div class="card-title">BitAxe / NerdAxe Devices</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Voltage (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="12" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th>Temp (°C)</th><th>VR Temp</th><th>Power (W)</th><th>Voltage (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Fan RPM</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="18" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -359,12 +384,15 @@
 <div id="toast-container"></div>
 
 <script>
-  const API = 'http://localhost:8000';
+  const API = window.location.origin;
 
   let currentPage = 'dashboard';
   let refreshTimer = null;
   let lastDashboard = null;
   let currentConfig = {};
+  let _offlineTracked = new Set();
+  const _MAX_LOG = 60;
+  let _liveLog = [];
 
   const PAGE_TITLES = {
     dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
@@ -411,7 +439,8 @@
     try {
       lastDashboard = await apiFetch('/api/dashboard');
       currentConfig = lastDashboard.config || {};
-      renderDashboard(lastDashboard);
+      const _s = renderDashboard(lastDashboard);
+      appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`);
       document.getElementById('last-update').textContent =
         'Updated: ' + new Date().toLocaleTimeString('en-US');
       const unread = lastDashboard.unread_alerts || 0;
@@ -422,6 +451,7 @@
       statBadge.textContent = unread;
       statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
     } catch (e) {
+      appendLog('critical', 'Load error: ' + e.message);
       toast('Load error: ' + e.message, 'error');
     }
   }
@@ -490,6 +520,9 @@
         const temp = parseFloat(d.temp || d.temperature || 0);
         if (online) { totalHr += hr; onlineCnt++; }
         if (temp > maxTemp) maxTemp = temp;
+        const _nk = 'nm_' + d.ip;
+        if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline'); _offlineTracked.add(_nk); }
+        else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online'); _offlineTracked.delete(_nk); }
         return `<tr>
           <td>${d.name || d.ip || '–'}</td>
           <td>${fmtStatus(online)}</td>
@@ -512,6 +545,9 @@
         const temp = parseFloat(d.temp || 0);
         if (online) { totalHr += hr; onlineCnt++; }
         if (temp > maxTemp) maxTemp = temp;
+        const _ak = 'ax_' + d._ip;
+        if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline'); _offlineTracked.add(_ak); }
+        else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online'); _offlineTracked.delete(_ak); }
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
@@ -530,6 +566,7 @@
     document.getElementById('stat-online').textContent = onlineCnt;
     document.getElementById('stat-total').textContent = total;
     document.getElementById('stat-maxtemp').textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
+    return { totalHr, onlineCnt, total };
   }
 
   // ── NMMiner detail page ────────────────────────────────────────────────────
@@ -588,29 +625,50 @@
     const tMax = currentConfig.thresholds?.temp_max || 70;
     const tbody = document.getElementById('ax-rows');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="18" class="empty text-muted">No devices configured</td></tr>';
       return;
     }
     tbody.innerHTML = devs.map(d => {
       const online = d._online !== false;
       const hr = parseFloat(d.hashRate || 0);
+      const hr1m = parseFloat(d.hashRate_1m || 0);
+      const expHr = parseFloat(d.expectedHashrate || 0);
+      const errPct = d.errorPercentage != null ? parseFloat(d.errorPercentage).toFixed(2) + '%' : '–';
       const temp = parseFloat(d.temp || 0);
-      const restartBtn = online
-        ? `<button class="btn btn-secondary btn-sm" onclick="restartDevice('${d._ip}')">↺ Restart</button>`
-        : '';
+      const vrTemp = d.vrTemp != null ? parseFloat(d.vrTemp).toFixed(1) + '°C' : '–';
+      const power = d.power != null ? parseFloat(d.power).toFixed(1) + ' W' : '–';
+      const freq = d.actualFrequency ?? d.frequency ?? d.freqMHz ?? '–';
+      const fanRpm = d.fanrpm ?? '–';
+      const paused = d.miningPaused;
+      const statusCell = online
+        ? (paused ? '<span class="dot-offline">Paused</span>' : '<span class="dot-online">Online</span>')
+        : '<span class="dot-offline">Offline</span>';
+      const actions = online ? [
+        paused
+          ? `<button class="btn btn-secondary btn-sm" onclick="resumeDevice('${d._ip}')">▶ Resume</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="pauseDevice('${d._ip}')">⏸ Pause</button>`,
+        `<button class="btn btn-secondary btn-sm" onclick="restartDevice('${d._ip}')">↺ Restart</button>`,
+        `<button class="btn btn-secondary btn-sm" onclick="identifyDevice('${d._ip}')">💡 ID</button>`,
+      ].join(' ') : '';
       return `<tr>
         <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
         <td>${d._type || '–'}</td>
-        <td>${fmtStatus(online)}</td>
+        <td>${statusCell}</td>
         <td>${hr.toFixed(2)}</td>
+        <td>${hr1m > 0 ? hr1m.toFixed(2) : '–'}</td>
+        <td>${expHr > 0 ? expHr.toFixed(2) : '–'}</td>
+        <td>${errPct}</td>
         <td>${fmtTemp(temp, tMax)}</td>
+        <td>${vrTemp}</td>
+        <td>${power}</td>
         <td>${d.voltage ?? '–'}</td>
-        <td>${d.frequency ?? d.freqMHz ?? '–'}</td>
-        <td>${d.fanspeed ?? d.fanSpeed ?? '–'}</td>
+        <td>${freq}</td>
+        <td>${d.fanspeed ?? '–'}</td>
+        <td>${fanRpm}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
         <td class="max-w">${d.stratumURL || '–'}</td>
-        <td>${restartBtn}</td>
+        <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('');
   }
@@ -618,8 +676,37 @@
   async function restartDevice(ip) {
     if (!confirm(`Restart device ${ip}?`)) return;
     try {
-      await fetch(`http://${ip}/api/system/restart`);
+      await fetch(`http://${ip}/api/system/restart`, { method: 'POST' });
       toast(`Restart triggered for ${ip}`, 'success');
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function pauseDevice(ip) {
+    try {
+      await fetch(`http://${ip}/api/system/pause`, { method: 'POST' });
+      toast(`Mining paused on ${ip}`, 'info');
+      loadAxPage();
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function resumeDevice(ip) {
+    try {
+      await fetch(`http://${ip}/api/system/resume`, { method: 'POST' });
+      toast(`Mining resumed on ${ip}`, 'success');
+      loadAxPage();
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function identifyDevice(ip) {
+    try {
+      await fetch(`http://${ip}/api/system/identify`, { method: 'POST' });
+      toast(`Identify signal sent to ${ip}`, 'info');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
     }
@@ -847,9 +934,52 @@
     setTimeout(() => el.remove(), 4000);
   }
 
+  // ── Live log ────────────────────────────────────────────────────────────────
+
+  function appendLog(severity, message) {
+    _liveLog.unshift({ ts: new Date().toLocaleTimeString('en-US'), severity, message });
+    if (_liveLog.length > _MAX_LOG) _liveLog.length = _MAX_LOG;
+    _renderLiveLog();
+  }
+
+  function _renderLiveLog() {
+    const panel = document.getElementById('live-log-panel');
+    if (!panel) return;
+    if (_liveLog.length === 0) {
+      panel.innerHTML = '<div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">No entries yet</span></div>';
+      return;
+    }
+    panel.innerHTML = _liveLog.map(e => {
+      const cls = e.severity === 'critical' ? 'log-critical' : e.severity === 'warning' ? 'log-warning' : e.severity === 'ok' ? 'log-ok' : 'log-info';
+      return `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${cls}">${e.message}</span></div>`;
+    }).join('');
+  }
+
+  function clearLiveLog() {
+    _liveLog = [];
+    _renderLiveLog();
+  }
+
+  async function initLiveLog() {
+    try {
+      const alerts = await apiFetch('/api/alerts');
+      if (!alerts || !alerts.length) return;
+      const history = [...alerts]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 20)
+        .map(a => ({
+          ts: new Date(a.timestamp).toLocaleTimeString('en-US'),
+          severity: a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'info',
+          message: a.message,
+        }));
+      _liveLog = [..._liveLog, ...history].slice(0, _MAX_LOG);
+      _renderLiveLog();
+    } catch (_) {}
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
 
-  document.addEventListener('DOMContentLoaded', () => showPage('dashboard'));
+  document.addEventListener('DOMContentLoaded', () => { initLiveLog(); showPage('dashboard'); });
 </script>
 </body>
 </html>
