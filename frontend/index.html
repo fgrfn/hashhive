@@ -721,9 +721,9 @@
   function fmtNmHr(v) {
     const n = parseFloat(v);
     if (!n && n !== 0) return '–';
-    if (n >= 1000) return (n / 1000).toFixed(3) + ' GH/s';
-    if (n < 1)     return (n * 1000).toFixed(2) + ' KH/s';
-    return n.toFixed(3) + ' MH/s';
+    if (n >= 1000) return (n / 1000).toFixed(2) + ' GH/s';
+    if (n < 1)     return Math.round(n * 1000) + ' KH/s';
+    return Math.round(n) + ' MH/s';
   }
 
   function fmtTemp(v, max) {
