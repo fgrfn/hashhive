@@ -1271,9 +1271,10 @@
         const nmCfg = nmCfgMap[ip] || {};
         const curPool   = nmCfg.PrimaryPool || d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
         const curWorker = nmCfg.PrimaryAddress || d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
+        const workerShort = curWorker ? curWorker.split('.').pop() || curWorker : '';
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
-          <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span></label>
+          <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}${workerShort ? ' · ' + workerShort : ''}</span></label>
         </div>`;
       });
     }
@@ -1284,9 +1285,10 @@
         const live = axLive[d.ip] || {};
         const curPool   = live.stratumURL || '';
         const curWorker = live.stratumUser || '';
+        const axWorkerShort = curWorker ? curWorker.split('.').pop() || curWorker : '';
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-ax-${d.ip}" data-type="axeos" data-ip="${d.ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
-          <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}</span></label>
+          <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}${axWorkerShort ? ' · ' + axWorkerShort : ''}</span></label>
         </div>`;
       });
     }
