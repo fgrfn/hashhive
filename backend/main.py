@@ -25,6 +25,8 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 MAX_ENTRIES_PER_DAY = 1000
 KEEP_DAYS = 30
 
+_startup_time = datetime.now(timezone.utc)
+
 
 def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -109,6 +111,7 @@ DEFAULT_CONFIG: dict = {
     "nmminer_devices": [],
     "axeos_devices": [],
     "refresh_interval": 30,
+    "offline_grace_minutes": 2,
     "thresholds": {
         "temp_max": 70,
         "hashrate_min": 0,
@@ -497,14 +500,15 @@ async def _fetch_axeos_device(client: httpx.AsyncClient, device: dict) -> dict:
     ip = device.get("ip", "")
     name = device.get("name", ip)
     device_type = device.get("type", "bitaxe")
+    temp_max = device.get("temp_max")  # per-device override, may be None
     try:
         resp = await client.get(f"http://{ip}/api/system/info")
         resp.raise_for_status()
         data = resp.json()
-        data.update({"_ip": ip, "_name": name, "_type": device_type, "_online": True})
+        data.update({"_ip": ip, "_name": name, "_type": device_type, "_online": True, "_temp_max": temp_max})
         return data
     except Exception:
-        return {"_ip": ip, "_name": name, "_type": device_type, "_online": False}
+        return {"_ip": ip, "_name": name, "_type": device_type, "_online": False, "_temp_max": temp_max}
 
 
 @app.get("/api/axeos/devices")
@@ -534,10 +538,32 @@ async def patch_axeos_config_all(data: dict):
 
 @app.get("/api/axeos/info/{ip}")
 async def get_axeos_info(ip: str):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    device_cfg = next((d for d in config.get("axeos_devices", []) if d.get("ip") == ip), {})
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(f"http://{ip}/api/system/info")
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        data["_temp_max"] = device_cfg.get("temp_max")
+        return data
+
+
+@app.patch("/api/settings/device")
+async def patch_device_settings(data: dict):
+    """Update per-device HashHive config overrides (e.g. temp_max)."""
+    ip = data.get("ip")
+    if not ip:
+        raise HTTPException(status_code=400, detail="ip required")
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    for d in config.get("axeos_devices", []):
+        if d.get("ip") == ip:
+            if "temp_max" in data and data["temp_max"] is not None:
+                d["temp_max"] = float(data["temp_max"])
+            elif d.get("temp_max") is not None and data.get("temp_max") is None:
+                d.pop("temp_max", None)
+            break
+    save_json(CONFIG_FILE, config)
+    return {"status": "ok"}
 
 
 @app.patch("/api/axeos/config/{ip}")
@@ -729,6 +755,17 @@ async def get_dashboard():
     except Exception:
         pass  # Never let alert checks break the dashboard
 
+    # Annotate offline devices with their offline_since timestamp from device_state
+    device_state = load_json(DEVICE_STATE_FILE, {})
+    for d in nmminer_data.get("devices", []):
+        if not d.get("online", True):
+            key = f"nmminer:{d.get('ip', '')}"
+            d["_offline_since"] = device_state.get(key, {}).get("offline_since")
+    for d in axeos_data.get("devices", []):
+        if not d.get("_online", True):
+            key = f"axeos:{d.get('_ip', '')}"
+            d["_offline_since"] = device_state.get(key, {}).get("offline_since")
+
     today_entries = _read_day(_today())
     unread = sum(1 for a in today_entries if not a.get("read", False))
 
@@ -737,6 +774,21 @@ async def get_dashboard():
         "axeos": axeos_data,
         "unread_alerts": unread,
         "config": config,
+    }
+
+
+@app.get("/api/health")
+async def health():
+    uptime = (datetime.now(timezone.utc) - _startup_time).total_seconds()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    nm_count = len(config.get("nmminer_devices", []))
+    ax_count = len(config.get("axeos_devices", []))
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "uptime_seconds": round(uptime),
+        "devices": {"nmminer": nm_count, "axeos": ax_count},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

@@ -71,6 +71,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
     thresholds = config.get("thresholds", {})
     temp_max: float = float(thresholds.get("temp_max", 70))
     hashrate_min: float = float(thresholds.get("hashrate_min", 0))
+    grace_seconds: float = float(config.get("offline_grace_minutes", 2)) * 60
 
     current_state: dict = {}
     new_alerts: list[dict] = []
@@ -88,19 +89,39 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             hashrate: float = float(device.get("GHs5s", 0) or device.get("hashrate", 0) or 0)
             pool: str = str(device.get("pool", "") or "")
 
+            prev = previous_state.get(key, {})
+            was_online = prev.get("online", True)
+
+            # Base state (carry over offline tracking fields when still offline)
             current_state[key] = {
                 "online": is_online,
                 "temp": temp,
                 "hashrate": hashrate,
                 "pool": pool,
             }
-            prev = previous_state.get(key, {})
 
-            # Online/offline transitions
-            if prev.get("online", True) and not is_online:
-                new_alerts.append(_make_alert(key, "offline", "critical", f"NMMiner {ip} is offline"))
-            elif not prev.get("online", True) and is_online:
-                new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} is back online"))
+            if was_online and not is_online:
+                # Just went offline — start grace timer, no alert yet
+                current_state[key]["offline_since"] = _now_iso()
+                current_state[key]["offline_alerted"] = False
+            elif not was_online and not is_online:
+                # Still offline — preserve tracking fields
+                offline_since = prev.get("offline_since", _now_iso())
+                alerted = prev.get("offline_alerted", False)
+                current_state[key]["offline_since"] = offline_since
+                current_state[key]["offline_alerted"] = alerted
+                if not alerted:
+                    try:
+                        elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(offline_since)).total_seconds()
+                        if elapsed >= grace_seconds:
+                            new_alerts.append(_make_alert(key, "offline", "critical", f"NMMiner {ip} is offline"))
+                            current_state[key]["offline_alerted"] = True
+                    except Exception:
+                        pass
+            elif not was_online and is_online:
+                # Came back online
+                if prev.get("offline_alerted", False):
+                    new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} is back online"))
 
             if is_online:
                 if temp > temp_max:
@@ -130,6 +151,12 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
         temp = float(device.get("temp", 0) or 0)
         hashrate = float(device.get("hashRate", 0) or 0)
         pool = str(device.get("stratumURL", "") or "")
+        # Per-device temp_max override
+        dev_temp_max = device.get("_temp_max")
+        effective_temp_max = float(dev_temp_max) if dev_temp_max is not None else temp_max
+
+        prev = previous_state.get(key, {})
+        was_online = prev.get("online", True)
 
         current_state[key] = {
             "online": is_online,
@@ -137,18 +164,32 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             "hashrate": hashrate,
             "pool": pool,
         }
-        prev = previous_state.get(key, {})
 
-        if prev.get("online", True) and not is_online:
-            new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) is offline"))
-        elif not prev.get("online", True) and is_online:
-            new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) is back online"))
+        if was_online and not is_online:
+            current_state[key]["offline_since"] = _now_iso()
+            current_state[key]["offline_alerted"] = False
+        elif not was_online and not is_online:
+            offline_since = prev.get("offline_since", _now_iso())
+            alerted = prev.get("offline_alerted", False)
+            current_state[key]["offline_since"] = offline_since
+            current_state[key]["offline_alerted"] = alerted
+            if not alerted:
+                try:
+                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(offline_since)).total_seconds()
+                    if elapsed >= grace_seconds:
+                        new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) is offline"))
+                        current_state[key]["offline_alerted"] = True
+                except Exception:
+                    pass
+        elif not was_online and is_online:
+            if prev.get("offline_alerted", False):
+                new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) is back online"))
 
         if is_online:
-            if temp > temp_max:
+            if temp > effective_temp_max:
                 new_alerts.append(
                     _make_alert(key, "temp_high", "critical",
-                                f"{name}: temperature {temp:.1f}°C > {temp_max:.0f}°C")
+                                f"{name}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C")
                 )
             if hashrate_min > 0 and hashrate < hashrate_min:
                 new_alerts.append(

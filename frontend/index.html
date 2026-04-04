@@ -518,7 +518,8 @@
           <div class="form-group"><label>Max. Temperature (°C)</label><input type="number" id="s-temp-max" value="70"></div>
           <div class="form-group"><label>Min. Hashrate GH/s (0 = off)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
           <div class="form-group"><label>Min. Share Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
-          <div class="form-group"><label>Refresh Interval (seconds)</label><input type="number" id="s-interval" value="30"></div>
+          <div class="form-group"><label>Refresh Interval (sec)</label><input type="number" id="s-interval" value="30"></div>
+          <div class="form-group"><label>Offline Alert Grace (min)</label><input type="number" id="s-offline-grace" value="2" min="0" step="0.5" title="Wait this many minutes before triggering an offline alert"></div>
         </div>
       </div>
 
@@ -738,6 +739,15 @@
             </div>
             <div class="form-group"><label>Fan Speed % (manual)</label><input type="number" id="axe-fanspeed" min="0" max="100"></div>
             <div class="form-group"><label>Target Temp °C (auto)</label><input type="number" id="axe-temptarget" min="30" max="90"></div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🔧 HashHive Thresholds</div>
+          <div class="form-group" style="max-width:260px">
+            <label>Max. Temperature Override (°C)</label>
+            <input type="number" id="axe-temp-max-override" min="30" max="100" placeholder="e.g. 65">
+            <small class="text-muted" style="display:block;margin-top:4px">Leave empty to use global threshold</small>
           </div>
         </div>
 
@@ -1051,6 +1061,26 @@
     return `<span class="${cls}">${n.toFixed(1)}°C</span>`;
   }
 
+  function fmtEff(val) {
+    const n = parseFloat(val);
+    if (!n || !isFinite(n)) return '–';
+    const col = n < 20 ? 'var(--success)' : n < 35 ? 'var(--warning)' : 'var(--danger)';
+    return `<span style="color:${col}">${n.toFixed(1)} J/TH</span>`;
+  }
+
+  function fmtOfflineSince(isoStr) {
+    if (!isoStr) return '';
+    try {
+      const diffMs = Date.now() - new Date(isoStr).getTime();
+      const m = Math.floor(diffMs / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ${m % 60}m ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    } catch { return ''; }
+  }
+
   function fmtStatus(online) {
     return online
       ? '<span class="dot-online">Online</span>'
@@ -1105,6 +1135,7 @@
         const sharePct = (() => { const m = String(shareStr).match(/(\d+(?:\.\d+))%/); return m ? parseFloat(m[1]) : null; })();
         const shareMin = currentConfig?.thresholds?.share_rate_min || 80;
         const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
+        const nmUptime = online ? fmtUptime(d.uptime || d.uptimeSeconds) : (d._offline_since ? `<span class="text-muted" style="font-size:11px">offline ${fmtOfflineSince(d._offline_since)}</span>` : '–');
         return `<tr>
           <td>${d.hostname || d.name || d.ip || '–'}<br><small class="text-muted">${d.ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
@@ -1112,7 +1143,7 @@
           <td>${fmtTemp(temp, tMax)}</td>
           <td><small style="${shareColor}">${shareStr || '–'}</small></td>
           <td class="max-w">${fmtPool(d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</td>
-          <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
+          <td>${nmUptime}</td>
         </tr>`;
       }).join('');
     }
@@ -1132,20 +1163,22 @@
         const _ak = 'ax_' + d._ip;
         if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); _saveTracked(); }
         else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); _saveTracked(); }
-        const effVal = pw != null && hr > 0 ? (pw / (hr / 1000)).toFixed(1) : null;
+        const devTMax = d._temp_max ?? tMax;
+        const effVal = pw != null && hr > 0 ? pw / (hr / 1000) : null;
         const acc = d.sharesAccepted ?? '–';
         const rej = d.sharesRejected;
         const sharesStr = rej != null && rej > 0 ? `${acc} / <span style="color:var(--danger)">${rej} err</span>` : String(acc);
+        const axUptime = online ? (d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–') : (d._offline_since ? `<span class="text-muted" style="font-size:11px">offline ${fmtOfflineSince(d._offline_since)}</span>` : '–');
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
           <td>${hr > 0 ? fmtHr(hr) : '–'}</td>
-          <td>${fmtTemp(temp, tMax)}</td>
+          <td>${fmtTemp(temp, devTMax)}</td>
           <td>${pw != null ? pw.toFixed(1) + ' W' : '–'}</td>
-          <td>${effVal != null ? effVal + ' J/TH' : '–'}</td>
+          <td>${fmtEff(effVal)}</td>
           <td><small>${sharesStr}</small></td>
           <td class="max-w">${d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
-          <td>${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</td>
+          <td>${axUptime}</td>
         </tr>`;
       }).join('');
     }
@@ -1281,8 +1314,9 @@
       const vrTemp = d.vrTemp != null ? parseFloat(d.vrTemp).toFixed(1) + '°C' : '–';
       const powerW = d.power != null ? parseFloat(d.power) : null;
       const power = powerW != null ? powerW.toFixed(1) + ' W' : '–';
-      const effVal = powerW != null && hr > 0 ? (powerW / (hr / 1000)).toFixed(1) : null;
-      const eff = effVal != null ? effVal + ' J/TH' : '–';
+      const effVal = powerW != null && hr > 0 ? powerW / (hr / 1000) : null;
+      const eff = fmtEff(effVal);
+      const devTMax = d._temp_max ?? tMax;
       const freq = d.actualFrequency ?? d.frequency ?? d.freqMHz ?? '–';
       const fanRpm = d.fanrpm ?? '–';
       const paused = d.miningPaused;
@@ -1309,7 +1343,7 @@
         <td>${hr1m > 0 ? hr1m.toFixed(2) : '–'}</td>
         <td>${expHr > 0 ? expHr.toFixed(2) : '–'}</td>
         <td>${errPct}</td>
-        <td>${fmtTemp(temp, tMax)}</td>
+        <td>${fmtTemp(temp, devTMax)}</td>
         <td>${vrTemp}</td>
         <td>${power}</td>
         <td>${eff}</td>
@@ -1600,6 +1634,7 @@
       document.getElementById('s-hr-min').value     = cfg.thresholds?.hashrate_min ?? 0;
       document.getElementById('s-share-min').value  = cfg.thresholds?.share_rate_min ?? 80;
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
+      document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
@@ -1831,6 +1866,7 @@
       share_rate_min: parseInt(document.getElementById('s-share-min').value)  || 80,
     };
     currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
+    currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
     try {
       await apiFetch('/api/settings', {
         method: 'POST',
@@ -2117,6 +2153,7 @@
     sel('axe-autofan',  c.autofanspeed ?? 1);
     s('axe-fanspeed',   c.fanspeed    ?? '');
     s('axe-temptarget', c.temptarget  ?? '');
+    s('axe-temp-max-override', c._temp_max ?? '');
   }
 
   async function saveAxEdit() {
@@ -2148,6 +2185,13 @@
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+      });
+      // Save HashHive per-device overrides
+      const overrideTempMax = document.getElementById('axe-temp-max-override')?.value.trim();
+      await apiFetch('/api/settings/device', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: _axEditIP, temp_max: overrideTempMax !== '' ? parseFloat(overrideTempMax) : null }),
       });
       appendLog('ok', `AxeOS config saved — ${_axEditIP}`, 'axeos');
       toast(`Config saved for ${_axEditIP}`, 'success');
