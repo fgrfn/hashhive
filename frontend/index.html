@@ -919,6 +919,15 @@
     // Show server-side interval as "live" indicator instead of countdown
     const cdEl = document.getElementById('refresh-countdown');
     if (cdEl) cdEl.style.display = 'none';
+    // Update detail pages silently if they are currently visible
+    if (currentPage === 'nmminer' && !document.getElementById('nmedit-overlay')?.classList.contains('open')) {
+      const nmDevs = msg.nmminer?.devices;
+      if (Array.isArray(nmDevs)) renderNmRows(nmDevs);
+    }
+    if (currentPage === 'axeos' && !document.getElementById('axedit-overlay')?.classList.contains('open')) {
+      const axDevs = msg.axeos?.devices;
+      if (Array.isArray(axDevs)) renderAxRows(axDevs);
+    }
   }
 
   function _wsConnect() {
