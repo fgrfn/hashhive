@@ -226,6 +226,13 @@ async def patch_axeos_config_all(data: dict):
     return {"results": results}
 
 
+@app.patch("/api/axeos/config/{ip}")
+async def patch_axeos_config_one(ip: str, data: dict):
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.patch(f"http://{ip}/api/system", json=data)
+    return {"ip": ip, "status": resp.status_code}
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 async def _fetch_nmminer_safe(client: httpx.AsyncClient, master: str) -> dict:

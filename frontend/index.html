@@ -167,6 +167,13 @@
     .modal-section-title{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
     .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
 
+    /* ── Pool device checklist ── */
+    .pool-devices{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+    .pool-dev-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;user-select:none}
+    .pool-dev-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;cursor:pointer}
+    .pool-dev-item label{flex:1;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+    .pool-dev-meta{font-size:11px;color:var(--text-muted)}
+
     /* ── Group summary bar ── */
     .group-summary{display:flex;align-items:center;gap:24px;padding:12px 0 16px;flex-wrap:wrap}
     .sum-chip{display:flex;flex-direction:column;gap:1px}
@@ -319,20 +326,34 @@
     <!-- ── POOL ── -->
     <div class="page" id="page-pool">
       <div class="card">
-        <div class="card-title mb-0">Pool Configuration – All Devices</div>
-        <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Push pool settings to all NMMiner and AxeOS devices simultaneously.</p>
+        <div class="card-title mb-0">Pool Configuration</div>
+        <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Push pool settings to selected devices. Use <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{suffix}</code> in the worker name to append a per-device suffix (hostname or IP).</p>
+
         <div class="form-grid">
           <div class="form-group"><label>Primary Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333"></div>
-          <div class="form-group"><label>Primary Worker</label><input type="text" id="pool-p-user" placeholder="wallet.worker1"></div>
+          <div class="form-group"><label>Primary Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-p-user" placeholder="wallet.{suffix}"></div>
           <div class="form-group"><label>Primary Password</label><input type="text" id="pool-p-pass" placeholder="x"></div>
         </div>
         <div class="form-grid">
           <div class="form-group"><label>Fallback Pool URL</label><input type="text" id="pool-s-url" placeholder="stratum+tcp://pool2.example.com:3333"></div>
-          <div class="form-group"><label>Fallback Worker</label><input type="text" id="pool-s-user" placeholder="wallet.worker1"></div>
+          <div class="form-group"><label>Fallback Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-s-user" placeholder="wallet.{suffix}"></div>
           <div class="form-group"><label>Fallback Password</label><input type="text" id="pool-s-pass" placeholder="x"></div>
         </div>
-        <div class="actions-row">
-          <button class="btn btn-primary" onclick="broadcastPool()">🚀 Push to All Devices</button>
+      </div>
+
+      <div class="card">
+        <div class="section-header" style="margin-bottom:8px">
+          <div class="card-title mb-0">Target Devices</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="poolSelectAll(true)">All</button>
+            <button class="btn btn-secondary btn-sm" onclick="poolSelectAll(false)">None</button>
+          </div>
+        </div>
+        <div class="pool-devices" id="pool-device-list">
+          <div class="text-muted" style="padding:8px;font-size:13px">Loading devices…</div>
+        </div>
+        <div class="actions-row" style="margin-top:12px">
+          <button class="btn btn-primary" onclick="broadcastPool()">🚀 Push to Selected Devices</button>
         </div>
       </div>
     </div>
@@ -630,6 +651,7 @@
       case 'nmminer':      loadNmPage(); break;
       case 'axeos':        loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
+      case 'pool':          loadPoolPage(); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
     }
   }
@@ -794,7 +816,17 @@
       : totalHr.toFixed(2);
     document.getElementById('stat-online').textContent = onlineCnt;
     document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-maxtemp').textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
+    const onlineEl = document.getElementById('stat-online');
+    onlineEl.style.color = total === 0 ? 'var(--accent)'
+      : onlineCnt === total ? 'var(--success)'
+      : 'var(--danger)';
+    const tMax = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.temp_max) || 70;
+    const tempEl = document.getElementById('stat-maxtemp');
+    tempEl.textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
+    tempEl.style.color = maxTemp <= 0 ? 'var(--accent)'
+      : maxTemp >= tMax ? 'var(--danger)'
+      : maxTemp >= tMax * 0.9 ? 'var(--warning)'
+      : 'var(--success)';
     return { totalHr, onlineCnt, total };
   }
 
@@ -967,38 +999,108 @@
     }
   }
 
-  // ── Pool broadcast ─────────────────────────────────────────────────────────
+  // ── Pool page ──────────────────────────────────────────────────────────────
+
+  async function loadPoolPage() {
+    const list = document.getElementById('pool-device-list');
+    list.innerHTML = '<div class="text-muted" style="padding:8px;font-size:13px">Loading…</div>';
+
+    let nmDevs = [];
+    try {
+      const data = await apiFetch('/api/nmminer/swarm');
+      nmDevs = Array.isArray(data) ? data : (data.devices || []);
+    } catch (_) {}
+
+    const axDevs = (currentConfig && currentConfig.axeos_devices) || [];
+
+    if (nmDevs.length === 0 && axDevs.length === 0) {
+      list.innerHTML = '<div class="text-muted" style="padding:8px;font-size:13px">No devices configured.</div>';
+      return;
+    }
+
+    let html = '';
+    if (nmDevs.length > 0) {
+      html += '<div class="form-section-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:4px 0 6px">NMMiner</div>';
+      nmDevs.forEach(d => {
+        const ip = d.ip || '';
+        const hostname = d.hostname || d.name || ip;
+        const suffix = hostname.replace(/\s+/g,'_');
+        html += `<div class="pool-dev-item">
+          <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" checked>
+          <label for="pdev-nm-${ip}">${hostname}<span class="pool-dev-meta">${ip}</span></label>
+        </div>`;
+      });
+    }
+    if (axDevs.length > 0) {
+      html += '<div class="form-section-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:10px 0 6px">BitAxe / NerdAxe</div>';
+      axDevs.forEach(d => {
+        const suffix = (d.name || d.ip).replace(/\s+/g,'_');
+        html += `<div class="pool-dev-item">
+          <input type="checkbox" id="pdev-ax-${d.ip}" data-type="axeos" data-ip="${d.ip}" data-suffix="${suffix}" checked>
+          <label for="pdev-ax-${d.ip}">${d.name || d.ip}<span class="pool-dev-meta">${d.ip} · ${d.type || 'axeos'}</span></label>
+        </div>`;
+      });
+    }
+    list.innerHTML = html;
+  }
+
+  function poolSelectAll(checked) {
+    document.querySelectorAll('#pool-device-list input[type=checkbox]').forEach(cb => cb.checked = checked);
+  }
+
+  function applyWorker(template, suffix) {
+    if (!template) return template;
+    return template.includes('{suffix}') ? template.replace(/\{suffix\}/g, suffix) : template;
+  }
 
   async function broadcastPool() {
-    const url = document.getElementById('pool-p-url').value.trim();
-    if (!url) { toast('Please enter a pool URL', 'error'); return; }
+    const baseUrl   = document.getElementById('pool-p-url').value.trim();
+    if (!baseUrl) { toast('Please enter a pool URL', 'error'); return; }
+    const baseUser  = document.getElementById('pool-p-user').value.trim();
+    const basePass  = document.getElementById('pool-p-pass').value.trim();
+    const fbUrl     = document.getElementById('pool-s-url').value.trim();
+    const fbUser    = document.getElementById('pool-s-user').value.trim();
+    const fbPass    = document.getElementById('pool-s-pass').value.trim();
 
-    const payload = {
-      stratumURL:              url,
-      stratumUser:             document.getElementById('pool-p-user').value.trim(),
-      stratumPassword:         document.getElementById('pool-p-pass').value.trim(),
-      fallbackStratumURL:      document.getElementById('pool-s-url').value.trim(),
-      fallbackStratumUser:     document.getElementById('pool-s-user').value.trim(),
-      fallbackStratumPassword: document.getElementById('pool-s-pass').value.trim(),
-    };
+    const selected = [...document.querySelectorAll('#pool-device-list input[type=checkbox]:checked')];
+    if (selected.length === 0) { toast('No devices selected', 'error'); return; }
+
     const hdr = { 'Content-Type': 'application/json' };
-    let ok = true;
+    let okCnt = 0, errCnt = 0;
 
-    try {
-      await apiFetch('/api/nmminer/broadcast-config', { method: 'POST', headers: hdr, body: JSON.stringify(payload) });
-    } catch (e) {
-      toast('NMMiner: ' + e.message, 'error');
-      ok = false;
+    for (const cb of selected) {
+      const { type, ip, suffix } = cb.dataset;
+      const payload = {
+        stratumURL:              baseUrl,
+        stratumUser:             applyWorker(baseUser, suffix),
+        stratumPassword:         basePass,
+        fallbackStratumURL:      fbUrl,
+        fallbackStratumUser:     applyWorker(fbUser, suffix),
+        fallbackStratumPassword: fbPass,
+      };
+      try {
+        if (type === 'nmminer') {
+          await apiFetch('/api/nmminer/device-config', { method: 'POST', headers: hdr,
+            body: JSON.stringify({ ip, ...payload }) });
+        } else {
+          await apiFetch(`/api/axeos/config/${ip}`, { method: 'PATCH', headers: hdr,
+            body: JSON.stringify({
+              stratumURL: payload.stratumURL, stratumUser: payload.stratumUser,
+              stratumPassword: payload.stratumPassword,
+              fallbackStratumURL: payload.fallbackStratumURL,
+              fallbackStratumUser: payload.fallbackStratumUser,
+              fallbackStratumPassword: payload.fallbackStratumPassword
+            }) });
+        }
+        okCnt++;
+      } catch (e) {
+        toast(`${ip}: ${e.message}`, 'error');
+        errCnt++;
+      }
     }
 
-    try {
-      await apiFetch('/api/axeos/config/all', { method: 'PATCH', headers: hdr, body: JSON.stringify(payload) });
-    } catch (e) {
-      toast('AxeOS: ' + e.message, 'error');
-      ok = false;
-    }
-
-    if (ok) toast('Pool config pushed to all devices', 'success');
+    if (errCnt === 0) toast(`Pool config pushed to ${okCnt} device${okCnt !== 1 ? 's' : ''}`, 'success');
+    else toast(`Done: ${okCnt} ok, ${errCnt} failed`, 'warning');
   }
 
   // ── Settings form ──────────────────────────────────────────────────────────
