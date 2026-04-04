@@ -1179,8 +1179,10 @@
     if (!confirm(`Restart device ${ip}?`)) return;
     try {
       await fetch(`http://${ip}/api/system/restart`, { method: 'POST' });
+      appendLog('warning', `Restart triggered — ${ip}`, 'axeos');
       toast(`Restart triggered for ${ip}`, 'success');
     } catch (e) {
+      appendLog('critical', `Restart failed — ${ip}: ${e.message}`, 'axeos');
       toast('Error: ' + e.message, 'error');
     }
   }
@@ -1188,9 +1190,11 @@
   async function pauseDevice(ip) {
     try {
       await fetch(`http://${ip}/api/system/pause`, { method: 'POST' });
+      appendLog('warning', `Mining paused — ${ip}`, 'axeos');
       toast(`Mining paused on ${ip}`, 'info');
       loadAxPage();
     } catch (e) {
+      appendLog('critical', `Pause failed — ${ip}: ${e.message}`, 'axeos');
       toast('Error: ' + e.message, 'error');
     }
   }
@@ -1198,9 +1202,11 @@
   async function resumeDevice(ip) {
     try {
       await fetch(`http://${ip}/api/system/resume`, { method: 'POST' });
+      appendLog('ok', `Mining resumed — ${ip}`, 'axeos');
       toast(`Mining resumed on ${ip}`, 'success');
       loadAxPage();
     } catch (e) {
+      appendLog('critical', `Resume failed — ${ip}: ${e.message}`, 'axeos');
       toast('Error: ' + e.message, 'error');
     }
   }
@@ -1208,8 +1214,10 @@
   async function identifyDevice(ip) {
     try {
       await fetch(`http://${ip}/api/system/identify`, { method: 'POST' });
+      appendLog('info', `Identify sent — ${ip}`, 'axeos');
       toast(`Identify signal sent to ${ip}`, 'info');
     } catch (e) {
+      appendLog('critical', `Identify failed — ${ip}: ${e.message}`, 'axeos');
       toast('Error: ' + e.message, 'error');
     }
   }
@@ -1363,9 +1371,11 @@
             body: JSON.stringify(axPayload) });
         }
         results.push({ ip, ok: true });
+        appendLog('ok', `Pool pushed → ${ip} (${type})`, 'system');
         okCnt++;
       } catch (e) {
         results.push({ ip, ok: false, msg: e.message });
+        appendLog('critical', `Pool push failed → ${ip}: ${e.message}`, 'system');
         errCnt++;
       }
     }
@@ -1373,8 +1383,13 @@
     // Show per-device result table
     _showPushResults(results);
     if (btn) { btn.disabled = false; btn.textContent = '🚀 Push to Selected Devices'; }
-    if (errCnt === 0) toast(`Pool config pushed to ${okCnt} device${okCnt !== 1 ? 's' : ''}`, 'success');
-    else toast(`Done: ${okCnt} ok, ${errCnt} failed`, 'warning');
+    if (errCnt === 0) {
+      toast(`Pool config pushed to ${okCnt} device${okCnt !== 1 ? 's' : ''}`, 'success');
+      appendLog('ok', `Pool push complete — ${okCnt}/${selected.length} ok`, 'system');
+    } else {
+      toast(`Done: ${okCnt} ok, ${errCnt} failed`, 'warning');
+      appendLog('warning', `Pool push done — ${okCnt} ok, ${errCnt} failed`, 'system');
+    }
   }
 
   // ── Settings form ──────────────────────────────────────────────────────────
@@ -1698,10 +1713,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      appendLog('ok', `NMMiner config saved — ${_nmEditIP}`, 'nmminer');
       toast(`Config saved for ${_nmEditIP}`, 'success');
       closeNmEdit();
       loadNmPage();
     } catch (e) {
+      appendLog('critical', `NMMiner config save failed — ${_nmEditIP}: ${e.message}`, 'nmminer');
       toast('Error: ' + e.message, 'error');
     }
   }
@@ -1794,6 +1811,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      appendLog('ok', `AxeOS config saved — ${_axEditIP}`, 'axeos');
       toast(`Config saved for ${_axEditIP}`, 'success');
       closeAxEdit();
       loadAxPage();
@@ -1801,6 +1819,7 @@
         restartDevice(_axEditIP);
       }
     } catch (e) {
+      appendLog('critical', `AxeOS config save failed — ${_axEditIP}: ${e.message}`, 'axeos');
       toast('Error: ' + e.message, 'error');
     }
   }
