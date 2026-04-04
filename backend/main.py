@@ -279,7 +279,10 @@ async def get_dashboard():
 
     axeos_data = {"devices": axeos_results}
 
-    await check_alerts(config, nmminer_data, axeos_data)
+    try:
+        await check_alerts(config, nmminer_data, axeos_data)
+    except Exception:
+        pass  # Never let alert checks break the dashboard
 
     alert_history = load_json(ALERT_HISTORY_FILE, [])
     unread = sum(1 for a in alert_history if not a.get("read", False))
