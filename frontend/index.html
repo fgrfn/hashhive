@@ -1024,11 +1024,13 @@
       const devs = Array.isArray(data) ? data : (data.devices || []);
       if (devs.length === 0 && data._error) {
         tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">NMMiner unreachable: ${data._error}</td></tr>`;
+        appendLog('critical', `NMMiner swarm error: ${data._error}`, 'nmminer');
         return;
       }
       renderNmRows(devs);
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      appendLog('critical', `NMMiner load failed: ${e.message}`, 'nmminer');
     }
   }
 
@@ -1093,6 +1095,7 @@
       renderAxRows(data.devices || []);
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="24" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      appendLog('critical', `AxeOS load failed: ${e.message}`, 'axeos');
     }
   }
 
@@ -1240,10 +1243,19 @@
       nmDevs = Array.isArray(data) ? data : (data.devices || []);
     } catch (_) {}
 
-    // Fetch per-device config for each NMMiner to get PrimaryAddress (worker)
+    // Fetch all NMMiner configs in one request to get PrimaryAddress (worker)
     const nmCfgMap = {};
-    await Promise.allSettled(nmDevs.map(async d => {
-      if (!d.ip) return;
+    try {
+      const allCfgs = await apiFetch('/api/nmminer/config');
+      const cfgList = allCfgs?.configs || (Array.isArray(allCfgs) ? allCfgs : []);
+      cfgList.forEach(entry => {
+        const ip  = entry.ip || entry.IP;
+        const cfg = entry.config || entry;
+        if (ip) nmCfgMap[ip] = cfg;
+      });
+    } catch (_) {}
+    // Fallback: per-device fetch for any still missing
+    await Promise.allSettled(nmDevs.filter(d => d.ip && !nmCfgMap[d.ip]).map(async d => {
       try {
         const cfg = await apiFetch(`/api/nmminer/device-config?ip=${d.ip}`);
         nmCfgMap[d.ip] = cfg;
@@ -1273,7 +1285,7 @@
         const suffix = hostname.replace(/\s+/g,'_');
         const nmCfg = nmCfgMap[ip] || {};
         const curPool   = nmCfg.PrimaryPool || d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
-        const curWorker = nmCfg.PrimaryAddress || d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
+        const curWorker = nmCfg.PrimaryAddress || nmCfg.walletAddress || nmCfg.WalletAddress || d.PrimaryAddress || d.walletAddress || d.worker || d.stratumUser || d.user || '';
         const nmPoolDisplay = curPool.replace(/^[a-z+]+:\/\//i, '');
         html += `<div class="pool-dev-item">
           <input type="checkbox" id="pdev-nm-${ip}" data-type="nmminer" data-ip="${ip}" data-suffix="${suffix}" data-current-pool="${curPool.replace(/"/g,'&quot;')}" data-current-worker="${curWorker.replace(/"/g,'&quot;')}" checked onchange="updatePoolPreview()">
@@ -1508,8 +1520,10 @@
         body: JSON.stringify(currentConfig),
       });
       toast('Settings saved', 'success');
+      appendLog('ok', 'Settings saved', 'system');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
+      appendLog('critical', `Settings save failed: ${e.message}`, 'system');
     }
   }
 
@@ -1551,8 +1565,10 @@
         body: JSON.stringify(currentConfig),
       });
       toast('Notifications saved', 'success');
+      appendLog('ok', 'Notification settings saved', 'system');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
+      appendLog('critical', `Notification settings save failed: ${e.message}`, 'system');
     }
   }
 
@@ -1561,9 +1577,12 @@
       const data = await apiFetch('/api/notifications/test', { method: 'POST' });
       const res = data.results || {};
       const parts = Object.entries(res).map(([k, v]) => `${k}: ${v ? '✓' : '✗'}`);
-      toast(parts.length ? parts.join(' · ') : 'No service enabled', 'info');
+      const msg = parts.length ? parts.join(' · ') : 'No service enabled';
+      toast(msg, 'info');
+      appendLog('info', `Test notification: ${msg}`, 'system');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
+      appendLog('critical', `Test notification failed: ${e.message}`, 'system');
     }
   }
 
