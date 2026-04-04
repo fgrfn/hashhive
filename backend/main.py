@@ -300,6 +300,28 @@ async def post_settings(data: dict) -> dict:
     return {"status": "ok"}
 
 
+@app.get("/api/settings/backup")
+async def download_config():
+    """Download dashboard_config.json as a file attachment."""
+    if not CONFIG_FILE.exists():
+        raise HTTPException(status_code=404, detail="No config file found")
+    return FileResponse(
+        CONFIG_FILE,
+        media_type="application/json",
+        filename="dashboard_config.json",
+        headers={"Content-Disposition": 'attachment; filename="dashboard_config.json"'},
+    )
+
+
+@app.post("/api/settings/restore")
+async def restore_config(data: dict) -> dict:
+    """Restore dashboard_config.json from uploaded JSON body."""
+    # Merge with DEFAULT_CONFIG to ensure all required keys exist
+    merged = {**DEFAULT_CONFIG, **data}
+    save_json(CONFIG_FILE, merged)
+    return {"status": "ok"}
+
+
 # ── NMMiner ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/nmminer/swarm")
@@ -555,13 +577,23 @@ async def patch_device_settings(data: dict):
     if not ip:
         raise HTTPException(status_code=400, detail="ip required")
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    updated = False
     for d in config.get("axeos_devices", []):
         if d.get("ip") == ip:
             if "temp_max" in data and data["temp_max"] is not None:
                 d["temp_max"] = float(data["temp_max"])
             elif d.get("temp_max") is not None and data.get("temp_max") is None:
                 d.pop("temp_max", None)
+            updated = True
             break
+    if not updated:
+        for d in config.get("nmminer_devices", []):
+            if d.get("ip") == ip:
+                if "temp_max" in data and data["temp_max"] is not None:
+                    d["temp_max"] = float(data["temp_max"])
+                elif d.get("temp_max") is not None and data.get("temp_max") is None:
+                    d.pop("temp_max", None)
+                break
     save_json(CONFIG_FILE, config)
     return {"status": "ok"}
 
@@ -701,6 +733,13 @@ async def _fetch_nmminer_safe(
             resp.raise_for_status()
             result = _normalize(resp.json())
             if result is not None:
+                # Enrich with per-device config overrides by IP
+                if nm_devices:
+                    cfg_by_ip = {d["ip"]: d for d in nm_devices if d.get("ip")}
+                    for dev in result.get("devices", []):
+                        ip = dev.get("ip", "")
+                        if ip in cfg_by_ip:
+                            dev["_temp_max"] = cfg_by_ip[ip].get("temp_max")
                 return result
         except Exception:
             pass  # fall through to per-device queries
@@ -708,6 +747,7 @@ async def _fetch_nmminer_safe(
     # Fallback: query each known device individually
     if nm_devices:
         all_devs: list = []
+        cfg_by_ip = {d["ip"]: d for d in nm_devices if d.get("ip")}
 
         async def _fetch_one(ip: str):
             try:
@@ -715,9 +755,12 @@ async def _fetch_nmminer_safe(
                 r.raise_for_status()
                 data = r.json()
                 devs = data if isinstance(data, list) else data.get("devices", [data])
-                all_devs.extend(devs if isinstance(devs, list) else [devs])
+                devs = devs if isinstance(devs, list) else [devs]
+                for dev in devs:
+                    dev["_temp_max"] = cfg_by_ip.get(ip, {}).get("temp_max")
+                all_devs.extend(devs)
             except Exception:
-                all_devs.append({"ip": ip, "online": False})
+                all_devs.append({"ip": ip, "online": False, "_temp_max": cfg_by_ip.get(ip, {}).get("temp_max")})
 
         await asyncio.gather(*[_fetch_one(d["ip"]) for d in nm_devices if d.get("ip")])
         return {"devices": all_devs}

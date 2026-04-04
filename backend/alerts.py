@@ -124,10 +124,12 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                     new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} is back online"))
 
             if is_online:
-                if temp > temp_max:
+                dev_temp_max = device.get("_temp_max")
+                effective_temp_max = float(dev_temp_max) if dev_temp_max is not None else temp_max
+                if temp > effective_temp_max:
                     new_alerts.append(
                         _make_alert(key, "temp_high", "critical",
-                                    f"NMMiner {ip}: temperature {temp:.1f}°C > {temp_max:.0f}°C")
+                                    f"NMMiner {ip}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C")
                     )
                 if hashrate_min > 0 and hashrate < hashrate_min:
                     new_alerts.append(

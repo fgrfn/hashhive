@@ -249,6 +249,8 @@
     .mb-0{margin-bottom:0!important}
     .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .max-w{max-width:200px;overflow:hidden;text-overflow:ellipsis}
+    .highlight-row{animation:rowFlash .6s ease 3}
+    @keyframes rowFlash{0%,100%{background:transparent}50%{background:var(--accent-glow)}}
   </style>
 </head>
 <body>
@@ -526,6 +528,18 @@
       <div class="actions-row" style="margin-top:0">
         <button class="btn btn-primary" onclick="saveSettings()">💾 Save</button>
       </div>
+
+      <div class="card" style="margin-top:0">
+        <div class="card-title">Backup &amp; Restore</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:12px">Download the current config as JSON or restore from a previously saved file.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-secondary" onclick="downloadConfig()">⬇ Download Config</button>
+          <label class="btn btn-secondary" style="cursor:pointer;margin:0">
+            ⬆ Restore Config
+            <input type="file" id="restore-file-input" accept=".json" style="display:none" onchange="restoreConfig(this)">
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- ── NOTIFICATIONS ── -->
@@ -665,6 +679,15 @@
             <div class="form-group"><label>Auto Brightness</label>
               <select id="nme-autobright"><option value="no">No</option><option value="yes">Yes</option></select>
             </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">🔧 HashHive Thresholds</div>
+          <div class="form-group" style="max-width:260px">
+            <label>Max. Temperature Override (°C)</label>
+            <input type="number" id="nme-temp-max-override" min="30" max="100" placeholder="e.g. 65">
+            <small class="text-muted" style="display:block;margin-top:4px">Leave empty to use global threshold</small>
           </div>
         </div>
 
@@ -829,6 +852,23 @@
       case 'pool':          loadPoolPage().then(updateWorkerPreview); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
     }
+  }
+
+  function navigateToDevice(type, ip) {
+    showPage(type);
+    // Wait for the table to render, then scroll to the matching row and flash it
+    const attempt = (tries) => {
+      const tbodyId = type === 'nmminer' ? 'nm-rows' : 'ax-rows';
+      const row = document.querySelector(`#${tbodyId} tr[data-ip="${ip}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('highlight-row');
+        setTimeout(() => row.classList.remove('highlight-row'), 2000);
+      } else if (tries > 0) {
+        setTimeout(() => attempt(tries - 1), 200);
+      }
+    };
+    setTimeout(() => attempt(10), 150);
   }
 
   // ── API helper ─────────────────────────────────────────────────────────────
@@ -1012,6 +1052,38 @@
     return url.replace(/^stratum\+(?:tcp|ssl|tls):\/\//i, '');
   }
 
+  // Rich pool cell: shows active/fallback indicator + hover tooltip with full details
+  function fmtPoolCell(d, type = 'axeos') {
+    if (type === 'nmminer') {
+      const primary   = d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL || '';
+      const secondary = d.SecondaryPool || d.fallbackPool || '';
+      const worker    = d.PrimaryAddress || d.worker || d.stratumUser || d.user || '';
+      const tip = [
+        primary   ? `Primary: ${primary}`   : '',
+        worker    ? `Worker:  ${worker}`    : '',
+        secondary ? `Backup:  ${secondary}` : '',
+      ].filter(Boolean).join('\n');
+      return `<span title="${tip.replace(/"/g,'&quot;')}">${fmtPool(primary)}</span>`;
+    }
+    // AxeOS
+    const primary  = d.stratumURL  || '';
+    const pPort    = d.stratumPort ? `:${d.stratumPort}` : '';
+    const worker   = d.stratumUser || '';
+    const fallback = d.fallbackStratumURL || '';
+    const fPort    = d.fallbackStratumPort ? `:${d.fallbackStratumPort}` : '';
+    const using    = d.isUsingFallbackStratum === 1 || d.isUsingFallbackStratum === true;
+    const tip = [
+      primary  ? `Primary: ${primary}${pPort}` : '',
+      worker   ? `Worker:  ${worker}` : '',
+      fallback ? `Fallback: ${fallback}${fPort}` : '',
+      using    ? '⚠ Currently using fallback!' : '',
+    ].filter(Boolean).join('\n');
+    const display = using
+      ? `<span style="color:var(--warning)" title="${tip.replace(/"/g,'&quot;')}">⚠ ${fmtPool(fallback || primary)}${fPort}</span>`
+      : `<span title="${tip.replace(/"/g,'&quot;')}">${fmtPool(primary)}${pPort}</span>`;
+    return display;
+  }
+
   function fmtHr(v) {
     const n = parseFloat(v);
     if (!n && n !== 0) return '–';
@@ -1136,13 +1208,13 @@
         const shareMin = currentConfig?.thresholds?.share_rate_min || 80;
         const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
         const nmUptime = online ? fmtUptime(d.uptime || d.uptimeSeconds) : (d._offline_since ? `<span class="text-muted" style="font-size:11px">offline ${fmtOfflineSince(d._offline_since)}</span>` : '–');
-        return `<tr>
+        return `<tr data-ip="${d.ip}" onclick="navigateToDevice('nmminer','${d.ip}')" style="cursor:pointer">
           <td>${d.hostname || d.name || d.ip || '–'}<br><small class="text-muted">${d.ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
           <td>${fmtNmHr(hrKh)}</td>
-          <td>${fmtTemp(temp, tMax)}</td>
+          <td>${fmtTemp(temp, d._temp_max ?? tMax)}</td>
           <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-          <td class="max-w">${fmtPool(d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</td>
+          <td class="max-w">${fmtPoolCell(d, 'nmminer')}</td>
           <td>${nmUptime}</td>
         </tr>`;
       }).join('');
@@ -1169,7 +1241,7 @@
         const rej = d.sharesRejected;
         const sharesStr = rej != null && rej > 0 ? `${acc} / <span style="color:var(--danger)">${rej} err</span>` : String(acc);
         const axUptime = online ? (d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–') : (d._offline_since ? `<span class="text-muted" style="font-size:11px">offline ${fmtOfflineSince(d._offline_since)}</span>` : '–');
-        return `<tr>
+        return `<tr data-ip="${d._ip}" onclick="navigateToDevice('axeos','${d._ip}')" style="cursor:pointer">
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
           <td>${hr > 0 ? fmtHr(hr) : '–'}</td>
@@ -1177,7 +1249,7 @@
           <td>${pw != null ? pw.toFixed(1) + ' W' : '–'}</td>
           <td>${fmtEff(effVal)}</td>
           <td><small>${sharesStr}</small></td>
-          <td class="max-w">${d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
+          <td class="max-w">${fmtPoolCell(d, 'axeos')}</td>
           <td>${axUptime}</td>
         </tr>`;
       }).join('');
@@ -1249,20 +1321,20 @@
       const sharePct = (() => { const m = String(shareStr).match(/(\d+(?:\.\d+))%/); return m ? parseFloat(m[1]) : null; })();
       const shareMin = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.share_rate_min) || 80;
       const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
-      return `<tr>
+      return `<tr data-ip="${d.ip}">
         <td><span class="copy-ip" onclick="copyIP('${d.ip}')" title="Copy IP">${d.ip || '–'}</span></td>
         <td>${d.hostname || d.name || '–'}</td>
         <td><small class="text-muted">${d.boardtype || d.boardType || d.board || '–'}</small></td>
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
         <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-        <td class="max-w"><small>${fmtPool(d.PrimaryPool || d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</small></td>
+        <td class="max-w"><small>${fmtPoolCell(d, 'nmminer')}</small></td>
         <td><small class="text-muted">${d.netDiff || '–'}</small></td>
         <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
         <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
         <td><small>${fmtDiff(d.bestDiff || d.best_share || d.bestShare)}</small></td>
         <td>${d.valid ?? d.hits ?? '–'}</td>
-        <td>${fmtTemp(tempRaw, tMax)}</td>
+        <td>${fmtTemp(tempRaw, d._temp_max ?? tMax)}</td>
         <td><small class="text-muted">${d.rssi || '–'}</small></td>
         <td><small class="text-muted">${d.memory || '–'}</small></td>
         <td><small>${fmtUptime(d.uptime || d.uptimeSeconds)}</small></td>
@@ -1334,7 +1406,7 @@
           `<button class="btn btn-secondary btn-sm" onclick="identifyDevice('${d._ip}')">💡 ID</button>`,
         ] : []),
       ].join(' ');
-      return `<tr>
+      return `<tr data-ip="${d._ip}">
         <td><span class="copy-ip" onclick="copyIP('${d._ip}')" title="Copy IP">${d._name || d._ip || '–'}</span><br><small class="text-muted">${d._ip || ''}</small></td>
         <td><small>${d.ASICModel || '–'}${d.boardVersion ? '<br><span class="text-muted">'+d.boardVersion+'</span>' : ''}</small></td>
         <td>${d._type || '–'}</td>
@@ -1357,9 +1429,7 @@
         <td><small>${fmtDiff(d.bestDiff)}</small></td>
         <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
         <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
-        <td class="max-w">${usingFallback
-          ? `<span style="color:var(--warning)" title="Using fallback pool">⚠ ${fmtPool(d.fallbackStratumURL || d.stratumURL)}${d.fallbackStratumPort ? ':'+d.fallbackStratumPort : ''}</span>`
-          : (d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':'+d.stratumPort : '') : '–')}</td>
+        <td class="max-w">${fmtPoolCell(d, 'axeos')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('');
@@ -1883,6 +1953,32 @@
 
   // ── Notification form ──────────────────────────────────────────────────────
 
+  function downloadConfig() {
+    window.location.href = API + '/api/settings/backup';
+  }
+
+  async function restoreConfig(input) {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await apiFetch('/api/settings/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      currentConfig = data;
+      loadSettingsForm();
+      toast('Config restored successfully', 'success');
+      appendLog('ok', 'Config restored from file', 'system');
+    } catch (e) {
+      toast('Restore failed: ' + e.message, 'error');
+    } finally {
+      input.value = '';
+    }
+  }
+
   async function loadNotifForm() {
     try {
       const cfg = await apiFetch('/api/settings');
@@ -2014,6 +2110,10 @@
       const cfg = await apiFetch(`/api/nmminer/device-config?ip=${encodeURIComponent(ip)}`);
       _nmEditRawConfig = cfg;
       _fillNmForm(cfg);
+      // Fill HashHive per-device override from local config
+      const _nmCfgEntry = (currentConfig?.nmminer_devices || []).find(x => x.ip === ip);
+      const _nmTmEl = document.getElementById('nme-temp-max-override');
+      if (_nmTmEl) _nmTmEl.value = _nmCfgEntry?.temp_max ?? '';
       loading.style.display = 'none';
       form.style.display = 'block';
     } catch (e) {
@@ -2086,6 +2186,12 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+      });
+      const _nmOverrideTm = document.getElementById('nme-temp-max-override')?.value.trim();
+      await apiFetch('/api/settings/device', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: _nmEditIP, temp_max: _nmOverrideTm !== '' ? parseFloat(_nmOverrideTm) : null }),
       });
       appendLog('ok', `NMMiner config saved — ${_nmEditIP}`, 'nmminer');
       toast(`Config saved for ${_nmEditIP}`, 'success');
