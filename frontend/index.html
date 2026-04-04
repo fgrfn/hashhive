@@ -820,7 +820,6 @@
     onlineEl.style.color = total === 0 ? 'var(--accent)'
       : onlineCnt === total ? 'var(--success)'
       : 'var(--danger)';
-    const tMax = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.temp_max) || 70;
     const tempEl = document.getElementById('stat-maxtemp');
     tempEl.textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
     tempEl.style.color = maxTemp <= 0 ? 'var(--accent)'
