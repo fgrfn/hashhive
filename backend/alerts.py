@@ -265,24 +265,24 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             if not alerted:
                 try:
                     elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(offline_since)).total_seconds()
-                    if elapsed >= grace_seconds:
+                    if elapsed >= grace_seconds and _type_enabled("offline"):
                         new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) is offline"))
                         current_state[key]["offline_alerted"] = True
                 except Exception:
                     pass
         elif not was_online and is_online:
-            if prev.get("offline_alerted", False):
+            if prev.get("offline_alerted", False) and _type_enabled("online"):
                 new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) is back online"))
 
         if is_online:
             # ── Temperature ──────────────────────────────────────────────────
-            if temp > effective_temp_max and _should_alert(prev, "temp_high", cooldown_seconds):
+            if temp > effective_temp_max and _should_alert(prev, "temp_high", cooldown_seconds) and _type_enabled("temp_high"):
                 new_alerts.append(
                     _make_alert(key, "temp_high", "critical",
                                 f"{name}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C")
                 )
                 _mark_alerted(current_state[key], "temp_high")
-            if vr_temp > 0 and vr_temp > vr_temp_max and _should_alert(prev, "vr_temp_high", cooldown_seconds):
+            if vr_temp > 0 and vr_temp > vr_temp_max and _should_alert(prev, "vr_temp_high", cooldown_seconds) and _type_enabled("vr_temp_high"):
                 new_alerts.append(
                     _make_alert(key, "vr_temp_high", "critical",
                                 f"{name}: VR temperature {vr_temp:.1f}°C > {vr_temp_max:.0f}°C")
@@ -290,13 +290,13 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                 _mark_alerted(current_state[key], "vr_temp_high")
 
             # ── Hashrate & error rate ────────────────────────────────────────
-            if hashrate_min > 0 and hashrate < hashrate_min and _should_alert(prev, "hashrate_low", cooldown_seconds):
+            if hashrate_min > 0 and hashrate < hashrate_min and _should_alert(prev, "hashrate_low", cooldown_seconds) and _type_enabled("hashrate_low"):
                 new_alerts.append(
                     _make_alert(key, "hashrate_low", "warning",
                                 f"{name}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
                 )
                 _mark_alerted(current_state[key], "hashrate_low")
-            if error_pct > error_rate_max and _should_alert(prev, "error_rate_high", cooldown_seconds):
+            if error_pct > error_rate_max and _should_alert(prev, "error_rate_high", cooldown_seconds) and _type_enabled("error_rate_high"):
                 new_alerts.append(
                     _make_alert(key, "error_rate_high", "warning",
                                 f"{name}: error rate {error_pct:.1f}% > {error_rate_max:.0f}%")
@@ -304,37 +304,38 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                 _mark_alerted(current_state[key], "error_rate_high")
 
             # ── Fan ──────────────────────────────────────────────────────────
-            if fan_rpm is not None and int(fan_rpm) == 0 and _should_alert(prev, "fan_failure", cooldown_seconds):
+            if fan_rpm is not None and int(fan_rpm) == 0 and _should_alert(prev, "fan_failure", cooldown_seconds) and _type_enabled("fan_failure"):
                 new_alerts.append(_make_alert(key, "fan_failure", "critical", f"{name}: fan RPM is 0 — fan may be failing"))
                 _mark_alerted(current_state[key], "fan_failure")
 
             # ── Pool ─────────────────────────────────────────────────────────
             prev_pool = prev.get("pool", "")
-            if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds):
+            if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
                 new_alerts.append(_make_alert(key, "pool_lost", "critical", f"{name}: pool connection lost"))
                 _mark_alerted(current_state[key], "pool_lost")
-            elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds):
+            elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
                 new_alerts.append(_make_alert(key, "pool_connected", "info", f"{name}: pool connected"))
                 _mark_alerted(current_state[key], "pool_connected")
 
             # ── Fallback pool ────────────────────────────────────────────────
             prev_fallback = prev.get("using_fallback", False)
-            if not prev_fallback and using_fallback:
+            if not prev_fallback and using_fallback and _type_enabled("fallback_active"):
                 new_alerts.append(_make_alert(key, "fallback_active", "warning",
                                               f"{name}: switched to fallback pool"))
-            elif prev_fallback and not using_fallback:
+            elif prev_fallback and not using_fallback and _type_enabled("fallback_recovered"):
                 new_alerts.append(_make_alert(key, "fallback_recovered", "info",
                                               f"{name}: primary pool restored"))
 
             # ── Mining paused ────────────────────────────────────────────────
             prev_paused = prev.get("paused", False)
-            if not prev_paused and paused:
+            if not prev_paused and paused and _type_enabled("mining_paused"):
                 new_alerts.append(_make_alert(key, "mining_paused", "warning", f"{name}: mining paused"))
 
             # ── Unexpected reboot ────────────────────────────────────────────
             prev_uptime = prev.get("uptime")
             if (uptime is not None and prev_uptime is not None
-                    and float(prev_uptime) > 300 and float(uptime) < 60):
+                    and float(prev_uptime) > 300 and float(uptime) < 60
+                    and _type_enabled("device_rebooted")):
                 new_alerts.append(_make_alert(key, "device_rebooted", "warning",
                                               f"{name}: unexpected reboot detected (uptime reset to {uptime}s)"))
 
@@ -342,13 +343,13 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             prev_best = prev.get("best_diff")
             if (best_diff is not None and prev_best is not None
                     and float(best_diff) > float(prev_best)):
-                # Check if this beats the network difficulty → actual block found
                 if network_difficulty and float(best_diff) >= network_difficulty:
-                    new_alerts.append(_make_alert(key, "block_found", "critical",
-                                                  f"🏆 {name} FOUND A BLOCK! "
-                                                  f"Diff: {_fmt_diff(best_diff)} "
-                                                  f"(network: {_fmt_diff(network_difficulty)}) 🎉🎉🎉"))
-                else:
+                    if _type_enabled("block_found"):
+                        new_alerts.append(_make_alert(key, "block_found", "critical",
+                                                      f"🏆 {name} FOUND A BLOCK! "
+                                                      f"Diff: {_fmt_diff(best_diff)} "
+                                                      f"(network: {_fmt_diff(network_difficulty)}) 🎉🎉🎉"))
+                elif _type_enabled("new_best_diff"):
                     new_alerts.append(_make_alert(key, "new_best_diff", "info",
                                                   f"{name}: new best difficulty! {_fmt_diff(best_diff)} "
                                                   f"(was {_fmt_diff(prev_best)}) 🎉"))
