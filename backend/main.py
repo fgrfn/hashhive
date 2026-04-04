@@ -112,9 +112,12 @@ DEFAULT_CONFIG: dict = {
     "axeos_devices": [],
     "refresh_interval": 30,
     "offline_grace_minutes": 2,
+    "alert_cooldown_minutes": 30,
     "thresholds": {
         "temp_max": 70,
+        "vr_temp_max": 85,
         "hashrate_min": 0,
+        "error_rate_max": 2.0,
         "share_rate_min": 80,
     },
     "notifications": {
@@ -126,6 +129,23 @@ DEFAULT_CONFIG: dict = {
         "gotify_enabled": False,
         "gotify_url": "",
         "gotify_token": "",
+    },
+    "alert_types": {
+        "offline": True,
+        "online": True,
+        "temp-high": True,
+        "vr-temp-high": True,
+        "hashrate-low": True,
+        "error-rate-high": True,
+        "fan-failure": True,
+        "pool-lost": True,
+        "pool-connected": False,
+        "fallback-active": True,
+        "fallback-recovered": False,
+        "mining-paused": True,
+        "device-rebooted": True,
+        "new-best-diff": False,
+        "block-found": True,
     },
 }
 
@@ -911,7 +931,11 @@ async def test_notification():
             try:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
-                    json={"chat_id": chat_id, "text": "HashHive: Test-Benachrichtigung"},
+                    json={
+                        "chat_id": chat_id,
+                        "text": "🐝 <b>HashHive</b>\n🟢 <b>[TEST]</b> Test notification — everything is working!",
+                        "parse_mode": "HTML",
+                    },
                 )
                 results["telegram"] = resp.status_code == 200
             except Exception:
@@ -920,7 +944,21 @@ async def test_notification():
         if notifications.get("discord_enabled") and notifications.get("discord_webhook"):
             webhook = notifications["discord_webhook"]
             try:
-                resp = await client.post(webhook, json={"content": "**HashHive**: Test-Benachrichtigung"})
+                from datetime import datetime, timezone as tz
+                resp = await client.post(webhook, json={
+                    "username": "HashHive",
+                    "embeds": [{
+                        "title": "🐝  HashHive Alert",
+                        "color": 0x22C55E,
+                        "fields": [{
+                            "name": "🟢  Connection Test",
+                            "value": "`Test notification — everything is working!`",
+                            "inline": False,
+                        }],
+                        "footer": {"text": "HashHive Mining Dashboard"},
+                        "timestamp": datetime.now(tz.utc).isoformat(),
+                    }],
+                })
                 results["discord"] = resp.status_code in (200, 204)
             except Exception:
                 results["discord"] = False
@@ -931,7 +969,7 @@ async def test_notification():
             try:
                 resp = await client.post(
                     f"{url}/message",
-                    json={"title": "HashHive", "message": "Test-Benachrichtigung", "priority": 5},
+                    json={"title": "🐝 HashHive", "message": "🟢 [TEST] Test notification — everything is working!", "priority": 3},
                     headers={"X-Gotify-Key": gotify_token},
                 )
                 results["gotify"] = resp.status_code == 200

@@ -518,10 +518,13 @@
         <div class="card-title">Alert Thresholds</div>
         <div class="form-grid">
           <div class="form-group"><label>Max. Temperature (°C)</label><input type="number" id="s-temp-max" value="70"></div>
+          <div class="form-group"><label>Max. VR Temperature (°C)</label><input type="number" id="s-vr-temp-max" value="85" title="Alert when voltage regulator temperature exceeds this"></div>
           <div class="form-group"><label>Min. Hashrate GH/s (0 = off)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
+          <div class="form-group"><label>Max. Error Rate % (0 = off)</label><input type="number" id="s-error-rate-max" value="2" step="0.1" min="0" title="Alert when hash error rate exceeds this percentage"></div>
           <div class="form-group"><label>Min. Share Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
           <div class="form-group"><label>Refresh Interval (sec)</label><input type="number" id="s-interval" value="30"></div>
           <div class="form-group"><label>Offline Alert Grace (min)</label><input type="number" id="s-offline-grace" value="2" min="0" step="0.5" title="Wait this many minutes before triggering an offline alert"></div>
+          <div class="form-group"><label>Alert Repeat Cooldown (min)</label><input type="number" id="s-alert-cooldown" value="30" min="1" step="1" title="Minimum time between repeated alerts of the same type (temp, hashrate, pool)"></div>
         </div>
       </div>
 
@@ -567,6 +570,28 @@
         <div class="form-grid" style="margin-top:14px">
           <div class="form-group"><label>Server URL</label><input type="text" id="n-go-url" placeholder="https://gotify.example.com"></div>
           <div class="form-group"><label>App Token</label><input type="text" id="n-go-token" placeholder="Axxxxxx"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Alert Types</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Choose which events trigger notifications. All types are still logged in Alert History.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px">
+          <div class="toggle-row"><span>🔴 Device Offline</span><label class="toggle"><input type="checkbox" id="at-offline" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔵 Device Online</span><label class="toggle"><input type="checkbox" id="at-online" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔴 High Temperature</span><label class="toggle"><input type="checkbox" id="at-temp-high" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔴 VR Overtemperature</span><label class="toggle"><input type="checkbox" id="at-vr-temp-high" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🟡 Low Hashrate</span><label class="toggle"><input type="checkbox" id="at-hashrate-low" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🟡 High Error Rate</span><label class="toggle"><input type="checkbox" id="at-error-rate-high" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔴 Fan Failure</span><label class="toggle"><input type="checkbox" id="at-fan-failure" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔴 Pool Connection Lost</span><label class="toggle"><input type="checkbox" id="at-pool-lost" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔵 Pool Connected</span><label class="toggle"><input type="checkbox" id="at-pool-connected"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🟡 Fallback Pool Active</span><label class="toggle"><input type="checkbox" id="at-fallback-active" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔵 Primary Pool Restored</span><label class="toggle"><input type="checkbox" id="at-fallback-recovered"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🟡 Mining Paused</span><label class="toggle"><input type="checkbox" id="at-mining-paused" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🟡 Unexpected Reboot</span><label class="toggle"><input type="checkbox" id="at-device-rebooted" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔵 New Best Difficulty</span><label class="toggle"><input type="checkbox" id="at-new-best-diff"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🏆 Block Found</span><label class="toggle"><input type="checkbox" id="at-block-found" checked><span class="toggle-slider"></span></label></div>
         </div>
       </div>
 
@@ -1710,10 +1735,13 @@
       currentConfig = cfg;
       document.getElementById('s-nmminer-master').value = cfg.nmminer_master || '';
       document.getElementById('s-temp-max').value   = cfg.thresholds?.temp_max    ?? 70;
+      document.getElementById('s-vr-temp-max').value = cfg.thresholds?.vr_temp_max ?? 85;
       document.getElementById('s-hr-min').value     = cfg.thresholds?.hashrate_min ?? 0;
+      document.getElementById('s-error-rate-max').value = cfg.thresholds?.error_rate_max ?? 2;
       document.getElementById('s-share-min').value  = cfg.thresholds?.share_rate_min ?? 80;
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
+      document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
       renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
@@ -1940,12 +1968,15 @@
   async function saveSettings() {
     currentConfig.nmminer_master = document.getElementById('s-nmminer-master').value.trim();
     currentConfig.thresholds = {
-      temp_max:      parseFloat(document.getElementById('s-temp-max').value)  || 70,
-      hashrate_min:  parseFloat(document.getElementById('s-hr-min').value)    || 0,
-      share_rate_min: parseInt(document.getElementById('s-share-min').value)  || 80,
+      temp_max:       parseFloat(document.getElementById('s-temp-max').value)       || 70,
+      vr_temp_max:    parseFloat(document.getElementById('s-vr-temp-max').value)    || 85,
+      hashrate_min:   parseFloat(document.getElementById('s-hr-min').value)         || 0,
+      error_rate_max: parseFloat(document.getElementById('s-error-rate-max').value) || 0,
+      share_rate_min: parseInt(document.getElementById('s-share-min').value)        || 80,
     };
     currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
     currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
+    currentConfig.alert_cooldown_minutes = parseFloat(document.getElementById('s-alert-cooldown').value) || 30;
     try {
       await apiFetch('/api/settings', {
         method: 'POST',
@@ -2001,6 +2032,19 @@
       document.getElementById('n-go-on').checked    = !!n.gotify_enabled;
       document.getElementById('n-go-url').value     = n.gotify_url        || '';
       document.getElementById('n-go-token').value   = n.gotify_token      || '';
+      // Alert type toggles (default: enabled for all except low-noise info types)
+      const at = cfg.alert_types || {};
+      const atDefaults = {
+        'offline': true, 'online': true, 'temp-high': true, 'vr-temp-high': true,
+        'hashrate-low': true, 'error-rate-high': true, 'fan-failure': true,
+        'pool-lost': true, 'pool-connected': false, 'fallback-active': true,
+        'fallback-recovered': false, 'mining-paused': true, 'device-rebooted': true,
+        'new-best-diff': false, 'block-found': true,
+      };
+      for (const [id, def] of Object.entries(atDefaults)) {
+        const el = document.getElementById(`at-${id}`);
+        if (el) el.checked = at[id] !== undefined ? !!at[id] : def;
+      }
     } catch (e) {
       console.error('loadNotifForm:', e);
     }
@@ -2017,6 +2061,14 @@
       gotify_url:        document.getElementById('n-go-url').value.trim(),
       gotify_token:      document.getElementById('n-go-token').value.trim(),
     };
+    const atIds = ['offline','online','temp-high','vr-temp-high','hashrate-low','error-rate-high',
+                   'fan-failure','pool-lost','pool-connected','fallback-active','fallback-recovered',
+                   'mining-paused','device-rebooted','new-best-diff','block-found'];
+    currentConfig.alert_types = {};
+    for (const id of atIds) {
+      const el = document.getElementById(`at-${id}`);
+      if (el) currentConfig.alert_types[id] = el.checked;
+    }
     try {
       await apiFetch('/api/settings', {
         method: 'POST',
