@@ -204,12 +204,20 @@
     .log-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
     /* ── Table filter bar ── */
-    .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-    .filter-bar input{flex:1;max-width:280px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px;transition:.15s}
+    .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+    .filter-bar input{flex:1;min-width:160px;max-width:280px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px;transition:.15s}
     .filter-bar input:focus{outline:none;border-color:var(--accent)}
     .filter-bar input::placeholder{color:var(--text-muted)}
     .filter-bar .filter-count{font-size:12px;color:var(--text-muted)}
     tr.filter-hidden{display:none}
+    /* ── Column picker ── */
+    .col-picker-wrap{position:relative}
+    .col-picker-drop{position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 0;z-index:500;min-width:180px;max-height:340px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+    .col-picker-drop.open{display:block}
+    .col-picker-item{display:flex;align-items:center;gap:8px;padding:5px 14px;cursor:pointer;font-size:13px;white-space:nowrap;user-select:none}
+    .col-picker-item:hover{background:var(--surface2)}
+    .col-picker-item input{width:14px;height:14px;accent-color:var(--accent);cursor:pointer}
+    td.col-hidden,th.col-hidden{display:none}
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
     .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -355,6 +363,10 @@
           <input type="search" id="nm-filter" placeholder="Filter by IP, hostname, pool…" oninput="filterTable('nm-rows','nm-filter','nm-filter-count')">
           <span class="filter-count" id="nm-filter-count"></span>
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('nm-filter').value='';filterTable('nm-rows','nm-filter','nm-filter-count')">✕</button>
+          <div class="col-picker-wrap">
+            <button class="btn btn-secondary btn-sm" onclick="toggleColPicker('nm-col-drop')">⚙ Spalten</button>
+            <div class="col-picker-drop" id="nm-col-drop"></div>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -377,6 +389,10 @@
           <input type="search" id="ax-filter" placeholder="Filter by name, IP, ASIC, pool…" oninput="filterTable('ax-rows','ax-filter','ax-filter-count')">
           <span class="filter-count" id="ax-filter-count"></span>
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ax-filter').value='';filterTable('ax-rows','ax-filter','ax-filter-count')">✕</button>
+          <div class="col-picker-wrap">
+            <button class="btn btn-secondary btn-sm" onclick="toggleColPicker('ax-col-drop')">⚙ Spalten</button>
+            <div class="col-picker-drop" id="ax-col-drop"></div>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -765,21 +781,22 @@
   let _countdownTimer = null;
 
   function startAutoRefresh() {
-    loadDashboard();
     stopAutoRefresh();
     const interval = (currentConfig.refresh_interval || 30) * 1000;
-    refreshTimer = setInterval(loadDashboard, interval);
-    // countdown indicator
-    const cdEl = document.getElementById('refresh-countdown');
-    const secsEl = document.getElementById('refresh-secs');
-    if (cdEl) cdEl.style.display = '';
-    let remaining = Math.round(interval / 1000);
-    if (secsEl) secsEl.textContent = remaining;
-    _countdownTimer = setInterval(() => {
-      remaining--;
-      if (remaining <= 0) remaining = Math.round(interval / 1000);
+    // load first, then start timers so countdown starts in sync
+    loadDashboard().then(() => {
+      refreshTimer = setInterval(loadDashboard, interval);
+      const cdEl = document.getElementById('refresh-countdown');
+      const secsEl = document.getElementById('refresh-secs');
+      if (cdEl) cdEl.style.display = '';
+      let remaining = Math.round(interval / 1000);
       if (secsEl) secsEl.textContent = remaining;
-    }, 1000);
+      _countdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) remaining = Math.round(interval / 1000);
+        if (secsEl) secsEl.textContent = remaining;
+      }, 1000);
+    });
   }
 
   function stopAutoRefresh() {
@@ -797,6 +814,11 @@
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
+
+  function fmtPool(url) {
+    if (!url) return '–';
+    return url.replace(/^stratum\+(?:tcp|ssl|tls):\/\//i, '');
+  }
 
   function fmtHr(v) {
     const n = parseFloat(v);
@@ -906,7 +928,7 @@
           <td>${fmtNmHr(hrKh)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
           <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-          <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
+          <td class="max-w">${fmtPool(d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</td>
           <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
         </tr>`;
       }).join('');
@@ -936,7 +958,7 @@
           <td>${pw != null ? pw.toFixed(1) + ' W' : '–'}</td>
           <td>${effVal != null ? effVal + ' J/TH' : '–'}</td>
           <td>${d.sharesAccepted ?? '–'}</td>
-          <td class="max-w">${d.stratumURL ? d.stratumURL + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
+          <td class="max-w">${d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':' + d.stratumPort : '') : '–'}</td>
         </tr>`;
       }).join('');
     }
@@ -1012,7 +1034,7 @@
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
         <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-        <td class="max-w"><small>${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</small></td>
+        <td class="max-w"><small>${fmtPool(d.pool || d.stratumURL || d.stratum_url || d.poolURL)}</small></td>
         <td><small class="text-muted">${d.netDiff || '–'}</small></td>
         <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
         <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
@@ -1033,6 +1055,8 @@
       summary.style.display = 'flex';
     }
     initSortable('nm-rows');
+    filterTable('nm-rows','nm-filter','nm-filter-count');
+    initColPicker('nm-rows', 'nm-col-drop');
   }
 
   async function loadAxPage() {
@@ -1110,8 +1134,8 @@
         <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
         <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
         <td class="max-w">${usingFallback
-          ? `<span style="color:var(--warning)" title="Using fallback pool">⚠ ${d.fallbackStratumURL || d.stratumURL || '–'}${d.fallbackStratumPort ? ':'+d.fallbackStratumPort : ''}</span>`
-          : (d.stratumURL ? d.stratumURL + (d.stratumPort ? ':'+d.stratumPort : '') : '–')}</td>
+          ? `<span style="color:var(--warning)" title="Using fallback pool">⚠ ${fmtPool(d.fallbackStratumURL || d.stratumURL)}${d.fallbackStratumPort ? ':'+d.fallbackStratumPort : ''}</span>`
+          : (d.stratumURL ? fmtPool(d.stratumURL) + (d.stratumPort ? ':'+d.stratumPort : '') : '–')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('');
@@ -1121,6 +1145,8 @@
       summary.style.display = 'flex';
     }
     initSortable('ax-rows');
+    filterTable('ax-rows','ax-filter','ax-filter-count');
+    initColPicker('ax-rows', 'ax-col-drop');
   }
 
   async function restartDevice(ip) {
@@ -1718,6 +1744,60 @@
     const countEl = document.getElementById(countId);
     if (countEl) countEl.textContent = q ? `${visible} / ${rows.length} shown` : '';
   }
+
+  // ── Column picker ──────────────────────────────────────────────────────────
+
+  const _colState = {};   // tbodyId → { colIndex: hidden }
+
+  function initColPicker(tbodyId, dropId) {
+    const table = document.getElementById(tbodyId)?.closest('table');
+    const drop = document.getElementById(dropId);
+    if (!table || !drop) return;
+    const ths = [...table.querySelectorAll('thead th')];
+    if (!_colState[tbodyId]) _colState[tbodyId] = {};
+    drop.innerHTML = ths.map((th, i) => {
+      const label = th.textContent.replace(/[ ↕↑↓]/g,'').trim() || `Col ${i+1}`;
+      const hidden = _colState[tbodyId][i] === true;
+      return `<label class="col-picker-item">
+        <input type="checkbox" ${hidden ? '' : 'checked'} onchange="toggleCol('${tbodyId}',${i},this.checked)">
+        ${label}
+      </label>`;
+    }).join('');
+    // apply already-saved hidden state
+    ths.forEach((th, i) => {
+      const hidden = _colState[tbodyId][i] === true;
+      _applyColVisibility(table, i, !hidden);
+    });
+  }
+
+  function toggleCol(tbodyId, colIdx, visible) {
+    const table = document.getElementById(tbodyId)?.closest('table');
+    if (!table) return;
+    if (!_colState[tbodyId]) _colState[tbodyId] = {};
+    _colState[tbodyId][colIdx] = !visible;
+    _applyColVisibility(table, colIdx, visible);
+  }
+
+  function _applyColVisibility(table, colIdx, visible) {
+    table.querySelectorAll(`tr > *:nth-child(${colIdx + 1})`).forEach(cell => {
+      cell.classList.toggle('col-hidden', !visible);
+    });
+  }
+
+  function toggleColPicker(dropId) {
+    // close all other dropdowns first
+    document.querySelectorAll('.col-picker-drop.open').forEach(d => {
+      if (d.id !== dropId) d.classList.remove('open');
+    });
+    document.getElementById(dropId)?.classList.toggle('open');
+  }
+
+  // Close col picker when clicking outside
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.col-picker-wrap')) {
+      document.querySelectorAll('.col-picker-drop.open').forEach(d => d.classList.remove('open'));
+    }
+  });
 
   // ── Sortable tables ────────────────────────────────────────────────────────
 
