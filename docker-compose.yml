@@ -1,0 +1,15 @@
+services:
+  hashhive:
+    build: .
+    container_name: hashhive
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistente Daten (Config, Alerts, Gerätestatus)
+      - hashhive-data:/app/backend/data
+    environment:
+      - HASHHIVE_DATA_DIR=/app/backend/data
+
+volumes:
+  hashhive-data:

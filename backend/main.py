@@ -1,5 +1,6 @@
 import json
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 from contextlib import asynccontextmanager
@@ -12,9 +13,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from alerts import check_alerts
 
 BASE_DIR = Path(__file__).parent
-CONFIG_FILE = BASE_DIR / "dashboard_config.json"
-ALERT_HISTORY_FILE = BASE_DIR / "alert_history.json"
-DEVICE_STATE_FILE = BASE_DIR / "device_state.json"
+# Daten-Verzeichnis: per Env-Variable überschreibbar (z.B. Docker-Volume)
+DATA_DIR = Path(os.environ.get("HASHHIVE_DATA_DIR", BASE_DIR))
+CONFIG_FILE = DATA_DIR / "dashboard_config.json"
+ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"
+DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 DEFAULT_CONFIG: dict = {
@@ -56,6 +59,7 @@ def save_json(path: Path, data: Any) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     load_json(CONFIG_FILE, DEFAULT_CONFIG)
     load_json(ALERT_HISTORY_FILE, [])
     load_json(DEVICE_STATE_FILE, {})

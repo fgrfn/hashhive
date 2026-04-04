@@ -24,6 +24,9 @@ hashhive/
 │   └── device_state.json        # Gerätestatus für Alert-Diff (auto-generiert)
 ├── frontend/
 │   └── index.html               # Komplettes Dashboard (single file)
+├── Dockerfile                   # Docker-Image (Backend + Frontend)
+├── docker-compose.yml           # Docker Compose mit persistentem Volume
+├── .dockerignore
 ├── setup.ps1                    # Setup-Skript Windows (inkl. Autostart-Option)
 ├── setup.sh                     # Setup-Skript Linux/macOS (inkl. systemd-Option)
 ├── claude.md                    # Diese Datei (in .gitignore)
@@ -214,6 +217,37 @@ Alerts werden bei jedem `/api/dashboard` Request automatisch geprüft:
 
 - Hashrate-Verlauf mit Chart.js + SQLite
 - Weitere Geräteklassen (z.B. Antminer via LuCI-API)
-- Docker-Compose für einfaches Deployment
 - WebSocket für Echtzeit-Updates statt Polling
 - HTTPS + Auth für externen Zugriff
+
+---
+
+## Docker
+
+### Starten
+
+```bash
+# Image bauen und starten
+docker compose up -d
+
+# Logs
+docker compose logs -f
+
+# Stoppen
+docker compose down
+```
+
+Dashboard: **http://localhost:8000**
+
+### Details
+- Ein einziges Image beinhaltet Backend (FastAPI) + Frontend (`/frontend/index.html`)
+- Persistente Daten (Config, Alerts, Gerätestatus) landen im Named Volume `hashhive-data`
+  → gemountet unter `/app/backend/data` im Container
+- Pfad wird per Env-Variable gesteuert: `HASHHIVE_DATA_DIR=/app/backend/data`
+- Port in `docker-compose.yml` änderbar: `"8000:8000"` → z.B. `"9000:8000"`
+
+### Rebuild nach Code-Änderungen
+
+```bash
+docker compose up -d --build
+```

@@ -1,5 +1,6 @@
 import json
 import asyncio
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -7,8 +8,10 @@ from typing import Any
 import httpx
 
 BASE_DIR = Path(__file__).parent
-ALERT_HISTORY_FILE = BASE_DIR / "alert_history.json"
-DEVICE_STATE_FILE = BASE_DIR / "device_state.json"
+# Daten-Verzeichnis: per Env-Variable überschreibbar (z.B. Docker-Volume)
+DATA_DIR = Path(os.environ.get("HASHHIVE_DATA_DIR", BASE_DIR))
+ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"
+DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 
 MAX_ALERT_HISTORY = 500
 
