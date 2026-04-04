@@ -253,6 +253,79 @@ async def get_nmminer_config():
     return {"configs": configs}
 
 
+@app.get("/api/nmminer/scan")
+async def scan_nmminer_devices():
+    """Scan the local /24 subnet for NMMiner devices (no master IP required)."""
+    import socket as _socket
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not determine local network interface")
+
+    parts = local_ip.split(".")
+    subnet = ".".join(parts[:3])
+
+    NM_FIELDS = {"PrimaryPool", "WiFiSSID", "Hostname", "PrimaryAddress"}
+    found: list[dict] = []
+    sem = asyncio.Semaphore(60)  # max 60 concurrent connections
+
+    limits = httpx.Limits(max_connections=60, max_keepalive_connections=0)
+    async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
+        async def _probe(ip: str):
+            async with sem:
+                # Try /swarm first (master exposes this)
+                for path in ("/swarm", "/config"):
+                    try:
+                        resp = await client.get(f"http://{ip}{path}")
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.json()
+                        if path == "/swarm":
+                            devs = data if isinstance(data, list) else \
+                                   data.get("devices", data.get("miners", data.get("workers", None)))
+                            if isinstance(devs, list):
+                                found.append({
+                                    "ip": ip,
+                                    "role": "master",
+                                    "device_count": len(devs),
+                                    "devices": [
+                                        {"ip": d.get("ip", ip), "name": d.get("hostname") or d.get("name") or d.get("ip", ip)}
+                                        for d in devs if isinstance(d, dict)
+                                    ],
+                                })
+                                return
+                        elif path == "/config":
+                            configs = data.get("configs") if isinstance(data, dict) else None
+                            if isinstance(configs, list):
+                                found.append({
+                                    "ip": ip,
+                                    "role": "master",
+                                    "device_count": len(configs),
+                                    "devices": [
+                                        {"ip": e.get("ip", ip), "name": (e.get("config") or {}).get("Hostname") or e.get("ip", ip)}
+                                        for e in configs if isinstance(e, dict)
+                                    ],
+                                })
+                                return
+                            if isinstance(data, dict) and NM_FIELDS & set(data.keys()):
+                                found.append({
+                                    "ip": ip,
+                                    "role": "device",
+                                    "device_count": 1,
+                                    "devices": [{"ip": ip, "name": data.get("Hostname", ip)}],
+                                })
+                                return
+                    except Exception:
+                        pass
+
+        await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
+
+    return {"subnet": f"{subnet}.0/24", "local_ip": local_ip, "found": found}
+
+
 @app.post("/api/nmminer/broadcast-config")
 async def broadcast_nmminer_config(data: dict):
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
