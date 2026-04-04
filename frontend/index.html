@@ -544,10 +544,18 @@
 
       <div class="card" style="margin-top:20px">
         <div class="section-header">
-          <div class="card-title mb-0">Alert History</div>
+          <div class="card-title mb-0">Alert History
+            <select id="alert-days" onchange="loadAlerts()" style="margin-left:10px;font-size:12px;padding:2px 6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px">
+              <option value="1">Today</option>
+              <option value="3">Last 3 days</option>
+              <option value="7" selected>Last 7 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-secondary btn-sm" onclick="markAllRead()">✓ Mark All Read</button>
-            <button class="btn btn-danger btn-sm" onclick="clearAlerts()">🗑 Clear</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAlerts()">🗑 Clear Today</button>
           </div>
         </div>
         <div id="alert-list">
@@ -733,10 +741,38 @@
   let refreshTimer = null;
   let lastDashboard = null;
   let currentConfig = {};
-  let _offlineTracked = new Set();
-  const _MAX_LOG = 60;
-  const _liveLogs = { all: [], nmminer: [], axeos: [], system: [] };
+  const _MAX_LOG = 100;
+  const _LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
   let _activeLogTab = 'all';
+
+  // ── Persistent log (sessionStorage – survives refresh, clears on tab close) ──
+  const _LOG_KEY    = 'hh_liveLogs';
+  const _TRACK_KEY  = 'hh_offlineTracked';
+
+  function _pruneOldEntries(arr) {
+    const cutoff = Date.now() - _LOG_MAX_AGE_MS;
+    return arr.filter(e => !e.isoTs || new Date(e.isoTs).getTime() > cutoff);
+  }
+  function _loadLogs() {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem(_LOG_KEY)) || { all: [], nmminer: [], axeos: [], system: [] };
+      // Prune entries older than 24h on load
+      Object.keys(raw).forEach(k => { raw[k] = _pruneOldEntries(raw[k]); });
+      return raw;
+    } catch (_) { return { all: [], nmminer: [], axeos: [], system: [] }; }
+  }
+  function _saveLogs() {
+    try { sessionStorage.setItem(_LOG_KEY, JSON.stringify(_liveLogs)); } catch (_) {}
+  }
+  function _loadTracked() {
+    try { return new Set(JSON.parse(sessionStorage.getItem(_TRACK_KEY)) || []); } catch (_) { return new Set(); }
+  }
+  function _saveTracked() {
+    try { sessionStorage.setItem(_TRACK_KEY, JSON.stringify([..._offlineTracked])); } catch (_) {}
+  }
+
+  const _liveLogs = _loadLogs();
+  let _offlineTracked = _loadTracked();
 
   const PAGE_TITLES = {
     dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
@@ -942,8 +978,8 @@
         if (online) { totalHr += hrKh / 1e6; onlineCnt++; }  // KH/s → GH/s for total
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
-        if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
-        else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online', 'nmminer'); _offlineTracked.delete(_nk); }
+        if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); _saveTracked(); }
+        else if (online && _offlineTracked.has(_nk)) { appendLog('ok', (d.name || d.ip) + ' is back online', 'nmminer'); _offlineTracked.delete(_nk); _saveTracked(); }
         const shareStr = d.share || d.shares || '';
         const sharePct = (() => { const m = String(shareStr).match(/(\d+(?:\.\d+))%/); return m ? parseFloat(m[1]) : null; })();
         const shareMin = currentConfig?.thresholds?.share_rate_min || 80;
@@ -973,8 +1009,8 @@
         if (online) { totalHr += hr; onlineCnt++; if (pw != null) totalPower += pw; }
         if (temp > maxTemp) maxTemp = temp;
         const _ak = 'ax_' + d._ip;
-        if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); }
-        else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); }
+        if (!online && !_offlineTracked.has(_ak)) { appendLog('critical', (d._name || d._ip) + ' went offline', 'axeos'); _offlineTracked.add(_ak); _saveTracked(); }
+        else if (online && _offlineTracked.has(_ak)) { appendLog('ok', (d._name || d._ip) + ' is back online', 'axeos'); _offlineTracked.delete(_ak); _saveTracked(); }
         const effVal = pw != null && hr > 0 ? (pw / (hr / 1000)).toFixed(1) : null;
         return `<tr>
           <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
@@ -1356,10 +1392,10 @@
               ...rawNmCfg,
               ip,
               IP:               ip,
-              PrimaryPool:      baseUrl,
+              PrimaryPool:      nmPoolUrl(baseUrl),
               PrimaryAddress:   resolvedUser,
               PrimaryPassword:  basePass || 'x',
-              SecondaryPool:    fbUrl,
+              SecondaryPool:    nmPoolUrl(fbUrl),
               SecondaryAddress: resolvedFbUser,
               SecondaryPassword: fbPass || 'x',
             }) });
@@ -1589,8 +1625,9 @@
   // ── Alert history ──────────────────────────────────────────────────────────
 
   async function loadAlerts() {
+    const days = parseInt(document.getElementById('alert-days')?.value || '7');
     try {
-      const alerts = await apiFetch('/api/alerts');
+      const alerts = await apiFetch(`/api/alerts?days=${days}`);
       renderAlerts(alerts);
     } catch (e) {
       document.getElementById('alert-list').innerHTML =
@@ -1709,10 +1746,10 @@
       Hostname:         v('nme-hostname'),
       WiFiSSID:         v('nme-ssid'),
       WiFiPWD:          v('nme-wifipass'),
-      PrimaryPool:      v('nme-p-url'),
+      PrimaryPool:      nmPoolUrl(v('nme-p-url')),
       PrimaryAddress:   v('nme-p-user'),
       PrimaryPassword:  v('nme-p-pass'),
-      SecondaryPool:    v('nme-s-url'),
+      SecondaryPool:    nmPoolUrl(v('nme-s-url')),
       SecondaryAddress: v('nme-s-user'),
       SecondaryPassword: v('nme-s-pass'),
       Timezone:         n('nme-timezone'),
@@ -1993,6 +2030,12 @@
 
   // ── Pool URL parser ────────────────────────────────────────────────────────
   // Returns { host, port } — strips protocol prefix, splits off port number.
+  // Ensure full stratum URL for NMMiner (requires "stratum+tcp://" prefix)
+  function nmPoolUrl(raw) {
+    if (!raw) return '';
+    return /^[a-z][a-z0-9+\-.]*:\/\//i.test(raw) ? raw : 'stratum+tcp://' + raw;
+  }
+
   function parsePoolUrl(raw) {
     if (!raw) return { host: '', port: null };
     let s = raw.trim();
@@ -2112,14 +2155,26 @@
 
   // ── Live log ────────────────────────────────────────────────────────────────
 
-  function appendLog(severity, message, source = 'system') {
-    const entry = { ts: new Date().toLocaleTimeString('en-US'), severity, message };
+  function appendLog(severity, message, source = 'system', persist = true) {
+    const now = new Date();
+    const entry = { ts: now.toLocaleTimeString('en-US'), isoTs: now.toISOString(), severity, message };
     _liveLogs.all.unshift(entry);
     if (_liveLogs.all.length > _MAX_LOG) _liveLogs.all.length = _MAX_LOG;
     const bucket = _liveLogs[source] || _liveLogs.system;
     bucket.unshift(entry);
     if (bucket.length > _MAX_LOG) bucket.length = _MAX_LOG;
+    _saveLogs();
     _renderLiveLog();
+    // Persist notable entries to backend so they survive browser restart
+    // Skip: routine "Refreshed" ok lines to avoid flooding alert_history
+    const isRoutineRefresh = severity === 'ok' && message.startsWith('Refreshed');
+    if (persist && !isRoutineRefresh) {
+      fetch(API + '/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ severity, message, source }),
+      }).catch(() => {}); // fire-and-forget, never block UI
+    }
   }
 
   function setLogTab(tab) {
@@ -2146,12 +2201,15 @@
 
   function clearLiveLog() {
     Object.keys(_liveLogs).forEach(k => _liveLogs[k] = []);
+    _saveLogs();
     _renderLiveLog();
   }
 
   async function initLiveLog() {
+    // If sessionStorage already has entries, just render – no need to re-seed
+    if (_liveLogs.all.length > 0) { _renderLiveLog(); return; }
     try {
-      const alerts = await apiFetch('/api/alerts');
+      const alerts = await apiFetch('/api/alerts?days=1');
       if (!alerts || !alerts.length) return;
       const history = [...alerts]
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
@@ -2166,6 +2224,7 @@
         _liveLogs.all.push(e);
         (_liveLogs[e.source] || _liveLogs.system).push(e);
       });
+      _saveLogs();
       _renderLiveLog();
     } catch (_) {}
   }

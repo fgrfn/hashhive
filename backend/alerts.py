@@ -10,10 +10,10 @@ import httpx
 BASE_DIR = Path(__file__).parent
 # Daten-Verzeichnis: per Env-Variable überschreibbar (z.B. Docker-Volume)
 DATA_DIR = Path(os.environ.get("HASHHIVE_DATA_DIR", BASE_DIR))
-ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"
+LOGS_DIR = DATA_DIR / "logs"
 DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 
-MAX_ALERT_HISTORY = 500
+MAX_ENTRIES_PER_DAY = 1000
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -27,6 +27,27 @@ def load_json(path: Path, default: Any) -> Any:
 
 def save_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _log_file(date_str: str) -> Path:
+    return LOGS_DIR / f"{date_str}.json"
+
+
+def _append_alerts(new_alerts: list) -> None:
+    if not new_alerts:
+        return
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    date_str = _today()
+    lf = _log_file(date_str)
+    existing: list = load_json(lf, [])
+    merged = new_alerts + existing
+    if len(merged) > MAX_ENTRIES_PER_DAY:
+        merged = merged[:MAX_ENTRIES_PER_DAY]
+    save_json(lf, merged)
 
 
 def _now_iso() -> str:
@@ -144,11 +165,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
     save_json(DEVICE_STATE_FILE, current_state)
 
     if new_alerts:
-        history: list = load_json(ALERT_HISTORY_FILE, [])
-        history.extend(new_alerts)
-        if len(history) > MAX_ALERT_HISTORY:
-            history = history[-MAX_ALERT_HISTORY:]
-        save_json(ALERT_HISTORY_FILE, history)
+        _append_alerts(new_alerts)
 
         notifications = config.get("notifications", {})
         if any([

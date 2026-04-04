@@ -1,12 +1,13 @@
 import json
 import asyncio
 import os
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -16,9 +17,92 @@ BASE_DIR = Path(__file__).parent
 # Daten-Verzeichnis: per Env-Variable überschreibbar (z.B. Docker-Volume)
 DATA_DIR = Path(os.environ.get("HASHHIVE_DATA_DIR", BASE_DIR))
 CONFIG_FILE = DATA_DIR / "dashboard_config.json"
-ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"
+ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"  # legacy – migrated on first start
 DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
+LOGS_DIR = DATA_DIR / "logs"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
+
+MAX_ENTRIES_PER_DAY = 1000
+KEEP_DAYS = 30
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _log_file(date_str: str) -> Path:
+    return LOGS_DIR / f"{date_str}.json"
+
+
+def _read_day(date_str: str) -> list:
+    return load_json(_log_file(date_str), [])
+
+
+def _write_day(date_str: str, entries: list) -> None:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    save_json(_log_file(date_str), entries)
+
+
+def _append_entry(record: dict) -> None:
+    """Append one record to today's log file and enforce MAX_ENTRIES_PER_DAY."""
+    date_str = _today()
+    entries = _read_day(date_str)
+    entries.insert(0, record)
+    if len(entries) > MAX_ENTRIES_PER_DAY:
+        entries = entries[:MAX_ENTRIES_PER_DAY]
+    _write_day(date_str, entries)
+
+
+def _cleanup_old_logs() -> None:
+    """Delete log files older than KEEP_DAYS."""
+    if not LOGS_DIR.exists():
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
+    for f in LOGS_DIR.glob("*.json"):
+        try:
+            file_date = datetime.strptime(f.stem, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if file_date < cutoff:
+                f.unlink()
+        except ValueError:
+            pass
+
+
+def _load_recent(days: int = 1) -> list:
+    """Return entries from the last N days, newest first."""
+    result = []
+    for i in range(days):
+        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        result.extend(_read_day(date_str))
+    return result
+
+
+def _migrate_legacy() -> None:
+    """Move old alert_history.json into daily log files on first start."""
+    if not ALERT_HISTORY_FILE.exists():
+        return
+    try:
+        old = load_json(ALERT_HISTORY_FILE, [])
+        if not old:
+            return
+        # Group by date
+        by_day: dict = {}
+        for entry in old:
+            ts = entry.get("timestamp", "")
+            try:
+                day = datetime.fromisoformat(ts).strftime("%Y-%m-%d")
+            except (ValueError, TypeError):
+                day = _today()
+            by_day.setdefault(day, []).append(entry)
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        for day, entries in by_day.items():
+            existing = _read_day(day)
+            merged = entries + existing
+            if len(merged) > MAX_ENTRIES_PER_DAY:
+                merged = merged[:MAX_ENTRIES_PER_DAY]
+            _write_day(day, merged)
+        ALERT_HISTORY_FILE.rename(ALERT_HISTORY_FILE.with_suffix(".json.migrated"))
+    except Exception:
+        pass
 
 DEFAULT_CONFIG: dict = {
     "nmminer_master": "",
@@ -60,9 +144,11 @@ def save_json(path: Path, data: Any) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
     load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    load_json(ALERT_HISTORY_FILE, [])
     load_json(DEVICE_STATE_FILE, {})
+    _migrate_legacy()
+    _cleanup_old_logs()
     yield
 
 
@@ -309,8 +395,8 @@ async def get_dashboard():
     except Exception:
         pass  # Never let alert checks break the dashboard
 
-    alert_history = load_json(ALERT_HISTORY_FILE, [])
-    unread = sum(1 for a in alert_history if not a.get("read", False))
+    today_entries = _read_day(_today())
+    unread = sum(1 for a in today_entries if not a.get("read", False))
 
     return {
         "nmminer": nmminer_data,
@@ -320,25 +406,64 @@ async def get_dashboard():
     }
 
 
-# ── Alerts ────────────────────────────────────────────────────────────────────
+# ── Alerts & Logs ─────────────────────────────────────────────────────────────
 
 @app.get("/api/alerts")
-async def get_alerts():
-    return load_json(ALERT_HISTORY_FILE, [])
+async def get_alerts(days: int = Query(default=1, ge=1, le=30)):
+    """Return log entries. days=1 → today only; days=7 → last 7 days."""
+    return _load_recent(days)
+
+
+@app.get("/api/logs/dates")
+async def get_log_dates():
+    """List available log file dates (newest first)."""
+    if not LOGS_DIR.exists():
+        return []
+    dates = sorted(
+        [f.stem for f in LOGS_DIR.glob("*.json") if len(f.stem) == 10],
+        reverse=True,
+    )
+    return dates
 
 
 @app.post("/api/alerts/read-all")
 async def mark_alerts_read():
-    alerts = load_json(ALERT_HISTORY_FILE, [])
-    for alert in alerts:
-        alert["read"] = True
-    save_json(ALERT_HISTORY_FILE, alerts)
+    date_str = _today()
+    entries = _read_day(date_str)
+    for entry in entries:
+        entry["read"] = True
+    _write_day(date_str, entries)
     return {"status": "ok"}
 
 
 @app.delete("/api/alerts")
 async def delete_alerts():
-    save_json(ALERT_HISTORY_FILE, [])
+    """Delete today's log file."""
+    lf = _log_file(_today())
+    if lf.exists():
+        lf.unlink()
+    return {"status": "ok"}
+
+
+@app.post("/api/log")
+async def post_log_entry(entry: dict):
+    """Persist a manual action log entry (pool push, config save, etc.) to today's log file."""
+    severity = entry.get("severity", "info")
+    message  = entry.get("message", "")
+    source   = entry.get("source", "system")
+    if not message:
+        raise HTTPException(status_code=400, detail="message required")
+    now = datetime.now(timezone.utc).isoformat()
+    record = {
+        "id":        f"log:{source}:{now}",
+        "device":    f"log:{source}",
+        "kind":      "user_action",
+        "severity":  severity,
+        "message":   message,
+        "timestamp": now,
+        "read":      True,   # action logs are pre-read; don't bump unread counter
+    }
+    _append_entry(record)
     return {"status": "ok"}
 
 
