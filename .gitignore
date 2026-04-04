@@ -1,0 +1,29 @@
+# Claude / AI instruction files
+claude.md
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Auto-generated data files (created at runtime)
+backend/dashboard_config.json
+backend/alert_history.json
+backend/device_state.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HashHive</title>
+  <style>
+    :root {
+      --bg:           #0f0f13;
+      --surface:      #1a1a24;
+      --surface2:     #222230;
+      --border:       #2d2d3d;
+      --text:         #e2e2f0;
+      --text-muted:   #8888aa;
+      --accent:       #a855f7;
+      --accent-dim:   #7c3aed;
+      --accent-glow:  rgba(168,85,247,.15);
+      --success:      #22c55e;
+      --warning:      #f59e0b;
+      --danger:       #ef4444;
+      --info:         #3b82f6;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;display:flex;min-height:100vh}
+
+    /* ── Sidebar ── */
+    #sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+    .sidebar-logo{padding:20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+    .logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent-dim));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}
+    .logo-text{font-size:18px;font-weight:700}
+    .logo-text span{color:var(--accent)}
+    nav{flex:1;padding:10px 0;overflow-y:auto}
+    nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--text-muted);text-decoration:none;transition:.15s;border-left:3px solid transparent;cursor:pointer;user-select:none}
+    nav a:hover{color:var(--text);background:var(--surface2)}
+    nav a.active{color:var(--accent);background:var(--accent-glow);border-left-color:var(--accent)}
+    .nav-icon{font-size:16px;width:20px;text-align:center}
+    .nav-badge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px}
+    .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px}
+
+    /* ── Main ── */
+    #main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+    .topbar{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50}
+    .topbar h1{font-size:17px;font-weight:600}
+    .topbar-right{display:flex;gap:8px;align-items:center}
+    .content{padding:22px;flex:1}
+    .page{display:none}
+    .page.active{display:block}
+
+    /* ── Cards ── */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+    .card-title{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+
+    /* ── Stat grid ── */
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+    .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+    .stat-value{font-size:24px;font-weight:700;color:var(--accent);line-height:1.1}
+    .stat-unit{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+    /* ── Tables ── */
+    .table-wrap{overflow-x:auto;border-radius:6px}
+    table{width:100%;border-collapse:collapse}
+    thead th{text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+    tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+    tbody tr:hover{background:var(--surface2)}
+    tbody tr:last-child td{border-bottom:none}
+
+    /* ── Status dots ── */
+    .dot-online{display:inline-flex;align-items:center;gap:5px;color:var(--success);font-weight:500}
+    .dot-online::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--success)}
+    .dot-offline{display:inline-flex;align-items:center;gap:5px;color:var(--danger);font-weight:500}
+    .dot-offline::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--danger)}
+
+    /* ── Temp colors ── */
+    .t-ok{color:var(--success)}
+    .t-warn{color:var(--warning)}
+    .t-crit{color:var(--danger)}
+
+    /* ── Buttons ── */
+    .btn{padding:7px 14px;border-radius:6px;border:1px solid transparent;cursor:pointer;font-size:13px;font-weight:500;transition:.15s;line-height:1.4}
+    .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-primary:hover{background:var(--accent-dim);border-color:var(--accent-dim)}
+    .btn-secondary{background:var(--surface2);color:var(--text);border-color:var(--border)}
+    .btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+    .btn-danger:hover{background:var(--danger);color:#fff}
+    .btn-sm{padding:4px 10px;font-size:12px}
+
+    /* ── Forms ── */
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;margin-bottom:5px;color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+    .form-group input,.form-group select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;transition:.15s}
+    .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
+    .form-group input::placeholder{color:var(--text-muted)}
+
+    /* ── Toggle ── */
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+    .toggle-row:last-of-type{border-bottom:none}
+    .toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:22px;transition:.2s}
+    .toggle-slider::before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+    .toggle input:checked+.toggle-slider{background:var(--accent)}
+    .toggle input:checked+.toggle-slider::before{transform:translateX(18px)}
+
+    /* ── Device list ── */
+    .device-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+    .device-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+    .device-item-info{display:flex;flex-direction:column;gap:2px}
+    .device-item-name{font-weight:500}
+    .device-item-ip{font-size:12px;color:var(--text-muted)}
+
+    /* ── Section header ── */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+
+    /* ── Alert items ── */
+    .alert-item{display:flex;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);align-items:flex-start}
+    .alert-item:last-child{border-bottom:none}
+    .alert-item.unread{background:rgba(168,85,247,.05)}
+    .alert-sev{font-size:16px;margin-top:1px;flex-shrink:0}
+    .alert-content{flex:1;min-width:0}
+    .alert-message{font-size:13px;word-break:break-word}
+    .alert-meta{font-size:11px;color:var(--text-muted);margin-top:3px}
+    .sev-critical{color:var(--danger)}
+    .sev-warning{color:var(--warning)}
+    .sev-info{color:var(--info)}
+
+    /* ── Empty state ── */
+    .empty{text-align:center;padding:40px;color:var(--text-muted)}
+    .empty-icon{font-size:40px;margin-bottom:10px}
+
+    /* ── Toast ── */
+    #toast-container{position:fixed;bottom:22px;right:22px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+    .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;max-width:320px;animation:toastIn .2s ease}
+    .toast.success{border-color:var(--success);color:var(--success)}
+    .toast.error{border-color:var(--danger);color:var(--danger)}
+    .toast.info{border-color:var(--info);color:var(--info)}
+    @keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+
+    /* ── Misc ── */
+    .text-muted{color:var(--text-muted)}
+    .mb-0{margin-bottom:0!important}
+    .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .max-w{max-width:200px;overflow:hidden;text-overflow:ellipsis}
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════ SIDEBAR ════════════════════════════════════ -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🐝</div>
+    <div class="logo-text">Hash<span>Hive</span></div>
+  </div>
+  <nav>
+    <a id="nav-dashboard"      onclick="showPage('dashboard')">      <span class="nav-icon">📊</span> Dashboard</a>
+    <a id="nav-nmminer"        onclick="showPage('nmminer')">        <span class="nav-icon">⛏️</span> NMMiner</a>
+    <a id="nav-axeos"          onclick="showPage('axeos')">          <span class="nav-icon">🔧</span> BitAxe / NerdAxe</a>
+    <a id="nav-pool"           onclick="showPage('pool')">           <span class="nav-icon">🌐</span> Pool</a>
+    <a id="nav-settings"       onclick="showPage('settings')">       <span class="nav-icon">⚙️</span> Einstellungen</a>
+    <a id="nav-notifications"  onclick="showPage('notifications')">  <span class="nav-icon">🔔</span> Benachrichtigungen
+      <span class="nav-badge" id="alert-badge" style="display:none">0</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">HashHive v1.0</div>
+</aside>
+
+<!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
+<div id="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <div class="topbar-right">
+      <span id="last-update" class="text-muted" style="font-size:12px"></span>
+      <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Aktualisieren</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Gesamt Hashrate</div>
+          <div class="stat-value" id="stat-hashrate">–</div>
+          <div class="stat-unit">GH/s</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Geräte Online</div>
+          <div class="stat-value" id="stat-online">–</div>
+          <div class="stat-unit">von <span id="stat-total">–</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Max. Temperatur</div>
+          <div class="stat-value" id="stat-maxtemp">–</div>
+          <div class="stat-unit">°C</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Offene Alerts</div>
+          <div class="stat-value" id="stat-alerts" style="color:var(--warning)">–</div>
+          <div class="stat-unit">ungelesen</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">NMMiner</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Uptime</th></tr></thead>
+            <tbody id="dash-nm-rows"><tr><td colspan="6" class="empty text-muted">Keine Daten</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">BitAxe / NerdAxe</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares OK</th><th>Pool</th></tr></thead>
+            <tbody id="dash-ax-rows"><tr><td colspan="6" class="empty text-muted">Keine Daten</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── NMMINER ── -->
+    <div class="page" id="page-nmminer">
+      <div class="card">
+        <div class="card-title">NMMiner Geräte</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>IP</th><th>Name</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Pool</th><th>Worker</th><th>Uptime</th><th>Best Share</th></tr></thead>
+            <tbody id="nm-rows"><tr><td colspan="9" class="empty text-muted">Keine Daten</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AXEOS ── -->
+    <div class="page" id="page-axeos">
+      <div class="card">
+        <div class="card-title">BitAxe / NerdAxe Geräte</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name / IP</th><th>Typ</th><th>Status</th><th>Hashrate (GH/s)</th><th>Temp (°C)</th><th>Spannung (mV)</th><th>Freq (MHz)</th><th>Fan (%)</th><th>Shares OK</th><th>Shares Err</th><th>Pool</th><th>Aktionen</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="12" class="empty text-muted">Keine Daten</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── POOL ── -->
+    <div class="page" id="page-pool">
+      <div class="card">
+        <div class="card-title mb-0">Pool Konfiguration – Alle Geräte</div>
+        <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Übertragung an alle NMMiner und AxeOS-Geräte gleichzeitig.</p>
+        <div class="form-grid">
+          <div class="form-group"><label>Primär Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333"></div>
+          <div class="form-group"><label>Primär Worker</label><input type="text" id="pool-p-user" placeholder="wallet.worker1"></div>
+          <div class="form-group"><label>Primär Passwort</label><input type="text" id="pool-p-pass" placeholder="x"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Fallback Pool URL</label><input type="text" id="pool-s-url" placeholder="stratum+tcp://pool2.example.com:3333"></div>
+          <div class="form-group"><label>Fallback Worker</label><input type="text" id="pool-s-user" placeholder="wallet.worker1"></div>
+          <div class="form-group"><label>Fallback Passwort</label><input type="text" id="pool-s-pass" placeholder="x"></div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-primary" onclick="broadcastPool()">🚀 An alle Geräte senden</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <div class="card-title">NMMiner</div>
+        <div class="form-group" style="max-width:340px">
+          <label>Master IP</label>
+          <input type="text" id="s-nmminer-master" placeholder="10.10.40.182">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title mb-0">BitAxe / NerdAxe Geräte</div>
+          <button class="btn btn-secondary btn-sm" onclick="addAxeDevice()">+ Hinzufügen</button>
+        </div>
+        <ul class="device-list" id="axe-device-list">
+          <li class="text-muted" style="padding:8px">Keine Geräte konfiguriert</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Alert-Schwellenwerte</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Max. Temperatur (°C)</label><input type="number" id="s-temp-max" value="70"></div>
+          <div class="form-group"><label>Min. Hashrate GH/s (0 = aus)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
+          <div class="form-group"><label>Min. Share-Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
+          <div class="form-group"><label>Refresh-Intervall (Sekunden)</label><input type="number" id="s-interval" value="30"></div>
+        </div>
+      </div>
+
+      <div class="actions-row" style="margin-top:0">
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Speichern</button>
+      </div>
+    </div>
+
+    <!-- ── NOTIFICATIONS ── -->
+    <div class="page" id="page-notifications">
+      <div class="card">
+        <div class="card-title">Telegram</div>
+        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-tg-on"><span class="toggle-slider"></span></label></div>
+        <div class="form-grid" style="margin-top:14px">
+          <div class="form-group"><label>Bot Token</label><input type="text" id="n-tg-token" placeholder="123456:ABC-DEF..."></div>
+          <div class="form-group"><label>Chat ID</label><input type="text" id="n-tg-chat" placeholder="-1001234567890"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Discord</div>
+        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-dc-on"><span class="toggle-slider"></span></label></div>
+        <div class="form-grid" style="margin-top:14px">
+          <div class="form-group"><label>Webhook URL</label><input type="text" id="n-dc-hook" placeholder="https://discord.com/api/webhooks/..."></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Gotify</div>
+        <div class="toggle-row"><span>Aktivieren</span><label class="toggle"><input type="checkbox" id="n-go-on"><span class="toggle-slider"></span></label></div>
+        <div class="form-grid" style="margin-top:14px">
+          <div class="form-group"><label>Server URL</label><input type="text" id="n-go-url" placeholder="https://gotify.example.com"></div>
+          <div class="form-group"><label>App Token</label><input type="text" id="n-go-token" placeholder="Axxxxxx"></div>
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" onclick="saveNotifications()">💾 Speichern</button>
+        <button class="btn btn-secondary" onclick="testNotification()">📨 Test senden</button>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="section-header">
+          <div class="card-title mb-0">Alert-Verlauf</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="markAllRead()">✓ Alle gelesen</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAlerts()">🗑 Löschen</button>
+          </div>
+        </div>
+        <div id="alert-list">
+          <div class="empty"><div class="empty-icon">🔔</div>Keine Alerts</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<div id="toast-container"></div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  let currentPage = 'dashboard';
+  let refreshTimer = null;
+  let lastDashboard = null;
+  let currentConfig = {};
+
+  const PAGE_TITLES = {
+    dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
+    pool: 'Pool Einstellungen', settings: 'Einstellungen', notifications: 'Benachrichtigungen',
+  };
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    const page = document.getElementById('page-' + name);
+    if (page) page.classList.add('active');
+    const navEl = document.getElementById('nav-' + name);
+    if (navEl) navEl.classList.add('active');
+    document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
+    currentPage = name;
+
+    if (name !== 'dashboard') stopAutoRefresh();
+
+    switch (name) {
+      case 'dashboard':    startAutoRefresh(); break;
+      case 'nmminer':      loadNmPage(); break;
+      case 'axeos':        loadAxPage(); break;
+      case 'settings':     loadSettingsForm(); break;
+      case 'notifications': loadNotifForm(); loadAlerts(); break;
+    }
+  }
+
+  // ── API helper ─────────────────────────────────────────────────────────────
+
+  async function apiFetch(path, opts = {}) {
+    const resp = await fetch(API + path, opts);
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => resp.statusText);
+      throw new Error(`HTTP ${resp.status}: ${txt}`);
+    }
+    return resp.json();
+  }
+
+  // ── Dashboard ──────────────────────────────────────────────────────────────
+
+  async function loadDashboard() {
+    try {
+      lastDashboard = await apiFetch('/api/dashboard');
+      currentConfig = lastDashboard.config || {};
+      renderDashboard(lastDashboard);
+      document.getElementById('last-update').textContent =
+        'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+      const unread = lastDashboard.unread_alerts || 0;
+      const badge = document.getElementById('alert-badge');
+      const statBadge = document.getElementById('stat-alerts');
+      badge.textContent = unread;
+      badge.style.display = unread > 0 ? '' : 'none';
+      statBadge.textContent = unread;
+      statBadge.style.color = unread > 0 ? 'var(--warning)' : 'var(--success)';
+    } catch (e) {
+      toast('Ladefehler: ' + e.message, 'error');
+    }
+  }
+
+  function startAutoRefresh() {
+    loadDashboard();
+    stopAutoRefresh();
+    const interval = (currentConfig.refresh_interval || 30) * 1000;
+    refreshTimer = setInterval(loadDashboard, interval);
+  }
+
+  function stopAutoRefresh() {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  }
+
+  function refreshCurrent() {
+    if (currentPage === 'dashboard') loadDashboard();
+    else if (currentPage === 'nmminer') loadNmPage();
+    else if (currentPage === 'axeos') loadAxPage();
+    else if (currentPage === 'notifications') loadAlerts();
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  function fmtHr(v) {
+    const n = parseFloat(v);
+    if (!n && n !== 0) return '–';
+    if (n >= 1000) return (n / 1000).toFixed(3) + ' TH/s';
+    return n.toFixed(2) + ' GH/s';
+  }
+
+  function fmtTemp(v, max) {
+    const n = parseFloat(v);
+    if (!n) return '–';
+    const cls = n >= max ? 't-crit' : n >= max * 0.9 ? 't-warn' : 't-ok';
+    return `<span class="${cls}">${n.toFixed(1)}°C</span>`;
+  }
+
+  function fmtStatus(online) {
+    return online
+      ? '<span class="dot-online">Online</span>'
+      : '<span class="dot-offline">Offline</span>';
+  }
+
+  function fmtUptime(s) {
+    if (!s) return '–';
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+
+  function renderDashboard(data) {
+    const tMax = currentConfig.thresholds?.temp_max || 70;
+    const nmDevs = Array.isArray(data.nmminer) ? data.nmminer : (data.nmminer?.devices || []);
+    const axDevs = data.axeos?.devices || [];
+
+    let totalHr = 0, onlineCnt = 0, maxTemp = 0;
+
+    // NMMiner rows
+    const nmBody = document.getElementById('dash-nm-rows');
+    if (nmDevs.length === 0) {
+      nmBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Keine NMMiner konfiguriert</td></tr>';
+    } else {
+      nmBody.innerHTML = nmDevs.map(d => {
+        const online = d.online !== false;
+        const hr = parseFloat(d.GHs5s || d.hashrate || 0);
+        const temp = parseFloat(d.temp || d.temperature || 0);
+        if (online) { totalHr += hr; onlineCnt++; }
+        if (temp > maxTemp) maxTemp = temp;
+        return `<tr>
+          <td>${d.name || d.ip || '–'}</td>
+          <td>${fmtStatus(online)}</td>
+          <td>${fmtHr(hr)}</td>
+          <td>${fmtTemp(temp, tMax)}</td>
+          <td class="max-w">${d.pool || d.stratumURL || '–'}</td>
+          <td>${fmtUptime(d.uptime)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // AxeOS rows
+    const axBody = document.getElementById('dash-ax-rows');
+    if (axDevs.length === 0) {
+      axBody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Keine AxeOS-Geräte konfiguriert</td></tr>';
+    } else {
+      axBody.innerHTML = axDevs.map(d => {
+        const online = d._online !== false;
+        const hr = parseFloat(d.hashRate || 0);
+        const temp = parseFloat(d.temp || 0);
+        if (online) { totalHr += hr; onlineCnt++; }
+        if (temp > maxTemp) maxTemp = temp;
+        return `<tr>
+          <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
+          <td>${fmtStatus(online)}</td>
+          <td>${fmtHr(hr)}</td>
+          <td>${fmtTemp(temp, tMax)}</td>
+          <td>${d.sharesAccepted ?? '–'}</td>
+          <td class="max-w">${d.stratumURL || '–'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    const total = nmDevs.length + axDevs.length;
+    document.getElementById('stat-hashrate').textContent = totalHr >= 1000
+      ? (totalHr / 1000).toFixed(3) + ' TH'
+      : totalHr.toFixed(2);
+    document.getElementById('stat-online').textContent = onlineCnt;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-maxtemp').textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
+  }
+
+  // ── NMMiner detail page ────────────────────────────────────────────────────
+
+  async function loadNmPage() {
+    const tbody = document.getElementById('nm-rows');
+    tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Lade…</td></tr>';
+    try {
+      const data = await apiFetch('/api/nmminer/swarm');
+      const devs = Array.isArray(data) ? data : (data.devices || []);
+      renderNmRows(devs);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+    }
+  }
+
+  function renderNmRows(devs) {
+    const tMax = currentConfig.thresholds?.temp_max || 70;
+    const tbody = document.getElementById('nm-rows');
+    if (!devs || devs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty text-muted">Keine Daten</td></tr>';
+      return;
+    }
+    tbody.innerHTML = devs.map(d => {
+      const online = d.online !== false;
+      const hr = parseFloat(d.GHs5s || d.hashrate || 0);
+      const temp = parseFloat(d.temp || d.temperature || 0);
+      return `<tr>
+        <td>${d.ip || '–'}</td>
+        <td>${d.name || '–'}</td>
+        <td>${fmtStatus(online)}</td>
+        <td>${hr.toFixed(2)}</td>
+        <td>${fmtTemp(temp, tMax)}</td>
+        <td class="max-w">${d.pool || '–'}</td>
+        <td>${d.worker || '–'}</td>
+        <td>${fmtUptime(d.uptime)}</td>
+        <td>${d.bestShare || '–'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── AxeOS detail page ──────────────────────────────────────────────────────
+
+  async function loadAxPage() {
+    const tbody = document.getElementById('ax-rows');
+    tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Lade…</td></tr>';
+    try {
+      const data = await apiFetch('/api/axeos/devices');
+      renderAxRows(data.devices || []);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="12" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+    }
+  }
+
+  function renderAxRows(devs) {
+    const tMax = currentConfig.thresholds?.temp_max || 70;
+    const tbody = document.getElementById('ax-rows');
+    if (!devs || devs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Keine Geräte konfiguriert</td></tr>';
+      return;
+    }
+    tbody.innerHTML = devs.map(d => {
+      const online = d._online !== false;
+      const hr = parseFloat(d.hashRate || 0);
+      const temp = parseFloat(d.temp || 0);
+      const restartBtn = online
+        ? `<button class="btn btn-secondary btn-sm" onclick="restartDevice('${d._ip}')">↺ Restart</button>`
+        : '';
+      return `<tr>
+        <td>${d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || ''}</small></td>
+        <td>${d._type || '–'}</td>
+        <td>${fmtStatus(online)}</td>
+        <td>${hr.toFixed(2)}</td>
+        <td>${fmtTemp(temp, tMax)}</td>
+        <td>${d.voltage ?? '–'}</td>
+        <td>${d.frequency ?? d.freqMHz ?? '–'}</td>
+        <td>${d.fanspeed ?? d.fanSpeed ?? '–'}</td>
+        <td>${d.sharesAccepted ?? '–'}</td>
+        <td>${d.sharesRejected ?? '–'}</td>
+        <td class="max-w">${d.stratumURL || '–'}</td>
+        <td>${restartBtn}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function restartDevice(ip) {
+    if (!confirm(`Gerät ${ip} neu starten?`)) return;
+    try {
+      await fetch(`http://${ip}/api/system/restart`);
+      toast(`Neustart von ${ip} ausgelöst`, 'success');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  // ── Pool broadcast ─────────────────────────────────────────────────────────
+
+  async function broadcastPool() {
+    const url = document.getElementById('pool-p-url').value.trim();
+    if (!url) { toast('Bitte Pool-URL eingeben', 'error'); return; }
+
+    const payload = {
+      stratumURL:              url,
+      stratumUser:             document.getElementById('pool-p-user').value.trim(),
+      stratumPassword:         document.getElementById('pool-p-pass').value.trim(),
+      fallbackStratumURL:      document.getElementById('pool-s-url').value.trim(),
+      fallbackStratumUser:     document.getElementById('pool-s-user').value.trim(),
+      fallbackStratumPassword: document.getElementById('pool-s-pass').value.trim(),
+    };
+    const hdr = { 'Content-Type': 'application/json' };
+    let ok = true;
+
+    try {
+      await apiFetch('/api/nmminer/broadcast-config', { method: 'POST', headers: hdr, body: JSON.stringify(payload) });
+    } catch (e) {
+      toast('NMMiner: ' + e.message, 'error');
+      ok = false;
+    }
+
+    try {
+      await apiFetch('/api/axeos/config/all', { method: 'PATCH', headers: hdr, body: JSON.stringify(payload) });
+    } catch (e) {
+      toast('AxeOS: ' + e.message, 'error');
+      ok = false;
+    }
+
+    if (ok) toast('Pool-Config übertragen', 'success');
+  }
+
+  // ── Settings form ──────────────────────────────────────────────────────────
+
+  async function loadSettingsForm() {
+    try {
+      const cfg = await apiFetch('/api/settings');
+      currentConfig = cfg;
+      document.getElementById('s-nmminer-master').value = cfg.nmminer_master || '';
+      document.getElementById('s-temp-max').value   = cfg.thresholds?.temp_max    ?? 70;
+      document.getElementById('s-hr-min').value     = cfg.thresholds?.hashrate_min ?? 0;
+      document.getElementById('s-share-min').value  = cfg.thresholds?.share_rate_min ?? 80;
+      document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
+      renderAxeDeviceList(cfg.axeos_devices || []);
+    } catch (e) {
+      toast('Einstellungen konnten nicht geladen werden', 'error');
+    }
+  }
+
+  function renderAxeDeviceList(devs) {
+    const list = document.getElementById('axe-device-list');
+    if (devs.length === 0) {
+      list.innerHTML = '<li class="text-muted" style="padding:8px">Keine Geräte konfiguriert</li>';
+      return;
+    }
+    list.innerHTML = devs.map((d, i) => `
+      <li class="device-item">
+        <div class="device-item-info">
+          <span class="device-item-name">${d.name || 'Unbekannt'}</span>
+          <span class="device-item-ip">${d.ip} · ${d.type || 'bitaxe'}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeAxeDevice(${i})">✕</button>
+      </li>`).join('');
+  }
+
+  function addAxeDevice() {
+    const ip   = prompt('IP-Adresse:');     if (!ip) return;
+    const name = prompt('Name:') || ip;
+    const type = prompt('Typ (bitaxe / nerdaxe):', 'bitaxe') || 'bitaxe';
+    const devs = (currentConfig.axeos_devices || []);
+    devs.push({ ip: ip.trim(), name: name.trim(), type: type.trim() });
+    currentConfig.axeos_devices = devs;
+    renderAxeDeviceList(devs);
+  }
+
+  function removeAxeDevice(i) {
+    const devs = currentConfig.axeos_devices || [];
+    devs.splice(i, 1);
+    currentConfig.axeos_devices = devs;
+    renderAxeDeviceList(devs);
+  }
+
+  async function saveSettings() {
+    currentConfig.nmminer_master = document.getElementById('s-nmminer-master').value.trim();
+    currentConfig.thresholds = {
+      temp_max:      parseFloat(document.getElementById('s-temp-max').value)  || 70,
+      hashrate_min:  parseFloat(document.getElementById('s-hr-min').value)    || 0,
+      share_rate_min: parseInt(document.getElementById('s-share-min').value)  || 80,
+    };
+    currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
+    try {
+      await apiFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentConfig),
+      });
+      toast('Einstellungen gespeichert', 'success');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  // ── Notification form ──────────────────────────────────────────────────────
+
+  async function loadNotifForm() {
+    try {
+      const cfg = await apiFetch('/api/settings');
+      currentConfig = cfg;
+      const n = cfg.notifications || {};
+      document.getElementById('n-tg-on').checked    = !!n.telegram_enabled;
+      document.getElementById('n-tg-token').value   = n.telegram_token    || '';
+      document.getElementById('n-tg-chat').value    = n.telegram_chat_id  || '';
+      document.getElementById('n-dc-on').checked    = !!n.discord_enabled;
+      document.getElementById('n-dc-hook').value    = n.discord_webhook   || '';
+      document.getElementById('n-go-on').checked    = !!n.gotify_enabled;
+      document.getElementById('n-go-url').value     = n.gotify_url        || '';
+      document.getElementById('n-go-token').value   = n.gotify_token      || '';
+    } catch (e) {
+      console.error('loadNotifForm:', e);
+    }
+  }
+
+  async function saveNotifications() {
+    currentConfig.notifications = {
+      telegram_enabled:  document.getElementById('n-tg-on').checked,
+      telegram_token:    document.getElementById('n-tg-token').value.trim(),
+      telegram_chat_id:  document.getElementById('n-tg-chat').value.trim(),
+      discord_enabled:   document.getElementById('n-dc-on').checked,
+      discord_webhook:   document.getElementById('n-dc-hook').value.trim(),
+      gotify_enabled:    document.getElementById('n-go-on').checked,
+      gotify_url:        document.getElementById('n-go-url').value.trim(),
+      gotify_token:      document.getElementById('n-go-token').value.trim(),
+    };
+    try {
+      await apiFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentConfig),
+      });
+      toast('Benachrichtigungen gespeichert', 'success');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  async function testNotification() {
+    try {
+      const data = await apiFetch('/api/notifications/test', { method: 'POST' });
+      const res = data.results || {};
+      const parts = Object.entries(res).map(([k, v]) => `${k}: ${v ? '✓' : '✗'}`);
+      toast(parts.length ? parts.join(' · ') : 'Kein Dienst aktiviert', 'info');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  // ── Alert history ──────────────────────────────────────────────────────────
+
+  async function loadAlerts() {
+    try {
+      const alerts = await apiFetch('/api/alerts');
+      renderAlerts(alerts);
+    } catch (e) {
+      document.getElementById('alert-list').innerHTML =
+        `<p style="color:var(--danger);padding:16px">${e.message}</p>`;
+    }
+  }
+
+  function renderAlerts(alerts) {
+    const el = document.getElementById('alert-list');
+    if (!alerts || alerts.length === 0) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div>Keine Alerts</div>';
+      return;
+    }
+    const sorted = [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const icons = { critical: '🔴', warning: '🟡', info: '🔵' };
+    el.innerHTML = sorted.map(a => `
+      <div class="alert-item ${a.read ? '' : 'unread'}">
+        <div class="alert-sev">${icons[a.severity] || '⚪'}</div>
+        <div class="alert-content">
+          <div class="alert-message sev-${a.severity}">${a.message}</div>
+          <div class="alert-meta">${new Date(a.timestamp).toLocaleString('de-DE')} · ${a.kind}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function markAllRead() {
+    try {
+      await apiFetch('/api/alerts/read-all', { method: 'POST' });
+      await loadAlerts();
+      document.getElementById('alert-badge').style.display = 'none';
+      toast('Alle Alerts als gelesen markiert', 'success');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  async function clearAlerts() {
+    if (!confirm('Alle Alerts löschen?')) return;
+    try {
+      await apiFetch('/api/alerts', { method: 'DELETE' });
+      await loadAlerts();
+      document.getElementById('alert-badge').style.display = 'none';
+      toast('Alerts gelöscht', 'success');
+    } catch (e) {
+      toast('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+
+  function toast(msg, type = 'info') {
+    const c = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    c.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', () => showPage('dashboard'));
+</script>
+</body>
+</html>
