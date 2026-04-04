@@ -435,44 +435,72 @@ async def patch_axeos_config_one(ip: str, data: dict):
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
-async def _fetch_nmminer_safe(client: httpx.AsyncClient, master: str) -> dict:
-    try:
-        resp = await client.get(f"http://{master}/swarm")
-        resp.raise_for_status()
-        data = resp.json()
-        # Normalize to {devices: [...]} regardless of API format
+async def _fetch_nmminer_safe(
+    client: httpx.AsyncClient,
+    master: str,
+    nm_devices: list | None = None,
+) -> dict:
+    def _normalize(data) -> dict | None:
         if isinstance(data, list):
             return {"devices": data}
         if isinstance(data, dict):
-            # Already has devices key
             if "devices" in data and isinstance(data["devices"], list):
                 return data
-            # Try other common list keys (miners, workers, peers, swarm)
             for key in ("miners", "workers", "peers", "swarm", "data"):
                 if key in data and isinstance(data[key], list):
                     return {"devices": data[key]}
-            # Dict keyed by IP (e.g. {"10.0.0.1": {...}})
             values = list(data.values())
             if values and isinstance(values[0], dict) and any(
                 k in values[0] for k in ("ip", "hashrate", "GHs", "temp", "pool")
             ):
                 return {"devices": [{"ip": k, **v} for k, v in data.items() if isinstance(v, dict)]}
-        return {"devices": [], "_error": "unknown_format"}
-    except Exception as exc:
-        return {"devices": [], "_error": str(exc)}
+        return None
+
+    # Try master first (one request for all devices)
+    if master:
+        try:
+            resp = await client.get(f"http://{master}/swarm")
+            resp.raise_for_status()
+            result = _normalize(resp.json())
+            if result is not None:
+                return result
+        except Exception:
+            pass  # fall through to per-device queries
+
+    # Fallback: query each known device individually
+    if nm_devices:
+        all_devs: list = []
+        errors: list = []
+
+        async def _fetch_one(ip: str):
+            try:
+                r = await client.get(f"http://{ip}/swarm")
+                r.raise_for_status()
+                data = r.json()
+                devs = data if isinstance(data, list) else data.get("devices", [data])
+                all_devs.extend(devs if isinstance(devs, list) else [devs])
+            except Exception as exc:
+                all_devs.append({"ip": ip, "online": False})
+                errors.append(str(exc))
+
+        await asyncio.gather(*[_fetch_one(d["ip"]) for d in nm_devices if d.get("ip")])
+        return {"devices": all_devs}
+
+    return {"devices": [], "_error": "no NMMiner configured"}
 
 
 @app.get("/api/dashboard")
 async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("nmminer_master", "")
+    nm_devices = config.get("nmminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
+    has_nmminer = bool(master or nm_devices)
 
     async with httpx.AsyncClient(timeout=10) as client:
         coros: list = []
-        has_nmminer = bool(master)
         if has_nmminer:
-            coros.append(_fetch_nmminer_safe(client, master))
+            coros.append(_fetch_nmminer_safe(client, master, nm_devices))
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
 
         results = await asyncio.gather(*coros) if coros else []
