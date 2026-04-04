@@ -1323,12 +1323,13 @@
           await apiFetch('/api/nmminer/device-config', { method: 'POST', headers: hdr,
             body: JSON.stringify({
               ip,
-              stratumURL:              baseUrl,
-              stratumUser:             resolvedUser,
-              stratumPassword:         basePass,
-              fallbackStratumURL:      fbUrl,
-              fallbackStratumUser:     resolvedFbUser,
-              fallbackStratumPassword: fbPass,
+              IP:               ip,
+              PrimaryPool:      baseUrl,
+              PrimaryAddress:   resolvedUser,
+              PrimaryPassword:  basePass,
+              SecondaryPool:    fbUrl,
+              SecondaryAddress: resolvedFbUser,
+              SecondaryPassword: fbPass,
             }) });
         } else {
           // AxeOS requires URL (host only, no port) and port as separate fields
