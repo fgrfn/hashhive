@@ -718,11 +718,27 @@
   }
 
   // NMMiner hashrate values are in MH/s (ESP32 devices)
-  function fmtNmHr(v) {
-    const n = parseFloat(v);
+  // Parse NMMiner hashRate string (e.g. "1.0340MH/s", "391.41KH/s") → KH/s number
+  function nmHrToKh(d) {
+    const raw = d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs ||
+                d.hashrate || d.currentHashrate || (d.mhsAv ? String(d.mhsAv) + 'MH/s' : null);
+    if (!raw && raw !== 0) return 0;
+    const s = String(raw).trim();
+    const num = parseFloat(s);
+    if (isNaN(num) || num === 0) return 0;
+    const low = s.toLowerCase();
+    if (low.includes('gh')) return num * 1e6;
+    if (low.includes('mh')) return num * 1e3;
+    if (low.includes('kh')) return num;
+    // plain number fallback – assume GH/s for fields like GHs5s
+    return num * 1e6;
+  }
+
+  function fmtNmHr(kh) {
+    const n = parseFloat(kh);
     if (!n && n !== 0) return '–';
-    if (n >= 1000000) return (n / 1000000).toFixed(2) + ' GH/s';
-    if (n >= 1000)    return (n / 1000).toFixed(1) + ' MH/s';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + ' GH/s';
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + ' MH/s';
     return Math.round(n) + ' KH/s';
   }
 
@@ -767,9 +783,9 @@
     } else {
       nmBody.innerHTML = nmDevs.map(d => {
         const online = d.online !== false;
-        const hrMh = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
+        const hrKh = nmHrToKh(d);
         const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
-        if (online) { totalHr += hrMh / 1000000; onlineCnt++; }  // KH/s → GH/s for total
+        if (online) { totalHr += hrKh / 1e6; onlineCnt++; }  // KH/s → GH/s for total
         if (temp > maxTemp) maxTemp = temp;
         const _nk = 'nm_' + d.ip;
         if (!online && !_offlineTracked.has(_nk)) { appendLog('critical', (d.name || d.ip) + ' went offline', 'nmminer'); _offlineTracked.add(_nk); }
@@ -777,7 +793,7 @@
         return `<tr>
           <td>${d.name || d.ip || '–'}</td>
           <td>${fmtStatus(online)}</td>
-          <td>${fmtNmHr(hrMh)}</td>
+          <td>${fmtNmHr(hrKh)}</td>
           <td>${fmtTemp(temp, tMax)}</td>
           <td class="max-w">${d.pool || d.stratumURL || d.stratum_url || d.poolURL || '–'}</td>
           <td>${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
@@ -859,7 +875,7 @@
     let totalMh = 0, onlineCnt = 0;
     tbody.innerHTML = devs.map(d => {
       const online = d.online !== false;
-      const hr = parseFloat(d.hashRate || d.GHs5s || d.GHs5 || d.GHs1m || d.GHsav || d.GHs || d.hashrate || d.currentHashrate || (d.mhsAv && d.mhsAv / 1000) || 0);
+      const hr = nmHrToKh(d);
       const temp = parseFloat(d.temp || d.temperature || d.chipTemp || 0);
       if (online) { totalMh += hr; onlineCnt++; }
       return `<tr>
