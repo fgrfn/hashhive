@@ -1026,7 +1026,10 @@
       document.getElementById('ax-sum-online').textContent = `${onlineCnt} / ${devs.length}`;
       summary.style.display = 'flex';
     }
-    initSortable('ax-rows');(ip) {
+    initSortable('ax-rows');
+  }
+
+  async function restartDevice(ip) {
     if (!confirm(`Restart device ${ip}?`)) return;
     try {
       await fetch(`http://${ip}/api/system/restart`, { method: 'POST' });
