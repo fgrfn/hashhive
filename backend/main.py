@@ -588,12 +588,11 @@ async def axeos_action_batch(data: dict):
 
 @app.get("/api/axeos/scan")
 async def scan_axeos_devices():
-    """Scan local /24 subnet(s) for AxeOS devices (BitAxe/NerdAxe). No IP required."""
+    """Scan local /24 subnet for AxeOS devices (BitAxe/NerdAxe). No IP required."""
     import socket as _socket
-    # Determine subnets to scan: configured extras + auto-detected local
+    # Determine local /24 subnet to scan
     subnets: list[str] = []
     try:
-        import socket as _socket
         s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
