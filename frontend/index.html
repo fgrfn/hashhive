@@ -449,8 +449,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px" data-picker="skip"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th data-picker="skip">Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="26" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th style="width:32px" data-picker="skip"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th>Share Acc%</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th data-picker="skip">Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="27" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -511,8 +511,8 @@
         <p class="text-muted" style="font-size:12px;margin:8px 0 12px">Live view of each device's active pool connection. Opens Dashboard to fetch latest data.</p>
         <div class="table-wrap">
           <table id="pool-status-table">
-            <thead><tr><th>Device</th><th>Type</th><th>Pool</th><th>Worker</th><th>Fallback</th><th>Shares OK</th><th>Shares Err</th></tr></thead>
-            <tbody id="pool-status-rows"><tr><td colspan="7" class="empty text-muted">No data — visit Dashboard first</td></tr></tbody>
+            <thead><tr><th>Device</th><th>Type</th><th>Pool</th><th>Worker</th><th>Fallback</th><th>Shares OK</th><th>Shares Err</th><th>Share Acc%</th></tr></thead>
+            <tbody id="pool-status-rows"><tr><td colspan="8" class="empty text-muted">No data — visit Dashboard first</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1268,6 +1268,14 @@
     return `<small style="color:${col}">${n} dBm</small>`;
   }
 
+  function fmtShareAcc(ok, err) {
+    const a = parseFloat(ok), r = parseFloat(err);
+    if (!isFinite(a) || a + r === 0) return '–';
+    const pct = (a / (a + r)) * 100;
+    const col = pct >= 99 ? 'var(--success)' : pct >= 95 ? 'var(--warning)' : 'var(--danger)';
+    return `<span style="color:${col};font-weight:600">${pct.toFixed(1)}%</span>`;
+  }
+
   function fmtOfflineSince(isoStr) {
     if (!isoStr) return '';
     try {
@@ -1483,12 +1491,12 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="26" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="27" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="26" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="27" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
       appendLog('critical', `AxeOS load failed: ${e.message}`, 'axeos');
     }
   }
@@ -1498,7 +1506,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="26" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="27" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -1555,6 +1563,7 @@
         <td>${d.fan2rpm ?? '–'}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
+        <td>${fmtShareAcc(d.sharesAccepted, d.sharesRejected)}</td>
         <td><small>${fmtDiff(d.bestDiff)}</small></td>
         <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
         <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
@@ -1727,7 +1736,7 @@
   async function restartDevice(ip) {
     if (!confirm(`Restart device ${ip}?`)) return;
     try {
-      await fetch(`http://${ip}/api/system/restart`, { method: 'POST' });
+      await apiFetch(`/api/axeos/action/${encodeURIComponent(ip)}?action=restart`, { method: 'POST' });
       appendLog('warning', `Restart triggered — ${ip}`, 'axeos');
       toast(`Restart triggered for ${ip}`, 'success');
     } catch (e) {
@@ -1738,7 +1747,7 @@
 
   async function pauseDevice(ip) {
     try {
-      await fetch(`http://${ip}/api/system/pause`, { method: 'POST' });
+      await apiFetch(`/api/axeos/action/${encodeURIComponent(ip)}?action=pause`, { method: 'POST' });
       appendLog('warning', `Mining paused — ${ip}`, 'axeos');
       toast(`Mining paused on ${ip}`, 'info');
       loadAxPage();
@@ -1750,7 +1759,7 @@
 
   async function resumeDevice(ip) {
     try {
-      await fetch(`http://${ip}/api/system/resume`, { method: 'POST' });
+      await apiFetch(`/api/axeos/action/${encodeURIComponent(ip)}?action=resume`, { method: 'POST' });
       appendLog('ok', `Mining resumed — ${ip}`, 'axeos');
       toast(`Mining resumed on ${ip}`, 'success');
       loadAxPage();
@@ -1762,7 +1771,7 @@
 
   async function identifyDevice(ip) {
     try {
-      await fetch(`http://${ip}/api/system/identify`, { method: 'POST' });
+      await apiFetch(`/api/axeos/action/${encodeURIComponent(ip)}?action=identify`, { method: 'POST' });
       appendLog('info', `Identify sent — ${ip}`, 'axeos');
       toast(`Identify signal sent to ${ip}`, 'info');
     } catch (e) {
@@ -1802,7 +1811,7 @@
     if (!tbody) return;
     const data = lastDashboard;
     if (!data) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">No data — visit Dashboard first</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty text-muted">No data — visit Dashboard first</td></tr>';
       return;
     }
     const rows = [];
@@ -1822,6 +1831,7 @@
         <td>${fallback ? '<span style="color:var(--warning);font-size:11px">⚠ Fallback</span>' : '<span style="color:var(--success);font-size:11px">Primary</span>'}</td>
         <td>${d.sharesAccepted ?? '–'}</td>
         <td>${d.sharesRejected ?? '–'}</td>
+        <td>${fmtShareAcc(d.sharesAccepted, d.sharesRejected)}</td>
       </tr>`);
     }
     // NMMiner devices
@@ -1839,10 +1849,11 @@
         <td><span style="color:var(--success);font-size:11px">Primary</span></td>
         <td>${sharesOk}</td>
         <td>${sharesErr}</td>
+        <td>${fmtShareAcc(sharesOk, sharesErr)}</td>
       </tr>`);
     }
     if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">No online devices found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty text-muted">No online devices found</td></tr>';
     } else {
       tbody.innerHTML = rows.join('');
     }
