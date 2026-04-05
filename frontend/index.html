@@ -310,7 +310,7 @@
       <span class="nav-badge" id="alert-badge" style="display:none">0</span>
     </a>
   </nav>
-  <div class="sidebar-footer">HashHive v1.0</div>
+  <div class="sidebar-footer" id="sidebar-version">HashHive</div>
 </aside>
 
 <!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
@@ -3200,7 +3200,13 @@
 
   // ── Init ───────────────────────────────────────────────────────────────────
 
-  document.addEventListener('DOMContentLoaded', () => { initLiveLog(); showPage('dashboard'); });
+  document.addEventListener('DOMContentLoaded', () => {
+    initLiveLog();
+    showPage('dashboard');
+    fetch('/api/health').then(r => r.json()).then(d => {
+      document.getElementById('sidebar-version').textContent = `HashHive v${d.version}`;
+    }).catch(() => { document.getElementById('sidebar-version').textContent = 'HashHive'; });
+  });
 </script>
 </body>
 </html>

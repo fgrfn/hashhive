@@ -22,6 +22,12 @@ DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 LOGS_DIR = DATA_DIR / "logs"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
+# App-Version aus version.txt (Single Source of Truth; liegt im Projekt-Root)
+try:
+    APP_VERSION = (BASE_DIR.parent / "version.txt").read_text().strip()
+except Exception:
+    APP_VERSION = "dev"
+
 MAX_ENTRIES_PER_DAY = 1000
 KEEP_DAYS = 30
 
@@ -445,7 +451,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="HashHive", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="HashHive", version=APP_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1103,7 +1109,7 @@ async def health():
     ax_count = len(config.get("axeos_devices", []))
     return {
         "status": "ok",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "uptime_seconds": round(uptime),
         "devices": {"nmminer": nm_count, "axeos": ax_count},
         "timestamp": datetime.now(timezone.utc).isoformat(),

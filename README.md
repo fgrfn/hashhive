@@ -18,11 +18,12 @@
 |---|---|
 | 📊 **Dashboard** | Live stats — hashrate, temperature, power, share rate |
 | ⛏️ **NMMiner** | Full swarm table · per-device config modal · pool push |
-| 🔧 **BitAxe / NerdAxe** | Live stats · pause / resume / restart / identify per device |
-| 🌐 **Pool** | Push primary + fallback pool to all devices at once, with live preview |
-| 🔔 **Alerts** | Offline · temp spike · hashrate drop · pool loss — with daily log rotation |
-| 📨 **Notifications** | Telegram · Discord · Gotify |
-| 📋 **Live Log** | Persistent per-session log (survives refresh, rolls after 24 h) |
+| 🔧 **BitAxe / NerdAxe** | Live stats · pause / resume / restart / identify · bulk actions · inline rename |
+| 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets |
+| 🔔 **Alerts** | Offline · temp spike · VR temp · hashrate drop · error rate · fan failure · pool loss · fallback · reboot detection |
+| 📨 **Notifications** | Telegram · Discord · Gotify · weekly summary |
+| 📋 **Live Log** | Source badges · search filter · load up to 7 days history · persists across refresh |
+| 📊 **Share Acceptance Rate** | Color-coded acc% column on AxeOS table · Pool Status table |
 
 ---
 
@@ -89,9 +90,11 @@ On first start, `dashboard_config.json` is created automatically. Configure via 
 
 - NMMiner master IP (all devices fetched via swarm)
 - AxeOS device list (IP · name · type)
-- Alert thresholds (max temp · min hashrate · min share rate)
+- Alert thresholds (max chip temp · max VR temp · min hashrate · max error rate)
 - Refresh interval
 - Notification credentials (Telegram / Discord / Gotify)
+- Weekly summary schedule (day + time)
+- Pool presets (saved on the Pool page)
 
 ---
 
@@ -122,6 +125,43 @@ Unregister-ScheduledTask -TaskName "HashHive" -Confirm:$false
 
 ---
 
+## GitHub Actions
+
+| Workflow | Trigger | Was passiert |
+|---|---|---|
+| **Secret Scan** | Jeder Push / PR | `gitleaks` scannt die gesamte Git-History auf API-Keys, Tokens, Passwörter |
+| **Release Please** | Push auf `main` | Analysiert Commits; öffnet/aktualisiert Release PR mit `CHANGELOG.md` + `version.txt` Bump |
+| **Release** | `v*`-Tag (nach Merge des Release PR) | Docker-Build → Push zu GHCR; GitHub Release mit `docker run`-Snippet |
+
+### Release auslösen
+
+Commits nach [Conventional Commits](https://www.conventionalcommits.org/) schreiben:
+
+| Prefix | Version-Bump |
+|---|---|
+| `feat: ...` | Minor (`1.0.0 → 1.1.0`) |
+| `fix: ...` | Patch (`1.0.0 → 1.0.1`) |
+| `feat!: ...` | Major (`1.0.0 → 2.0.0`) |
+| `chore:`, `docs:` | kein Release |
+
+Nach dem Merge des Release PR steht das Image bereit:
+
+```bash
+docker pull ghcr.io/fgrfn/hashhive:latest
+```
+
+---
+
+## Version
+
+Die App-Version steht in [`version.txt`](version.txt) und wird automatisch durch Release Please aktualisiert.
+
+- **Backend** liest `version.txt` beim Start und exposes sie in `/api/health`
+- **Frontend** zeigt die Version in der Sidebar (lädt von `/api/health`)
+- **Docker-Image** enthält `version.txt` im Build-Kontext
+
+---
+
 ## Stack
 
 - **Backend** — Python 3.10+ · FastAPI · httpx · asyncio
@@ -132,6 +172,8 @@ Unregister-ScheduledTask -TaskName "HashHive" -Confirm:$false
 ---
 
 ## License
+
+[MIT](LICENSE)
 
 [MIT](LICENSE)
 

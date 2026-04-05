@@ -6,9 +6,10 @@ WORKDIR /app
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Backend + Frontend kopieren
+# Backend + Frontend + Version kopieren
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
+COPY version.txt ./
 
 WORKDIR /app/backend
 

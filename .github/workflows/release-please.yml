@@ -1,0 +1,30 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-please:
+    name: Create Release PR & bump version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push CHANGELOG.md + version.txt commits
+      pull-requests: write  # open / update the Release PR
+
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # When the Release PR is merged, the action creates a tag.
+      # That tag triggers .github/workflows/release.yml (Docker build + GHCR push).
+      - name: Show release outputs
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          echo "🚀 Released: ${{ steps.release.outputs.tag_name }}"
+          echo "📦 Version:  ${{ steps.release.outputs.version }}"

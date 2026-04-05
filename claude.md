@@ -1,5 +1,5 @@
 # CLAUDE.md – HashHive Development Guide
-<!-- Zuletzt aktualisiert: 2026-04-04 -->
+<!-- Zuletzt aktualisiert: 2026-04-05 -->
 
 ## Projektübersicht
 
@@ -17,6 +17,11 @@
 
 ```
 hashhive/
+├── .github/
+│   └── workflows/
+│       ├── secret-scan.yml      # gitleaks bei jedem Push/PR
+│       ├── release-please.yml   # CHANGELOG + version.txt Bump PR bei Push auf main
+│       └── release.yml          # Docker-Build → GHCR + GitHub Release bei v*-Tag
 ├── backend/
 │   ├── main.py                  # FastAPI App, alle API-Endpunkte
 │   ├── alerts.py                # Alert-Erkennung & Benachrichtigungen
@@ -26,6 +31,9 @@ hashhive/
 │   └── device_state.json        # Gerätestatus für Alert-Diff (auto-generiert)
 ├── frontend/
 │   └── index.html               # Komplettes Dashboard (single file)
+├── version.txt                  # App-Version (Single Source of Truth)
+├── release-please-config.json   # release-please Konfiguration
+├── .release-please-manifest.json # Aktuelle Version für release-please
 ├── Dockerfile                   # Docker-Image (Backend + Frontend)
 ├── docker-compose.yml           # Docker Compose mit persistentem Volume
 ├── .dockerignore
@@ -106,18 +114,31 @@ sudo journalctl -u hashhive -f   # Logs
 |---|---|---|
 | GET | `/api/dashboard` | Alle Daten + unread Alert-Count |
 | GET | `/api/settings` | Aktuelle Konfiguration laden |
-| POST | `/api/settings` | Konfiguration speichern |
+| POST | `/api/settings` | Konfiguration speichern (loggt Eintrag) |
+| GET | `/api/settings/backup` | Config als JSON-Datei herunterladen |
+| POST | `/api/settings/restore` | Config aus JSON-Body wiederherstellen |
+| PATCH | `/api/settings/device` | Per-Gerät Felder aktualisieren (name, temp_max) |
 | GET | `/api/nmminer/swarm` | NMMiner Stats (alle Geräte via Master) |
 | GET | `/api/nmminer/config` | NMMiner Pool-Config |
 | POST | `/api/nmminer/broadcast-config` | Pool-Config an alle NMMiners pushen |
 | GET | `/api/nmminer/device-config?ip={ip}` | Einzelne NMMiner-Gerätekonfiguration laden |
-| POST | `/api/nmminer/device-config` | Einzelne NMMiner-Gerätekonfiguration speichern |
+| POST | `/api/nmminer/device-config` | Einzelne NMMiner-Gerätekonfiguration speichern (loggt Eintrag) |
 | GET | `/api/axeos/devices` | BitAxe / NerdAxe Stats (alle konfigurierten Geräte) |
+| GET | `/api/axeos/info/{ip}` | Einzelne AxeOS-Geräteinfo |
 | PATCH | `/api/axeos/config/all` | Pool-Config an alle AxeOS-Geräte pushen |
-| GET | `/api/alerts` | Alert-Historie |
+| PATCH | `/api/axeos/config/batch` | Freq/Voltage an ausgewählte AxeOS-Geräte pushen |
+| POST | `/api/axeos/action/{ip}?action=` | Einzelaktion: pause / resume / restart / identify (loggt Eintrag) |
+| POST | `/api/axeos/action/batch` | Batch-Aktion an mehrere Geräte |
+| GET | `/api/axeos/scan` | Lokales /24-Subnet nach AxeOS-Geräten scannen |
+| GET | `/api/alerts?days=N` | Log-Einträge (1–30 Tage) |
+| GET | `/api/logs/dates` | Verfügbare Log-Datumsliste |
 | POST | `/api/alerts/read-all` | Alle Alerts als gelesen markieren |
-| DELETE | `/api/alerts` | Alert-Historie löschen |
+| DELETE | `/api/alerts` | Heutigen Log löschen |
+| POST | `/api/log` | Manuellen Log-Eintrag persistent speichern |
+| GET | `/api/health` | Backend-Healthcheck (uptime, device counts) |
 | POST | `/api/notifications/test` | Test-Benachrichtigung senden |
+| POST | `/api/weekly-summary/test` | Weekly Summary sofort auslösen |
+| WebSocket | `/ws` | Push-Updates (Dashboard-Daten) |
 
 ### `/api/dashboard` Response-Schema
 
@@ -149,9 +170,13 @@ Das Backend versucht der Reihe nach:
     { "ip": "10.10.40.203", "name": "NerdAxe",      "type": "nerdaxe" }
   ],
   "refresh_interval": 30,
+  "offline_grace_minutes": 2,
+  "alert_cooldown_minutes": 30,
   "thresholds": {
     "temp_max": 70,
+    "vr_temp_max": 85,
     "hashrate_min": 0,
+    "error_rate_max": 2.0,
     "share_rate_min": 80
   },
   "notifications": {
@@ -163,7 +188,40 @@ Das Backend versucht der Reihe nach:
     "gotify_enabled": false,
     "gotify_url": "",
     "gotify_token": ""
-  }
+  },
+  "alert_types": {
+    "offline": true,
+    "online": true,
+    "temp-high": true,
+    "vr-temp-high": true,
+    "hashrate-low": true,
+    "error-rate-high": true,
+    "fan-failure": true,
+    "pool-lost": true,
+    "pool-connected": false,
+    "fallback-active": true,
+    "fallback-recovered": false,
+    "mining-paused": true,
+    "device-rebooted": true,
+    "new-best-diff": false,
+    "block-found": true
+  },
+  "weekly_summary": {
+    "enabled": false,
+    "day": "monday",
+    "time": "08:00"
+  },
+  "pool_presets": [
+    {
+      "name": "My Pool",
+      "url": "stratum+tcp://pool.example.com:3333",
+      "worker": "wallet.{suffix}",
+      "password": "x",
+      "fallback_url": "",
+      "fallback_worker": "",
+      "fallback_password": ""
+    }
+  ]
 }
 ```
 
@@ -332,9 +390,9 @@ Das gesamte Frontend befindet sich in **einer einzigen Datei**: `frontend/index.
 |---|---|
 | Dashboard | Stat-Cards (Hashrate, Online, Max-Temp, Alerts) + kompakte Tabellen + Live-Log |
 | NMMiner | Vollständige Tabelle + ✏ Edit-Button pro Gerät (öffnet Konfig-Modal) |
-| BitAxe / NerdAxe | Vollständige Tabelle mit Pause/Resume/Restart/Identify-Buttons |
-| Pool | Primär/Sekundär Pool für alle Geräte gleichzeitig pushen |
-| Settings | NMMiner Master-IP, AxeOS Devices, Alert-Schwellenwerte, Refresh-Interval |
+| BitAxe / NerdAxe | Vollständige Tabelle mit Bulk-Aktionen, Inline-Rename, Pause/Resume/Restart/Identify |
+| Pool | Primär/Sekundär Pool pushen + Pool Preset Library |
+| Settings | NMMiner Master-IP, AxeOS Devices, Alert-Schwellenwerte, Refresh-Interval, Weekly Summary |
 | Notifications | Telegram/Discord/Gotify + Alert-Verlauf |
 
 ### Dashboard – Stat-Cards
@@ -346,9 +404,13 @@ Das gesamte Frontend befindet sich in **einer einzigen Datei**: `frontend/index.
 | Open Alerts | `unread_alerts` aus `/api/dashboard` |
 
 ### Dashboard – Live Log
-- Zeigt letzte 60 Log-Einträge (monospace, farbkodiert)
+- Zeigt letzte 100 Log-Einträge (monospace, farbkodiert)
 - **Schweregrade:** `critical` (rot), `warning` (gelb), `info` (blau), `ok` (grün)
-- Initialisierung: lädt letzte 20 Alerts aus der Alert-Historie via `/api/alerts`
+- **Source-Badges:** `NM` (lila), `AX` (blau), `SYS` (grün) pro Eintrag
+- **Tabs:** All / NMMiner / BitAxe\u200bNerdAxe / HashHive
+- **🔍 Suchfeld:** Echtzeit-Filter über alle Einträge
+- **📅 Load more:** Lädt bis zu 7 Tage History aus der Backend-Log-Datenbank nach
+- Initialisierung: lädt letzte 40 Einträge aus `/api/alerts?days=1`
 - Jeder Dashboard-Refresh → neuer `"Refreshed – X/Y online · Z GH/s"` Eintrag (grün)
 - Geräte offline/online Übergänge werden dedupliziert geloggt (`_offlineTracked` Set)
 - Fetch-Fehler werden rot geloggt
@@ -370,15 +432,21 @@ Das gesamte Frontend befindet sich in **einer einzigen Datei**: `frontend/index.
 Speichern via `POST /api/nmminer/device-config`. Außerhalb klicken oder Cancel schließt ohne Speichern.
 
 ### BitAxe / NerdAxe-Seite
-**Tabellenspalten:** Name/IP | Type | Status | Hashrate (GH/s) | 1m Avg | Expected | Err % | Temp (°C) | VR Temp | Power (W) | Voltage (mV) | Freq (MHz) | Fan (%) | Fan RPM | Shares OK | Shares Err | Pool | Actions
+**Tabellenspalten:** ☐ | Name/IP | ASIC/Board | Type | Status | Hashrate (GH/s) | 1m Avg | Expected | Err % | Temp (°C) | VR Temp | Power (W) | Eff. (J/TH) | Voltage | Freq | Fan | Fan RPM | Fan 2 | Shares OK | Shares Err | **Share Acc%** | Best Diff | Session Best | Uptime | RSSI | Pool | Actions
+
+**Bulk Bar** (erscheint wenn ≥1 Checkbox aktiv):
+- Bulk Pause / Resume / Restart
+- Bulk Freq/Voltage Modal (eigenes Fenster mit Freq + Voltage Inputs)
+
+**Inline Rename:** Klick auf Gerätename → Inline-Input, Enter oder Blur speichert via `PATCH /api/settings/device`
 
 **Status:** Online (grün) / Offline (rot) / Paused (rot dot, Text "Paused")
 
-**Actions (nur wenn online):**
-- ⏸ Pause → `POST /api/system/pause` (wird zu ▶ Resume wenn `miningPaused = true`)
-- ▶ Resume → `POST /api/system/resume`
-- ↺ Restart → `POST /api/system/restart` (**POST**, nicht GET!)
-- 💡 ID → `POST /api/system/identify` (LED blinkt)
+**Actions (nur wenn online) — alle via Backend-Proxy:**
+- ⏸ Pause → `POST /api/axeos/action/{ip}?action=pause`
+- ▶ Resume → `POST /api/axeos/action/{ip}?action=resume`
+- ↺ Restart → `POST /api/axeos/action/{ip}?action=restart`
+- 💡 ID → `POST /api/axeos/action/{ip}?action=identify` (LED blinkt, Firmware-abhängig)
 
 ### CSS-Variablen (`:root`)
 ```css
@@ -403,22 +471,31 @@ Speichern via `POST /api/nmminer/device-config`. Außerhalb klicken oder Cancel 
 | `showPage(name)` | Navigiert zu einer Seite, startet/stoppt Auto-Refresh |
 | `loadDashboard()` | Lädt `/api/dashboard`, ruft `renderDashboard()` auf |
 | `startAutoRefresh()` | Startet interval-Timer basierend auf `config.refresh_interval` |
-| `renderDashboard(data)` | Rendert Stat-Cards + NMMiner + AxeOS Tabellen, gibt `{totalHr, onlineCnt, total}` zurück |
-| `appendLog(severity, msg)` | Fügt Eintrag in Live-Log ein, capped bei 60 |
-| `initLiveLog()` | Lädt letzte 20 Alert-History beim Start |
+| `renderDashboard(data)` | Rendert Stat-Cards + NMMiner + AxeOS Tabellen |
+| `appendLog(severity, msg, source)` | Fügt Eintrag in Live-Log ein, capped bei 100 |
+| `filterLiveLog(q)` | Filtert Live-Log nach Suchbegriff |
+| `loadYesterdayLog()` | Lädt zusätzliche Tage History vom Backend (max 7) |
+| `initLiveLog()` | Lädt letzte 40 Alert-History beim Start |
 | `openNmEdit(ip)` | Öffnet Modal, lädt Device-Config |
 | `saveNmEdit()` | Sendet Formular-Daten an `/api/nmminer/device-config` |
 | `closeNmEdit()` | Schließt Modal |
 | `loadNmPage()` | Lädt `/api/nmminer/swarm`, rendert Tabelle |
 | `loadAxPage()` | Lädt `/api/axeos/devices`, rendert Tabelle |
-| `pauseDevice(ip)` | POST `/api/system/pause` direkt ans Gerät |
-| `resumeDevice(ip)` | POST `/api/system/resume` direkt ans Gerät |
-| `restartDevice(ip)` | POST `/api/system/restart` direkt ans Gerät |
-| `identifyDevice(ip)` | POST `/api/system/identify` direkt ans Gerät |
+| `pauseDevice(ip)` | `POST /api/axeos/action/{ip}?action=pause` (via Backend-Proxy) |
+| `resumeDevice(ip)` | `POST /api/axeos/action/{ip}?action=resume` (via Backend-Proxy) |
+| `restartDevice(ip)` | `POST /api/axeos/action/{ip}?action=restart` (via Backend-Proxy) |
+| `identifyDevice(ip)` | `POST /api/axeos/action/{ip}?action=identify` (via Backend-Proxy) |
+| `doBulkAction(action)` | Batch-Aktion für ausgewählte AxeOS-Geräte |
+| `openBulkFreqModal()` | Bulk Freq/Voltage Modal öffnen |
+| `renderPoolPresets()` | Preset-Chips rendern |
+| `applyPoolPreset(i)` | Preset in Pool-Formular einfüllen |
+| `savePoolPreset()` | Aktuelles Formular als Preset speichern |
+| `deletePoolPreset(i)` | Preset löschen |
 | `broadcastPool()` | Pusht Pool-Config an NMMiner + AxeOS |
 | `fmtHr(v)` | Formatiert GH/s, zeigt TH/s wenn ≥ 1000 |
 | `fmtUptime(s)` | Sekunden oder String (z.B. "2d 3h") → "Xh Ym" |
 | `fmtTemp(v, max)` | Temperatur mit Farbklasse t-ok/t-warn/t-crit |
+| `fmtShareAcc(ok, err)` | Share Acceptance Rate in % mit Farbkodierung |
 | `toast(msg, type)` | Zeigt temporäre Benachrichtigung (success/error/info) |
 
 ---
@@ -435,29 +512,86 @@ Alerts werden bei jedem `/api/dashboard` Request automatisch geprüft:
 ### Alert-Typen
 | Kind | Schwere | Auslöser |
 |---|---|---|
-| `offline` | critical | Gerät war online, ist jetzt nicht erreichbar |
+| `offline` | critical | Gerät war online, ist jetzt nicht erreichbar (nach Grace-Period) |
 | `online` | info | Gerät war offline, ist wieder erreichbar |
-| `temp_high` | critical | Temperatur > `temp_max` Schwellenwert |
+| `temp_high` | critical | Chip-Temperatur > `temp_max` Schwellenwert |
+| `vr_temp_high` | critical | VR-Temperatur > `vr_temp_max` (AxeOS only) |
 | `hashrate_low` | warning | Hashrate < `hashrate_min` (nur wenn > 0) |
+| `error_rate_high` | warning | Hash-Fehlerrate > `error_rate_max` % (AxeOS only) |
+| `fan_failure` | critical | Fan RPM = 0 (AxeOS only) |
 | `pool_lost` | critical | Pool-URL war gesetzt, ist jetzt leer |
 | `pool_connected` | info | Pool-Verbindung wiederhergestellt |
+| `fallback_active` | warning | Primär-Pool ausgefallen, Fallback aktiv (AxeOS only) |
+| `fallback_recovered` | info | Primär-Pool wiederhergestellt (AxeOS only) |
+| `mining_paused` | warning | Mining wurde pausiert (AxeOS only) |
+| `device_rebooted` | warning | Uptime-Reset erkannt (AxeOS only) |
+| `new_best_diff` | info | Neue beste Difficulty (optional, default: aus) |
+| `block_found` | critical | Difficulty ≥ Netzwerk-Difficulty 🏆 (AxeOS only) |
+
+**Cooldown:** Alle Alerts (außer Zustandsänderungen) respektieren `alert_cooldown_minutes`.
+**Grace-Period:** Offline-Alerts erst nach `offline_grace_minutes`.
 
 ### Alert-Schema
 ```json
 {
-  "id": "nmminer:10.0.0.1:offline:2026-04-04T...",
+  "id": "nmminer:10.0.0.1:offline:2026-04-05T...",
   "device": "nmminer:10.0.0.1",
   "kind": "offline",
   "severity": "critical",
   "message": "NMMiner 10.0.0.1 is offline",
-  "timestamp": "2026-04-04T12:00:00+00:00",
-  "read": false
+  "timestamp": "2026-04-05T12:00:00+00:00",
+  "read": false,
+  "source": "nmminer"
 }
 ```
+
+**Eintrag-Arten im Log:** Alert-Events (von `alerts.py`), User-Actions (von `POST /api/log`), System-Events (Startup, Config-Speichern, Geräte-Aktionen)
 
 ### Daten-Pfad
 `DATA_DIR` wird per Env-Variable `HASHHIVE_DATA_DIR` gesteuert (Standard: `backend/`-Verzeichnis).  
 Docker setzt: `HASHHIVE_DATA_DIR=/app/backend/data`
+
+---
+
+## GitHub Actions
+
+| Workflow | Datei | Trigger | Beschreibung |
+|---|---|---|---|
+| Secret Scan | `secret-scan.yml` | Push / PR auf alle Branches | `gitleaks` scannt komplette Git-History auf Tokens, API-Keys, Passwörter |
+| Release Please | `release-please.yml` | Push auf `main` | Analysiert Commits (Conventional Commits); erstellt/aktualisiert Release PR mit `CHANGELOG.md` + `version.txt` Bump |
+| Release | `release.yml` | `v*`-Tag (nach Merge des Release PR) | Docker-Build → Push zu `ghcr.io/fgrfn/hashhive:{version}` + `:latest`; GitHub Release mit auto-generierten Release Notes |
+
+### Conventional Commits → Version-Bump
+
+| Prefix | Bump |
+|---|---|
+| `feat: ...` | Minor (`1.0.0 → 1.1.0`) |
+| `fix: ...` | Patch (`1.0.0 → 1.0.1`) |
+| `feat!: ...` oder `BREAKING CHANGE:` | Major (`1.0.0 → 2.0.0`) |
+| `chore:`, `docs:`, `style:` | kein Release |
+
+### Ablauf
+```
+git push (main)
+  └► release-please.yml
+        └► Release PR mit CHANGELOG.md + version.txt Bump
+
+User merged Release PR
+  └► Tag v1.x.x erstellt
+        └► release.yml: Docker-Build → GHCR + GitHub Release
+```
+
+---
+
+## Versionierung
+
+**Single Source of Truth:** `version.txt` im Projekt-Root.
+
+- `backend/main.py` liest `version.txt` beim Start: `APP_VERSION = (BASE_DIR.parent / "version.txt").read_text().strip()`
+- FastAPI-App-Titel und `/api/health` Response verwenden `APP_VERSION`
+- `frontend/index.html` fetcht `/api/health` beim Laden, zeigt `HashHive v{version}` in der Sidebar
+- `Dockerfile` kopiert `version.txt` ins Image (`COPY version.txt ./`)
+- `release-please-config.json` + `.release-please-manifest.json` steuern den automatischen Bump
 
 ---
 
@@ -466,7 +600,12 @@ Docker setzt: `HASHHIVE_DATA_DIR=/app/backend/data`
 ### Starten
 
 ```bash
-# Image bauen und starten
+# Aus dem ghcr.io-Image starten (kein Build nötig)
+docker run -d -p 8000:8000 \
+  -v hashhive-data:/app/backend/data \
+  ghcr.io/fgrfn/hashhive:latest
+
+# Oder lokal bauen und starten
 docker compose up -d
 
 # Logs
@@ -507,9 +646,10 @@ Dashboard: **http://localhost:8000**
 | `NaNh NaNm` Uptime | NMMiner gibt String statt Sekunden zurück | `fmtUptime()` prüft `typeof s === 'string'` |
 | `0.00` Hashrate | Falscher Feldname | Fallback-Kette `GHs5s → GHs5 → GHs1m → GHsav → hashrate → ...` |
 | Dashboard zeigt „No NMMiner" obwohl NMMiner-Seite funktioniert | `/swarm` gibt anderes Format zurück als `{devices:[]}` | Backend normalisiert alle bekannten Formate |
-| Restart funktioniert nicht | AxeOS `restart` benötigt POST, kein GET | `fetch(url, { method: 'POST' })` |
+| Restart/Pause/Resume/ID-Button: „Failed to fetch“ | Browser kann Gerät nicht direkt erreichen (CORS / Netz) | Alle Actions laufen über Backend-Proxy `/api/axeos/action/{ip}?action=` |
 | Pool-Push ändert nichts trotz Erfolg | NMMiner erwartet `stratum+tcp://` Prefix | `nmPoolUrl()` ergänzt fehlende Schemata automatisch |
 | NMMiner-Config-Booleans werden ignoriert | Gerät erwartet `1`/`0`, nicht `true`/`false` | Alle booleschen Felder als Integer senden |
+| 💡 ID Button funktioniert nicht | Firmware unterstützt `/api/system/identify` nicht | Backend gibt 502, Gerät-Firmware aktualisieren |
 
 ---
 
@@ -517,6 +657,7 @@ Dashboard: **http://localhost:8000**
 
 - Hashrate-Verlauf mit Chart.js + SQLite
 - Weitere Geräteklassen (z.B. Antminer via LuCI-API)
-- WebSocket für Echtzeit-Updates statt Polling
 - HTTPS + Auth für externen Zugriff
 - Per-Gerät AxeOS-Settings-Modal (Freq, Voltage, Fan, Hostname)
+- Power Cost Tracker (Watt × kWh-Preis → Tages-/Monatskosten)
+- Auto-Discover AxeOS-Geräte im lokalen /24-Subnetz (Endpunkt existiert bereits: `GET /api/axeos/scan`)

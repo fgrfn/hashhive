@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build Docker image, push to GHCR & create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # create GitHub Release
+      packages: write    # push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Docker
+
+            ```bash
+            # Pull & run (no build needed)
+            docker run -d -p 8000:8000 ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+
+            Or with persistent data:
+            ```bash
+            docker run -d -p 8000:8000 \
+              -v hashhive-data:/app/backend/data \
+              ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+
+            Dashboard: **http://localhost:8000**
