@@ -189,6 +189,11 @@
 
     /* ── Pool preview ── */
     .pool-preview{margin-top:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .preset-chip{display:inline-flex;align-items:center;gap:0;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:12px;cursor:pointer;overflow:hidden;transition:.15s}
+    .preset-chip:hover{border-color:var(--accent)}
+    .preset-chip-label{padding:4px 10px 4px 12px;color:var(--text);white-space:nowrap}
+    .preset-chip-del{padding:4px 8px 4px 4px;color:var(--text-muted);line-height:1;font-size:14px;background:none;border:none;cursor:pointer}
+    .preset-chip-del:hover{color:var(--danger)}
     .pool-preview-hd{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface2);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);border-bottom:1px solid var(--border)}
     .pool-preview-body{padding:10px 14px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
     @media(max-width:700px){.pool-preview-body{grid-template-columns:1fr}}
@@ -457,6 +462,14 @@
         <div class="card-title mb-0">Pool Configuration</div>
         <p class="text-muted" style="margin:10px 0 18px;font-size:13px">Push pool settings to selected devices. Use <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{suffix}</code> in the worker name to append a per-device suffix (hostname or IP).</p>
 
+        <!-- Saved Pools -->
+        <div id="pool-presets-wrap" style="margin-bottom:16px;display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Saved Pools</span>
+          </div>
+          <div id="pool-preset-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
         <div class="form-grid">
           <div class="form-group"><label>Primär Pool URL</label><input type="text" id="pool-p-url" placeholder="stratum+tcp://pool.example.com:3333" oninput="updatePoolPreview()"></div>
           <div class="form-group"><label>Primär Worker <span class="text-muted" style="font-weight:400;font-size:10px">(use {suffix} for per-device)</span></label><input type="text" id="pool-p-user" placeholder="wallet.{suffix}" oninput="updatePoolPreview()"></div>
@@ -471,6 +484,9 @@
         <div id="pool-preview" class="pool-preview" style="display:none">
           <div class="pool-preview-hd">📋 Vorschau — wird so gesendet</div>
           <div class="pool-preview-body" id="pool-preview-body"></div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-secondary btn-sm" onclick="savePoolPreset()">💾 Save as Preset</button>
         </div>
       </div>
 
@@ -953,7 +969,7 @@
       case 'nmminer':      document.getElementById('nm-filter').value=''; loadNmPage(); break;
       case 'axeos':        document.getElementById('ax-filter').value=''; loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
-      case 'pool':          loadPoolPage().then(() => { updateWorkerPreview(); renderPoolStatus(); }); break;
+      case 'pool':          loadPoolPage().then(() => { updateWorkerPreview(); renderPoolStatus(); renderPoolPresets(); }); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
     }
   }
@@ -1919,6 +1935,84 @@
   function poolSelectAll(checked) {
     document.querySelectorAll('#pool-device-list input[type=checkbox]').forEach(cb => cb.checked = checked);
     updatePoolPreview();
+  }
+
+  // ── Pool presets ────────────────────────────────────────────────────────────
+
+  function renderPoolPresets() {
+    const presets = currentConfig.pool_presets || [];
+    const wrap  = document.getElementById('pool-presets-wrap');
+    const chips = document.getElementById('pool-preset-chips');
+    if (!wrap || !chips) return;
+    if (presets.length === 0) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    chips.innerHTML = presets.map((p, i) => `
+      <div class="preset-chip" title="${p.url || ''}&#10;Worker: ${p.worker || '–'}">
+        <span class="preset-chip-label" onclick="applyPoolPreset(${i})">${p.name}</span>
+        <button class="preset-chip-del" onclick="deletePoolPreset(${i})" title="Delete">×</button>
+      </div>`).join('');
+  }
+
+  function applyPoolPreset(i) {
+    const p = (currentConfig.pool_presets || [])[i];
+    if (!p) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('pool-p-url',  p.url);
+    set('pool-p-user', p.worker);
+    set('pool-p-pass', p.password);
+    set('pool-s-url',  p.fallback_url);
+    set('pool-s-user', p.fallback_worker);
+    set('pool-s-pass', p.fallback_password);
+    updatePoolPreview();
+    toast(`Preset "${p.name}" loaded`, 'success');
+  }
+
+  async function savePoolPreset() {
+    const url = document.getElementById('pool-p-url')?.value.trim();
+    if (!url) { toast('Enter a pool URL first', 'error'); return; }
+    const name = prompt('Preset name:', url.replace(/^[a-z][a-z0-9+\-.]*:\/\//i,'').split(':')[0]);
+    if (!name) return;
+    const preset = {
+      name,
+      url,
+      worker:            document.getElementById('pool-p-user')?.value.trim() || '',
+      password:          document.getElementById('pool-p-pass')?.value.trim() || '',
+      fallback_url:      document.getElementById('pool-s-url')?.value.trim()  || '',
+      fallback_worker:   document.getElementById('pool-s-user')?.value.trim() || '',
+      fallback_password: document.getElementById('pool-s-pass')?.value.trim() || '',
+    };
+    if (!currentConfig.pool_presets) currentConfig.pool_presets = [];
+    currentConfig.pool_presets.push(preset);
+    try {
+      await apiFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentConfig),
+      });
+      renderPoolPresets();
+      toast(`Preset "${name}" saved`, 'success');
+    } catch (e) {
+      currentConfig.pool_presets.pop();
+      toast('Save failed: ' + e.message, 'error');
+    }
+  }
+
+  async function deletePoolPreset(i) {
+    const p = (currentConfig.pool_presets || [])[i];
+    if (!p || !confirm(`Delete preset "${p.name}"?`)) return;
+    currentConfig.pool_presets.splice(i, 1);
+    try {
+      await apiFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentConfig),
+      });
+      renderPoolPresets();
+      toast(`Preset "${p.name}" deleted`, 'success');
+    } catch (e) {
+      currentConfig.pool_presets.splice(i, 0, p);
+      toast('Delete failed: ' + e.message, 'error');
+    }
   }
 
   function applyWorker(template, suffix) {

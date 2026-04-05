@@ -152,6 +152,7 @@ DEFAULT_CONFIG: dict = {
         "day": "monday",
         "time": "08:00",
     },
+    "pool_presets": [],
 }
 
 
