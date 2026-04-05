@@ -236,15 +236,15 @@
     .col-picker-wrap{position:relative}
     .col-picker-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;transition:.15s;white-space:nowrap;line-height:1.4}
     .col-picker-btn:hover,.col-picker-btn.active{border-color:var(--accent);color:var(--accent)}
-    .col-picker-drop{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:500;width:240px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:none;overflow:hidden}
+    .col-picker-drop{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:500;width:300px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:none;overflow:hidden}
     .col-picker-drop.open{display:block}
     .col-picker-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 7px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
     .col-picker-head label{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px}
-    .col-picker-list{max-height:280px;overflow-y:auto;padding:4px 0 6px}
-    .col-picker-item{display:flex;flex-direction:row;align-items:center;gap:9px;padding:5px 12px;cursor:pointer;font-size:13px;user-select:none;transition:.1s;color:var(--text);text-align:left;width:100%;box-sizing:border-box}
+    .col-picker-list{max-height:300px;overflow-y:auto;padding:4px 0 6px}
+    .col-picker-item{display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:13px;user-select:none;transition:.1s;color:var(--text)}
     .col-picker-item:hover{background:var(--surface2)}
-    .col-picker-item input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0;order:0}
-    .col-picker-item span{flex:1;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;order:1}
+    .col-picker-item input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
+    .col-picker-item span{flex:1;line-height:1.4;min-width:0}
     td.col-hidden,th.col-hidden{display:none}
     .text-muted{color:var(--text-muted)}
     .mb-0{margin-bottom:0!important}
@@ -2727,7 +2727,7 @@
         const label = th.dataset.label || th.textContent.replace(/[↕↑↓]/g,'').trim() || `Col ${i+1}`;
         const hidden = _colState[tbodyId][i] === true;
         const cbId = `${dropId}-col-${i}`;
-        return `<label class="col-picker-item" for="${cbId}"><input type="checkbox" id="${cbId}" ${hidden ? '' : 'checked'} onchange="toggleCol('${tbodyId}',${i},this.checked,'${dropId}')"><span>${label}</span></label>`;
+        return `<label class="col-picker-item"><input type="checkbox" id="${cbId}" ${hidden ? '' : 'checked'} onchange="toggleCol('${tbodyId}',${i},this.checked,'${dropId}')"><span>${label}</span></label>`;
       }).join('') +
       `</div>`;
     // apply already-saved hidden state
