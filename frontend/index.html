@@ -236,7 +236,7 @@
     .col-picker-wrap{position:relative}
     .col-picker-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;transition:.15s;white-space:nowrap;line-height:1.4}
     .col-picker-btn:hover,.col-picker-btn.active{border-color:var(--accent);color:var(--accent)}
-    .col-picker-drop{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:500;width:210px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:none;overflow:hidden}
+    .col-picker-drop{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:500;width:240px;box-shadow:0 12px 32px rgba(0,0,0,.5);display:none;overflow:hidden}
     .col-picker-drop.open{display:block}
     .col-picker-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 7px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
     .col-picker-head label{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px}
@@ -401,7 +401,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th>Actions</th></tr></thead>
+            <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th data-picker="skip">Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -444,7 +444,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th>Actions</th></tr></thead>
+            <thead><tr><th style="width:32px" data-picker="skip"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th data-picker="skip">Actions</th></tr></thead>
             <tbody id="ax-rows"><tr><td colspan="26" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -2717,11 +2717,13 @@
     if (!table || !drop) return;
     const ths = [...table.querySelectorAll('thead th')];
     if (!_colState[tbodyId]) _colState[tbodyId] = {};
-    const allChecked = ths.every((_,i) => _colState[tbodyId][i] !== true);
+    const pickable = ths.filter(th => th.dataset.picker !== 'skip');
+    const allChecked = pickable.every(th => _colState[tbodyId][ths.indexOf(th)] !== true);
     drop.innerHTML =
       `<div class="col-picker-head"><span>Columns</span><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0;font-size:12px"><input type="checkbox" id="${dropId}-all" ${allChecked?'checked':''} onchange="_toggleAllCols('${tbodyId}','${dropId}',this.checked)" style="width:13px;height:13px;accent-color:var(--accent);cursor:pointer;margin:0"> all</label></div>` +
       `<div class="col-picker-list">` +
-      ths.map((th, i) => {
+      pickable.map(th => {
+        const i = ths.indexOf(th);
         const label = th.dataset.label || th.textContent.replace(/[↕↑↓]/g,'').trim() || `Col ${i+1}`;
         const hidden = _colState[tbodyId][i] === true;
         const cbId = `${dropId}-col-${i}`;
@@ -2739,7 +2741,8 @@
     const table = document.getElementById(tbodyId)?.closest('table');
     if (!table) return;
     if (!_colState[tbodyId]) _colState[tbodyId] = {};
-    table.querySelectorAll('thead th').forEach((_, i) => {
+    table.querySelectorAll('thead th').forEach((th, i) => {
+      if (th.dataset.picker === 'skip') return;  // never hide skipped columns
       _colState[tbodyId][i] = !visible;
       _applyColVisibility(table, i, visible);
     });
