@@ -1794,8 +1794,10 @@
     for (const d of (data.axeos?.devices || [])) {
       if (!d._online) continue;
       const fallback = d.isUsingFallbackStratum === 1 || d.isUsingFallbackStratum === true;
-      const pool = fallback ? (d.fallbackStratumURL || d.stratumURL || '–') : (d.stratumURL || '–');
-      const worker = fallback ? (d.fallbackStratumUser || d.stratumUser || '–') : (d.stratumUser || '–');
+      const poolUrl  = fallback ? (d.fallbackStratumURL || d.stratumURL || '') : (d.stratumURL || '');
+      const port     = fallback ? (d.fallbackStratumPort || d.stratumPort || '') : (d.stratumPort || '');
+      const pool     = poolUrl ? (port ? `${poolUrl}:${port}` : poolUrl) : '–';
+      const worker   = fallback ? (d.fallbackStratumUser || d.stratumUser || '–') : (d.stratumUser || '–');
       rows.push(`<tr>
         <td>${d._name || d._ip}</td>
         <td><span style="font-size:11px;color:var(--info)">${d._type || 'axeos'}</span></td>
