@@ -60,6 +60,7 @@
 
     /* ── Tables ── */
     .table-wrap{overflow-x:auto;border-radius:6px}
+    .bulk-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:8px;gap:8px;flex-wrap:wrap}
     table{width:100%;border-collapse:collapse}
     thead th{text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
     tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
@@ -431,10 +432,20 @@
             <div class="col-picker-drop" id="ax-col-drop"></div>
           </div>
         </div>
+        <div id="ax-bulk-bar" class="bulk-bar" style="display:none">
+          <span id="ax-bulk-count" class="text-muted" style="font-size:13px">0 selected</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="doBulkAction('pause')">⏸ Pause</button>
+            <button class="btn btn-secondary btn-sm" onclick="doBulkAction('resume')">▶ Resume</button>
+            <button class="btn btn-danger btn-sm" onclick="doBulkAction('restart')">↺ Restart</button>
+            <button class="btn btn-secondary btn-sm" onclick="openBulkFreqModal()">⚡ Set Freq</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearBulkSel()">✕ Clear</button>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th></th>Pool</th><th>Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="24" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th style="width:32px"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th>Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="26" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -476,6 +487,17 @@
         </div>
         <div class="actions-row" style="margin-top:12px">
           <button class="btn btn-primary" onclick="broadcastPool()">🚀 Push to Selected Devices</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:0">
+        <div class="card-title mb-0">Current Pool Status</div>
+        <p class="text-muted" style="font-size:12px;margin:8px 0 12px">Live view of each device's active pool connection. Opens Dashboard to fetch latest data.</p>
+        <div class="table-wrap">
+          <table id="pool-status-table">
+            <thead><tr><th>Device</th><th>Type</th><th>Pool</th><th>Worker</th><th>Fallback</th><th>Shares OK</th><th>Shares Err</th></tr></thead>
+            <tbody id="pool-status-rows"><tr><td colspan="7" class="empty text-muted">No data — visit Dashboard first</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -526,6 +548,34 @@
           <div class="form-group"><label>Offline Alert Grace (min)</label><input type="number" id="s-offline-grace" value="2" min="0" step="0.5" title="Wait this many minutes before triggering an offline alert"></div>
           <div class="form-group"><label>Alert Repeat Cooldown (min)</label><input type="number" id="s-alert-cooldown" value="30" min="1" step="1" title="Minimum time between repeated alerts of the same type (temp, hashrate, pool)"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Weekly Summary</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:12px">Sends a weekly digest of all alert events via all enabled notification channels.</p>
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span>Enable Weekly Summary</span>
+          <label class="toggle"><input type="checkbox" id="s-ws-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Day of Week (UTC)</label>
+            <select id="s-ws-day" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:14px;width:100%">
+              <option value="monday">Monday</option>
+              <option value="tuesday">Tuesday</option>
+              <option value="wednesday">Wednesday</option>
+              <option value="thursday">Thursday</option>
+              <option value="friday">Friday</option>
+              <option value="saturday">Saturday</option>
+              <option value="sunday">Sunday</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Time (UTC)</label>
+            <input type="time" id="s-ws-time" value="08:00">
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="testWeeklySummary()">📊 Send Test Summary Now</button>
       </div>
 
       <div class="actions-row" style="margin-top:0">
@@ -624,6 +674,35 @@
 
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ════════════ BULK FREQUENCY MODAL ════════════ -->
+<div class="modal-overlay" id="bulk-freq-overlay" onclick="if(event.target===this)closeBulkFreqModal()">
+  <div class="modal" style="width:min(400px,100%)">
+    <div class="modal-header">
+      <div class="modal-title">⚡ Set Frequency / Voltage
+        <small id="bulk-freq-subtitle">for selected devices</small>
+      </div>
+      <button class="modal-close" onclick="closeBulkFreqModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="form-group">
+          <label>Frequency (MHz) <span class="text-muted" style="font-size:11px">leave blank to skip</span></label>
+          <input type="number" id="bulk-freq-val" placeholder="e.g. 490" min="100" max="800" step="1">
+        </div>
+        <div class="form-group">
+          <label>Core Voltage (mV) <span class="text-muted" style="font-size:11px">leave blank to skip</span></label>
+          <input type="number" id="bulk-volt-val" placeholder="e.g. 1200" min="1000" max="1400" step="10">
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:12px;margin-top:8px">⚠ Changes take effect immediately and may affect mining stability. Devices will restart automatically.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeBulkFreqModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitBulkFreq()">⚡ Apply to Selected</button>
+    </div>
+  </div>
+</div>
 
 <!-- ════════════ NMMINER DEVICE CONFIG MODAL ════════════ -->
 <div class="modal-overlay" id="nmedit-overlay" onclick="if(event.target===this)closeNmEdit()">
@@ -874,7 +953,7 @@
       case 'nmminer':      document.getElementById('nm-filter').value=''; loadNmPage(); break;
       case 'axeos':        document.getElementById('ax-filter').value=''; loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
-      case 'pool':          loadPoolPage().then(updateWorkerPreview); break;
+      case 'pool':          loadPoolPage().then(() => { updateWorkerPreview(); renderPoolStatus(); }); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
     }
   }
@@ -1388,12 +1467,12 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="24" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="26" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="24" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="26" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
       appendLog('critical', `AxeOS load failed: ${e.message}`, 'axeos');
     }
   }
@@ -1403,7 +1482,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="25" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="26" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -1440,7 +1519,8 @@
         ] : []),
       ].join(' ');
       return `<tr data-ip="${d._ip}">
-        <td><span class="copy-ip" onclick="copyIP('${d._ip}')" title="Copy IP">${d._name || d._ip || '–'}</span><br><small class="text-muted">${d._ip || ''}</small></td>
+        <td style="text-align:center"><input type="checkbox" class="ax-sel" data-ip="${d._ip}" onchange="updateBulkBar()"></td>
+        <td><span class="copy-ip" onclick="copyIP('${d._ip}')" ondblclick="startAxRename(this,'${d._ip}')" title="Copy IP · Double-click to rename">${d._name || d._ip || '–'}</span><br><small class="text-muted">${d._ip || ''}</small></td>
         <td><small>${d.ASICModel || '–'}${d.boardVersion ? '<br><span class="text-muted">'+d.boardVersion+'</span>' : ''}</small></td>
         <td>${d._type || '–'}</td>
         <td>${statusCell}</td>
@@ -1475,6 +1555,157 @@
     initSortable('ax-rows');
     filterTable('ax-rows','ax-filter','ax-filter-count');
     initColPicker('ax-rows', 'ax-col-drop');
+    // Reset bulk selection state after re-render
+    updateBulkBar();
+  }
+
+  // ── Bulk selection ─────────────────────────────────────────────────────────
+
+  function getSelAxIPs() {
+    return [...document.querySelectorAll('#ax-rows .ax-sel:checked')].map(cb => cb.dataset.ip);
+  }
+
+  function updateBulkBar() {
+    const sel = getSelAxIPs();
+    const bar = document.getElementById('ax-bulk-bar');
+    const cnt = document.getElementById('ax-bulk-count');
+    if (sel.length > 0) {
+      bar.style.display = 'flex';
+      cnt.textContent = `${sel.length} selected`;
+    } else {
+      bar.style.display = 'none';
+    }
+    // Sync header checkbox tri-state
+    const all = document.querySelectorAll('#ax-rows .ax-sel');
+    const hdr = document.getElementById('ax-sel-all');
+    if (hdr) {
+      hdr.indeterminate = sel.length > 0 && sel.length < all.length;
+      hdr.checked = all.length > 0 && sel.length === all.length;
+    }
+  }
+
+  function bulkSelectAll(checked) {
+    document.querySelectorAll('#ax-rows .ax-sel').forEach(cb => cb.checked = checked);
+    updateBulkBar();
+  }
+
+  function clearBulkSel() {
+    bulkSelectAll(false);
+  }
+
+  async function doBulkAction(action) {
+    const ips = getSelAxIPs();
+    if (ips.length === 0) { toast('No devices selected', 'error'); return; }
+    const label = { restart: 'Restart', pause: 'Pause', resume: 'Resume' }[action] || action;
+    if (action === 'restart' && !confirm(`Restart ${ips.length} selected device(s)?`)) return;
+    toast(`${label} — sending to ${ips.length} device(s)…`, 'info');
+    try {
+      const result = await apiFetch('/api/axeos/action/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ips }),
+      });
+      const ok  = (result.results || []).filter(r => r.status && r.status < 400).length;
+      const err = (result.results || []).filter(r => r.error || (r.status && r.status >= 400)).length;
+      const msg = `${label} (${ips.length}) — ${ok} ok${err ? ', ' + err + ' failed' : ''}`;
+      appendLog(err ? 'warning' : 'ok', msg, 'axeos');
+      toast(msg, err ? 'warning' : 'success');
+      setTimeout(() => loadAxPage(), 2000);
+    } catch (e) {
+      appendLog('critical', `Bulk ${action} failed: ${e.message}`, 'axeos');
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  function openBulkFreqModal() {
+    const ips = getSelAxIPs();
+    if (ips.length === 0) { toast('No devices selected', 'error'); return; }
+    document.getElementById('bulk-freq-subtitle').textContent = `for ${ips.length} selected device(s)`;
+    document.getElementById('bulk-freq-val').value = '';
+    document.getElementById('bulk-volt-val').value = '';
+    document.getElementById('bulk-freq-overlay').classList.add('open');
+  }
+
+  function closeBulkFreqModal() {
+    document.getElementById('bulk-freq-overlay').classList.remove('open');
+  }
+
+  async function submitBulkFreq() {
+    const ips = getSelAxIPs();
+    const freq = parseInt(document.getElementById('bulk-freq-val').value);
+    const volt = parseInt(document.getElementById('bulk-volt-val').value);
+    if (!freq && !volt) { toast('Enter frequency and/or voltage', 'error'); return; }
+    const body = { ips };
+    if (freq) body.frequency = freq;
+    if (volt) body.coreVoltage = volt;
+    closeBulkFreqModal();
+    toast(`Setting freq/voltage on ${ips.length} device(s)…`, 'info');
+    try {
+      const result = await apiFetch('/api/axeos/config/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const ok  = (result.results || []).filter(r => r.status && r.status < 400).length;
+      const err = (result.results || []).filter(r => r.error || (r.status && r.status >= 400)).length;
+      const msg = `Set freq/volt (${ips.length}) — ${ok} ok${err ? ', ' + err + ' failed' : ''}`;
+      appendLog(err ? 'warning' : 'ok', msg, 'axeos');
+      toast(msg, err ? 'warning' : 'success');
+      setTimeout(() => loadAxPage(), 3000);
+    } catch (e) {
+      appendLog('critical', `Bulk freq/volt failed: ${e.message}`, 'axeos');
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  // ── Inline rename ──────────────────────────────────────────────────────────
+
+  function startAxRename(el, ip) {
+    if (el.tagName === 'INPUT') return;  // already editing
+    const current = el.textContent.trim();
+    const input = document.createElement('input');
+    input.value = current;
+    input.style.cssText = 'background:var(--surface2);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-size:inherit;width:120px;outline:none';
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      commitAxRename(ip, input, el);
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') {
+        committed = true;
+        input.replaceWith(el);
+      }
+    });
+    el.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  async function commitAxRename(ip, input, origEl) {
+    const newName = input.value.trim();
+    if (!newName || newName === origEl.textContent.trim()) {
+      input.replaceWith(origEl);
+      return;
+    }
+    try {
+      await apiFetch('/api/settings/device', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, name: newName }),
+      });
+      const dev = (currentConfig.axeos_devices || []).find(d => d.ip === ip);
+      if (dev) dev.name = newName;
+      origEl.textContent = newName;
+      input.replaceWith(origEl);
+      toast(`Renamed to "${newName}"`, 'success');
+    } catch (e) {
+      input.replaceWith(origEl);
+      toast('Rename failed: ' + e.message, 'error');
+    }
   }
 
   async function restartDevice(ip) {
@@ -1549,6 +1780,55 @@
   }
 
   // ── Pool page ──────────────────────────────────────────────────────────────
+
+  function renderPoolStatus() {
+    const tbody = document.getElementById('pool-status-rows');
+    if (!tbody) return;
+    const data = lastDashboard;
+    if (!data) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">No data — visit Dashboard first</td></tr>';
+      return;
+    }
+    const rows = [];
+    // AxeOS devices
+    for (const d of (data.axeos?.devices || [])) {
+      if (!d._online) continue;
+      const fallback = d.isUsingFallbackStratum === 1 || d.isUsingFallbackStratum === true;
+      const pool = fallback ? (d.fallbackStratumURL || d.stratumURL || '–') : (d.stratumURL || '–');
+      const worker = fallback ? (d.fallbackStratumUser || d.stratumUser || '–') : (d.stratumUser || '–');
+      rows.push(`<tr>
+        <td>${d._name || d._ip}</td>
+        <td><span style="font-size:11px;color:var(--info)">${d._type || 'axeos'}</span></td>
+        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${pool}">${pool}</td>
+        <td style="font-size:11px">${worker}</td>
+        <td>${fallback ? '<span style="color:var(--warning);font-size:11px">⚠ Fallback</span>' : '<span style="color:var(--success);font-size:11px">Primary</span>'}</td>
+        <td>${d.sharesAccepted ?? '–'}</td>
+        <td>${d.sharesRejected ?? '–'}</td>
+      </tr>`);
+    }
+    // NMMiner devices
+    for (const d of (data.nmminer?.devices || [])) {
+      if (!d._online && d.online === false) continue;
+      const pool = d.pool || d.stratumURL || d.stratum_url || d.poolURL || d.PrimaryPool || '–';
+      const worker = d.worker || d.stratumUser || d.user || d.PrimaryAddress || '–';
+      const sharesOk = d.Accepted ?? d.accepted ?? d.sharesAccepted ?? '–';
+      const sharesErr = d.Rejected ?? d.rejected ?? d.sharesRejected ?? '–';
+      rows.push(`<tr>
+        <td>${d.hostname || d.ip || '–'}</td>
+        <td><span style="font-size:11px;color:var(--accent)">nmminer</span></td>
+        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${pool}">${pool}</td>
+        <td style="font-size:11px">${worker}</td>
+        <td><span style="color:var(--success);font-size:11px">Primary</span></td>
+        <td>${sharesOk}</td>
+        <td>${sharesErr}</td>
+      </tr>`);
+    }
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">No online devices found</td></tr>';
+    } else {
+      tbody.innerHTML = rows.join('');
+    }
+  }
 
   async function loadPoolPage() {
     const list = document.getElementById('pool-device-list');
@@ -1742,6 +2022,11 @@
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
+      // Weekly summary
+      const ws = cfg.weekly_summary || {};
+      document.getElementById('s-ws-enabled').checked = !!ws.enabled;
+      document.getElementById('s-ws-day').value = ws.day || 'monday';
+      document.getElementById('s-ws-time').value = ws.time || '08:00';
       renderNmDeviceList(cfg.nmminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
@@ -1977,6 +2262,11 @@
     currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
     currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
     currentConfig.alert_cooldown_minutes = parseFloat(document.getElementById('s-alert-cooldown').value) || 30;
+    currentConfig.weekly_summary = {
+      enabled: document.getElementById('s-ws-enabled').checked,
+      day:     document.getElementById('s-ws-day').value,
+      time:    document.getElementById('s-ws-time').value,
+    };
     try {
       await apiFetch('/api/settings', {
         method: 'POST',
@@ -2094,6 +2384,17 @@
     } catch (e) {
       toast('Error: ' + e.message, 'error');
       appendLog('critical', `Test notification failed: ${e.message}`, 'system');
+    }
+  }
+
+  async function testWeeklySummary() {
+    try {
+      await apiFetch('/api/weekly-summary/test', { method: 'POST' });
+      toast('Weekly summary queued — check your notification channels', 'success');
+      appendLog('info', 'Weekly summary test sent', 'system');
+    } catch (e) {
+      toast('Error: ' + e.message, 'error');
+      appendLog('critical', `Weekly summary test failed: ${e.message}`, 'system');
     }
   }
 

@@ -147,6 +147,11 @@ DEFAULT_CONFIG: dict = {
         "new-best-diff": False,
         "block-found": True,
     },
+    "weekly_summary": {
+        "enabled": False,
+        "day": "monday",
+        "time": "08:00",
+    },
 }
 
 
@@ -235,6 +240,129 @@ async def _dashboard_broadcast_loop():
         await asyncio.sleep(interval)
 
 
+_WEEKDAY_MAP = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+async def _send_weekly_summary() -> None:
+    """Build and ship the weekly summary via all configured notification channels."""
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    notifications = config.get("notifications", {})
+    # Collect last 7 days of alerts
+    entries = _load_recent(7)
+    total = len(entries)
+    by_kind: dict[str, int] = {}
+    best_diffs: list[str] = []
+    blocks: int = 0
+    offline_events: int = 0
+    for e in entries:
+        kind = e.get("kind", "unknown")
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        if kind == "new_best_diff":
+            best_diffs.append(e.get("message", ""))
+        if kind == "block_found":
+            blocks += 1
+        if kind == "offline":
+            offline_events += 1
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    nm_count = len(config.get("nmminer_devices", []))
+    ax_count = len(config.get("axeos_devices", []))
+
+    # ── Telegram ─────────────────────────────────────────────────────────────
+    if notifications.get("telegram_enabled") and notifications.get("telegram_token") and notifications.get("telegram_chat_id"):
+        lines = [
+            "📊 <b>HashHive Weekly Summary</b>",
+            f"<i>{now}</i>",
+            "",
+            f"📦 Devices: {nm_count} NMMiner · {ax_count} AxeOS",
+            f"📋 Total events (7 days): {total}",
+        ]
+        if offline_events:
+            lines.append(f"⚠️ Offline events: {offline_events}")
+        if blocks:
+            lines.append(f"🏆 Block(s) found: {blocks}")
+        if by_kind:
+            lines.append("")
+            lines.append("Events by type:")
+            for k, c in sorted(by_kind.items(), key=lambda x: -x[1]):
+                lines.append(f"  • {k.replace('_', ' ').title()}: {c}")
+        text = "\n".join(lines)
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{notifications['telegram_token']}/sendMessage",
+                    json={"chat_id": notifications["telegram_chat_id"], "text": text, "parse_mode": "HTML"},
+                )
+        except Exception:
+            pass
+
+    # ── Discord ───────────────────────────────────────────────────────────────
+    if notifications.get("discord_enabled") and notifications.get("discord_webhook"):
+        breakdown = "\n".join(f"{k.replace('_', ' ').title()}: **{c}**" for k, c in sorted(by_kind.items(), key=lambda x: -x[1])) or "No events"
+        embed = {
+            "title": "📊 HashHive Weekly Summary",
+            "color": 0x7C3AED,
+            "fields": [
+                {"name": "Devices", "value": f"{nm_count} NMMiner · {ax_count} AxeOS", "inline": True},
+                {"name": "Total Events (7 days)", "value": str(total), "inline": True},
+                {"name": "Offline Events", "value": str(offline_events), "inline": True},
+                {"name": "Blocks Found", "value": str(blocks), "inline": True},
+                {"name": "Event Breakdown", "value": breakdown[:1000], "inline": False},
+            ],
+            "footer": {"text": "HashHive"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                await client.post(notifications["discord_webhook"], json={"embeds": [embed]})
+        except Exception:
+            pass
+
+    # ── Gotify ────────────────────────────────────────────────────────────────
+    if notifications.get("gotify_enabled") and notifications.get("gotify_url") and notifications.get("gotify_token"):
+        body = f"Period: last 7 days | Events: {total} | Offline: {offline_events} | Blocks found: {blocks}"
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                await client.post(
+                    f"{notifications['gotify_url'].rstrip('/')}/message",
+                    headers={"X-Gotify-Key": notifications["gotify_token"]},
+                    json={"title": "HashHive Weekly Summary", "message": body, "priority": 3},
+                )
+        except Exception:
+            pass
+
+
+async def _weekly_summary_loop() -> None:
+    """Background task: send weekly summary at the configured day+time (UTC)."""
+    last_sent_week: int = -1  # ISO calendar week number of last send
+    while True:
+        try:
+            config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+            ws = config.get("weekly_summary", {})
+            if ws.get("enabled"):
+                now = datetime.now(timezone.utc)
+                target_weekday = _WEEKDAY_MAP.get(ws.get("day", "monday").lower(), 0)
+                try:
+                    th, tm = (int(x) for x in ws.get("time", "08:00").split(":"))
+                except ValueError:
+                    th, tm = 8, 0
+                iso_week = now.isocalendar()[1]
+                if (
+                    now.weekday() == target_weekday
+                    and now.hour == th
+                    and now.minute == tm
+                    and iso_week != last_sent_week
+                ):
+                    last_sent_week = iso_week
+                    asyncio.create_task(_send_weekly_summary())
+        except Exception:
+            pass
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,12 +372,15 @@ async def lifespan(app: FastAPI):
     _migrate_legacy()
     _cleanup_old_logs()
     task = asyncio.create_task(_dashboard_broadcast_loop())
+    ws_task = asyncio.create_task(_weekly_summary_loop())
     yield
     task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    ws_task.cancel()
+    for t in (task, ws_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="HashHive", version="1.0.0", lifespan=lifespan)
@@ -604,6 +735,8 @@ async def patch_device_settings(data: dict):
                 d["temp_max"] = float(data["temp_max"])
             elif d.get("temp_max") is not None and data.get("temp_max") is None:
                 d.pop("temp_max", None)
+            if "name" in data and data["name"] is not None:
+                d["name"] = str(data["name"]).strip()
             updated = True
             break
     if not updated:
@@ -613,6 +746,8 @@ async def patch_device_settings(data: dict):
                     d["temp_max"] = float(data["temp_max"])
                 elif d.get("temp_max") is not None and data.get("temp_max") is None:
                     d.pop("temp_max", None)
+                if "name" in data and data["name"] is not None:
+                    d["name"] = str(data["name"]).strip()
                 break
     save_json(CONFIG_FILE, config)
     return {"status": "ok"}
@@ -637,6 +772,30 @@ async def axeos_action(ip: str, action: str = Query(...)):
             return {"ip": ip, "action": action, "status": resp.status_code}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.patch("/api/axeos/config/batch")
+async def patch_axeos_config_batch(data: dict):
+    """Batch PATCH config (frequency, voltage …) to multiple AxeOS devices.
+    Body: {"ips": ["10.0.0.1", ...], "frequency": 490, "coreVoltage": 1200, ...}
+    Omit "ips" to target all configured devices."""
+    ips: list[str] = data.pop("ips", [])
+    if not ips:
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
+    if not data:
+        raise HTTPException(status_code=400, detail="No config fields to update")
+    results: list[dict] = []
+    limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
+    async with httpx.AsyncClient(timeout=15, limits=limits) as client:
+        async def _patch(ip: str):
+            try:
+                resp = await client.patch(f"http://{ip}/api/system", json=data)
+                results.append({"ip": ip, "status": resp.status_code})
+            except Exception as exc:
+                results.append({"ip": ip, "error": str(exc)})
+        await asyncio.gather(*[_patch(ip) for ip in ips])
+    return {"results": results}
 
 
 @app.post("/api/axeos/action/batch")
@@ -977,3 +1136,10 @@ async def test_notification():
                 results["gotify"] = False
 
     return {"results": results}
+
+
+@app.post("/api/weekly-summary/test")
+async def test_weekly_summary():
+    """Immediately send a weekly summary via all configured notification channels."""
+    asyncio.create_task(_send_weekly_summary())
+    return {"status": "queued"}
