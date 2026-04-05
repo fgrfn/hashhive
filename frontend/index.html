@@ -148,12 +148,19 @@
     .log-panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;height:200px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px}
     .log-entry{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6;align-items:baseline}
     .log-entry:last-child{border-bottom:none}
+    .log-entry.log-hidden{display:none}
     .log-ts{color:var(--text-muted);flex-shrink:0;font-size:11px}
+    .log-src{flex-shrink:0;font-size:10px;padding:0 5px;border-radius:3px;line-height:1.7;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+    .log-src-nmminer{background:rgba(168,85,247,.18);color:var(--accent)}
+    .log-src-axeos{background:rgba(59,130,246,.18);color:var(--info)}
+    .log-src-system{background:rgba(34,197,94,.12);color:var(--success)}
     .log-msg{flex:1;word-break:break-word}
     .log-critical{color:var(--danger)}
     .log-warning{color:var(--warning)}
     .log-info{color:var(--info)}
     .log-ok{color:var(--success)}
+    .log-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:12px;margin-bottom:6px;box-sizing:border-box}
+    .log-search:focus{outline:none;border-color:var(--accent)}
 
     /* ── Modal ── */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px}
@@ -373,7 +380,10 @@
       <div class="card" style="margin-bottom:0">
         <div class="section-header" style="margin-bottom:6px">
           <div class="card-title mb-0">🖥 Live Log</div>
-          <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">✕ Clear</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="loadYesterdayLog()" id="log-load-hist-btn" title="Load previous day entries">📅 Load more</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">✕ Clear</button>
+          </div>
         </div>
         <div class="log-tabs">
           <button class="log-tab active" id="ltab-all"     onclick="setLogTab('all')">All</button>
@@ -381,6 +391,7 @@
           <button class="log-tab"        id="ltab-axeos"   onclick="setLogTab('axeos')">BitAxe / NerdAxe</button>
           <button class="log-tab"        id="ltab-system"  onclick="setLogTab('system')">HashHive</button>
         </div>
+        <input type="search" class="log-search" id="log-search" placeholder="🔍 Filter log…" oninput="filterLiveLog(this.value)">
         <div class="log-panel" id="live-log-panel">
           <div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">Waiting for data…</span></div>
         </div>
@@ -3061,7 +3072,7 @@
 
   function appendLog(severity, message, source = 'system', persist = true) {
     const now = new Date();
-    const entry = { ts: now.toLocaleTimeString('en-US'), isoTs: now.toISOString(), severity, message };
+    const entry = { ts: now.toLocaleTimeString('en-US'), isoTs: now.toISOString(), severity, message, source };
     _liveLogs.all.unshift(entry);
     if (_liveLogs.all.length > _MAX_LOG) _liveLogs.all.length = _MAX_LOG;
     const bucket = _liveLogs[source] || _liveLogs.system;
@@ -3086,6 +3097,15 @@
     document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
     const btn = document.getElementById('ltab-' + tab);
     if (btn) btn.classList.add('active');
+    const searchEl = document.getElementById('log-search');
+    if (searchEl) searchEl.value = '';
+    _renderLiveLog();
+  }
+
+  let _logSearchQ = '';
+
+  function filterLiveLog(q) {
+    _logSearchQ = q.trim().toLowerCase();
     _renderLiveLog();
   }
 
@@ -3097,9 +3117,18 @@
       panel.innerHTML = '<div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">No entries yet</span></div>';
       return;
     }
-    panel.innerHTML = entries.map(e => {
+    const q = _logSearchQ;
+    const filtered = q ? entries.filter(e => e.message.toLowerCase().includes(q)) : entries;
+    if (filtered.length === 0) {
+      panel.innerHTML = '<div class="log-entry"><span class="log-ts">–</span><span class="log-msg log-info">No matching entries</span></div>';
+      return;
+    }
+    panel.innerHTML = filtered.map(e => {
       const cls = e.severity === 'critical' ? 'log-critical' : e.severity === 'warning' ? 'log-warning' : e.severity === 'ok' ? 'log-ok' : 'log-info';
-      return `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${cls}">${e.message}</span></div>`;
+      const src = e.source || (e.message.toLowerCase().includes('nmminer') ? 'nmminer' : 'system');
+      const srcLabel = src === 'nmminer' ? 'NM' : src === 'axeos' ? 'AX' : 'SYS';
+      const srcCls = src === 'nmminer' ? 'log-src-nmminer' : src === 'axeos' ? 'log-src-axeos' : 'log-src-system';
+      return `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-src ${srcCls}">${srcLabel}</span><span class="log-msg ${cls}">${e.message}</span></div>`;
     }).join('');
   }
 
@@ -3107,6 +3136,17 @@
     Object.keys(_liveLogs).forEach(k => _liveLogs[k] = []);
     _saveLogs();
     _renderLiveLog();
+  }
+
+  function _alertToLogEntry(a) {
+    const src = a.source || (a.device?.startsWith('nmminer:') ? 'nmminer' : a.device?.startsWith('axeos:') ? 'axeos' : 'system');
+    return {
+      ts:       new Date(a.timestamp).toLocaleTimeString('en-US'),
+      isoTs:    a.timestamp,
+      severity: a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : a.severity === 'ok' ? 'ok' : 'info',
+      message:  a.message,
+      source:   src,
+    };
   }
 
   async function initLiveLog() {
@@ -3117,13 +3157,8 @@
       if (!alerts || !alerts.length) return;
       const history = [...alerts]
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, 20)
-        .map(a => ({
-          ts:       new Date(a.timestamp).toLocaleTimeString('en-US'),
-          severity: a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'info',
-          message:  a.message,
-          source:   a.device?.startsWith('nmminer:') ? 'nmminer' : a.device?.startsWith('axeos:') ? 'axeos' : 'system',
-        }));
+        .slice(0, 40)
+        .map(_alertToLogEntry);
       history.forEach(e => {
         _liveLogs.all.push(e);
         (_liveLogs[e.source] || _liveLogs.system).push(e);
@@ -3131,6 +3166,36 @@
       _saveLogs();
       _renderLiveLog();
     } catch (_) {}
+  }
+
+  let _histDaysLoaded = 1;
+
+  async function loadYesterdayLog() {
+    _histDaysLoaded = Math.min(_histDaysLoaded + 1, 7);
+    const btn = document.getElementById('log-load-hist-btn');
+    if (btn) btn.disabled = true;
+    try {
+      const alerts = await apiFetch(`/api/alerts?days=${_histDaysLoaded}`);
+      if (!alerts || !alerts.length) { toast('No more history available', 'info'); return; }
+      // Reset buckets and reload all with the extended range
+      Object.keys(_liveLogs).forEach(k => _liveLogs[k] = []);
+      [...alerts]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, _MAX_LOG)
+        .map(_alertToLogEntry)
+        .forEach(e => {
+          _liveLogs.all.push(e);
+          (_liveLogs[e.source] || _liveLogs.system).push(e);
+        });
+      _saveLogs();
+      _renderLiveLog();
+      toast(`Showing last ${_histDaysLoaded} days of history`, 'success');
+    } catch (e) {
+      toast('Failed to load history: ' + e.message, 'error');
+      _histDaysLoaded--;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────

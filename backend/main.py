@@ -268,6 +268,51 @@ async def _send_weekly_summary() -> None:
         if kind == "offline":
             offline_events += 1
 
+    # Fetch live device data to collect current share totals
+    shares_accepted: int = 0
+    shares_rejected: int = 0
+    try:
+        master = config.get("nmminer_master", "")
+        nm_devices = config.get("nmminer_devices", [])
+        axeos_devices = config.get("axeos_devices", [])
+        has_nmminer = bool(master or nm_devices)
+        async with httpx.AsyncClient(timeout=10) as client:
+            coros = []
+            if has_nmminer:
+                coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+            coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
+            results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
+        nmminer_devices = []
+        axeos_results = []
+        if has_nmminer and results:
+            nm_result = results[0]
+            if isinstance(nm_result, dict):
+                nmminer_devices = nm_result.get("devices", [])
+            axeos_results = list(results[1:])
+        else:
+            axeos_results = list(results)
+        for d in nmminer_devices:
+            if isinstance(d, dict):
+                acc = d.get("Accepted") or d.get("accepted") or d.get("sharesAccepted") or 0
+                rej = d.get("Rejected") or d.get("rejected") or d.get("sharesRejected") or 0
+                try:
+                    shares_accepted += int(acc)
+                    shares_rejected += int(rej)
+                except (TypeError, ValueError):
+                    pass
+        for d in axeos_results:
+            if isinstance(d, dict) and d.get("_online"):
+                try:
+                    shares_accepted += int(d.get("sharesAccepted") or 0)
+                    shares_rejected += int(d.get("sharesRejected") or 0)
+                except (TypeError, ValueError):
+                    pass
+    except Exception:
+        pass
+
+    shares_total = shares_accepted + shares_rejected
+    share_acc_pct = f"{shares_accepted / shares_total * 100:.1f}%" if shares_total > 0 else "–"
+
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     nm_count = len(config.get("nmminer_devices", []))
     ax_count = len(config.get("axeos_devices", []))
@@ -280,6 +325,9 @@ async def _send_weekly_summary() -> None:
             "",
             f"📦 Devices: {nm_count} NMMiner · {ax_count} AxeOS",
             f"📋 Total events (7 days): {total}",
+            f"✅ Shares accepted: {shares_accepted:,}",
+            f"❌ Shares rejected: {shares_rejected:,}",
+            f"📈 Share acceptance rate: {share_acc_pct}",
         ]
         if offline_events:
             lines.append(f"⚠️ Offline events: {offline_events}")
@@ -309,6 +357,9 @@ async def _send_weekly_summary() -> None:
             "fields": [
                 {"name": "Devices", "value": f"{nm_count} NMMiner · {ax_count} AxeOS", "inline": True},
                 {"name": "Total Events (7 days)", "value": str(total), "inline": True},
+                {"name": "Shares Accepted", "value": f"{shares_accepted:,}", "inline": True},
+                {"name": "Shares Rejected", "value": f"{shares_rejected:,}", "inline": True},
+                {"name": "Share Acceptance Rate", "value": share_acc_pct, "inline": True},
                 {"name": "Offline Events", "value": str(offline_events), "inline": True},
                 {"name": "Blocks Found", "value": str(blocks), "inline": True},
                 {"name": "Event Breakdown", "value": breakdown[:1000], "inline": False},
@@ -324,7 +375,7 @@ async def _send_weekly_summary() -> None:
 
     # ── Gotify ────────────────────────────────────────────────────────────────
     if notifications.get("gotify_enabled") and notifications.get("gotify_url") and notifications.get("gotify_token"):
-        body = f"Period: last 7 days | Events: {total} | Offline: {offline_events} | Blocks found: {blocks}"
+        body = f"Period: last 7 days | Events: {total} | Shares: {shares_accepted:,} accepted / {shares_rejected:,} rejected ({share_acc_pct}) | Offline: {offline_events} | Blocks found: {blocks}"
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 await client.post(
@@ -374,6 +425,16 @@ async def lifespan(app: FastAPI):
     _cleanup_old_logs()
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
+    _append_entry({
+        "id": f"system:startup:{datetime.now(timezone.utc).isoformat()}",
+        "device": "system",
+        "kind": "startup",
+        "severity": "info",
+        "message": "HashHive backend started",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "read": True,
+        "source": "system",
+    })
     yield
     task.cancel()
     ws_task.cancel()
@@ -449,6 +510,17 @@ async def get_settings() -> dict:
 @app.post("/api/settings")
 async def post_settings(data: dict) -> dict:
     save_json(CONFIG_FILE, data)
+    now = datetime.now(timezone.utc).isoformat()
+    _append_entry({
+        "id": f"system:config_saved:{now}",
+        "device": "system",
+        "kind": "config_saved",
+        "severity": "info",
+        "message": "Configuration saved",
+        "timestamp": now,
+        "read": True,
+        "source": "system",
+    })
     return {"status": "ok"}
 
 
@@ -663,6 +735,18 @@ async def post_nmminer_device_config(data: dict):
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             resp = await client.post(f"http://{device_ip}/broadcast-config", json=data)
+            hostname = data.get("Hostname") or device_ip
+            now = datetime.now(timezone.utc).isoformat()
+            _append_entry({
+                "id": f"nmminer:{device_ip}:config_saved:{now}",
+                "device": f"nmminer:{device_ip}",
+                "kind": "config_saved",
+                "severity": "info",
+                "message": f"NMMiner {hostname} config saved",
+                "timestamp": now,
+                "read": True,
+                "source": "nmminer",
+            })
             return {"status": resp.status_code, "detail": resp.text[:200]}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
@@ -770,6 +854,17 @@ async def axeos_action(ip: str, action: str = Query(...)):
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             resp = await client.post(f"http://{ip}/api/system/{action}")
+            now = datetime.now(timezone.utc).isoformat()
+            _append_entry({
+                "id": f"axeos:{ip}:{action}:{now}",
+                "device": f"axeos:{ip}",
+                "kind": f"device_{action}",
+                "severity": "warning" if action == "restart" else "info",
+                "message": f"{ip}: {action} triggered",
+                "timestamp": now,
+                "read": True,
+                "source": "axeos",
+            })
             return {"ip": ip, "action": action, "status": resp.status_code}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
@@ -1071,6 +1166,7 @@ async def post_log_entry(entry: dict):
         "message":   message,
         "timestamp": now,
         "read":      True,   # action logs are pre-read; don't bump unread counter
+        "source":    source,
     }
     _append_entry(record)
     return {"status": "ok"}
