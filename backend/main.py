@@ -103,10 +103,41 @@ def _load_recent(days: int = 1) -> list:
 
 _STATS_SAMPLE_INTERVAL = 60  # seconds between hashrate samples
 _last_stats_sample_ts: float = 0.0
+_last_dev_sample_ts: float = 0.0
 
 
 def _stats_file(date_str: str) -> Path:
     return STATS_DIR / f"{date_str}.json"
+
+
+def _dev_stats_file(date_str: str) -> Path:
+    return STATS_DIR / f"dev_{date_str}.json"
+
+
+def _append_device_samples(devices: list) -> None:
+    """Store per-device hashrate samples (max 1 per minute)."""
+    global _last_dev_sample_ts
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if now_ts - _last_dev_sample_ts < _STATS_SAMPLE_INTERVAL:
+        return
+    _last_dev_sample_ts = now_ts
+    STATS_DIR.mkdir(parents=True, exist_ok=True)
+    date_str = _today()
+    path = _dev_stats_file(date_str)
+    data: dict = load_json(path, {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for d in devices:
+        ip = d.get("_ip", "")
+        if not ip:
+            continue
+        gh = round(float(d.get("hashRate") or d.get("hashrate") or 0), 4)
+        if ip not in data:
+            data[ip] = []
+        data[ip].append({"ts": now_iso, "gh": gh})
+        # Keep last 1440 samples per device
+        if len(data[ip]) > 1440:
+            data[ip] = data[ip][-1440:]
+    save_json(path, data)
 
 
 def _append_hashrate_sample(gh: float, power_w: float = 0.0, shares_accepted: int = 0) -> None:
@@ -222,6 +253,11 @@ DEFAULT_CONFIG: dict = {
     },
     "pool_presets": [],
     "electricity_kwh_price": 0.0,
+    "auto_restart": {
+        "enabled": False,
+        "threshold_pct": 50,
+        "duration_minutes": 10,
+    },
 }
 
 
@@ -276,6 +312,52 @@ class _WSManager:
 
 _ws_manager = _WSManager()
 
+# ── Auto-restart state ────────────────────────────────────────────────────────
+_low_hr_since: dict[str, float] = {}  # ip → unix timestamp when low hashrate first detected
+
+
+async def _check_auto_restart(config: dict, axeos_results: list, client: httpx.AsyncClient) -> None:
+    """Restart AxeOS devices whose hashrate has been below threshold for too long."""
+    ar = config.get("auto_restart", {})
+    if not ar.get("enabled"):
+        _low_hr_since.clear()
+        return
+    threshold_pct = float(ar.get("threshold_pct") or 50) / 100.0
+    duration_secs = float(ar.get("duration_minutes") or 10) * 60.0
+    now = datetime.now(timezone.utc).timestamp()
+    for d in axeos_results:
+        ip = d.get("_ip", "")
+        if not ip or not d.get("_online"):
+            _low_hr_since.pop(ip, None)
+            continue
+        expected = float(d.get("expectedHashrate") or 0)
+        actual = float(d.get("hashRate") or 0)
+        if expected <= 0:
+            _low_hr_since.pop(ip, None)
+            continue
+        if actual < expected * threshold_pct:
+            if ip not in _low_hr_since:
+                _low_hr_since[ip] = now
+            elif now - _low_hr_since[ip] >= duration_secs:
+                # Trigger restart
+                try:
+                    await client.post(f"http://{ip}/api/system/restart")
+                    _append_entry({
+                        "id": f"axeos:{ip}:auto-restart:{datetime.now(timezone.utc).isoformat()}",
+                        "device": f"axeos:{ip}",
+                        "kind": "auto-restart",
+                        "severity": "warning",
+                        "message": f"Auto-restarted {d.get('_name') or ip}: hashrate {actual:.2f} GH/s < {expected * threshold_pct:.2f} GH/s ({int(threshold_pct*100)}% of {expected:.2f})",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "read": False,
+                        "source": "axeos",
+                    })
+                except Exception:
+                    pass
+                _low_hr_since.pop(ip, None)
+        else:
+            _low_hr_since.pop(ip, None)
+
 
 async def _dashboard_broadcast_loop():
     """Background task: fetch dashboard data and push to all WS clients."""
@@ -319,6 +401,13 @@ async def _dashboard_broadcast_loop():
                             total_pwr += float(d.get("power") or 0)
                             total_shares += int(d.get("sharesAccepted") or 0)
                     _append_hashrate_sample(total_gh, total_pwr, total_shares)
+                    _append_device_samples(axeos_results)
+                except Exception:
+                    pass
+                # ── Auto-restart check ─────────────────────────────────────
+                try:
+                    async with httpx.AsyncClient(timeout=10) as ar_client:
+                        await _check_auto_restart(config, axeos_results, ar_client)
                 except Exception:
                     pass
                 payload = json.dumps({
@@ -1281,6 +1370,28 @@ async def get_hashrate_stats(days: int = Query(default=1, ge=1, le=30)):
     for i in range(days - 1, -1, -1):
         date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
         result.extend(load_json(_stats_file(date_str), []))
+    return result
+
+
+@app.get("/api/stats/device")
+async def get_device_stats(ip: str = Query(...), hours: int = Query(default=1, ge=1, le=24)):
+    """Return per-device hashrate samples for the last N hours."""
+    _validate_device_ip(ip)
+    result: list = []
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(hours=hours)
+    # Scan enough days to cover the requested hours window
+    days_needed = min(hours // 24 + 2, 3)
+    for i in range(days_needed - 1, -1, -1):
+        date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
+        data: dict = load_json(_dev_stats_file(date_str), {})
+        for sample in data.get(ip, []):
+            try:
+                if datetime.fromisoformat(sample["ts"]) >= cutoff:
+                    result.append(sample)
+            except Exception:
+                pass
+    result.sort(key=lambda x: x.get("ts", ""))
     return result
 
 

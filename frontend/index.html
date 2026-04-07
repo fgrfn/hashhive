@@ -46,6 +46,8 @@
     .nav-icon{font-size:16px;width:20px;text-align:center}
     .nav-badge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px}
     .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px}
+    .sidebar-footer a{color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11px}
+    .sidebar-footer a:hover{color:var(--text)}
 
     /* ── Main ── */
     #main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
@@ -80,6 +82,38 @@
     .alert-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;margin-bottom:10px;box-sizing:border-box}
     .alert-search:focus{outline:none;border-color:var(--accent)}
     .alert-search::placeholder{color:var(--text-muted)}
+
+    /* ── Device chart panel ── */
+    #dev-chart-panel{position:fixed;bottom:0;left:0;right:0;height:320px;background:var(--surface);border-top:1px solid var(--border);z-index:200;transform:translateY(100%);transition:transform .25s ease;display:flex;flex-direction:column}
+    #dev-chart-panel.open{transform:translateY(0)}
+    #dev-chart-panel .panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+    #dev-chart-panel .panel-title{font-weight:600;font-size:15px}
+    #dev-chart-panel .panel-body{flex:1;min-height:0;padding:10px 16px 12px;display:flex;flex-direction:column;gap:8px}
+    #dev-chart-panel .panel-controls{display:flex;gap:8px;align-items:center;flex-shrink:0}
+    #dev-chart-wrap{flex:1;min-height:0;position:relative}
+
+    /* ── View toggle (Table / Map) ── */
+    .view-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+    .view-toggle button{background:none;border:none;padding:4px 10px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:background .15s,color .15s}
+    .view-toggle button.active{background:var(--accent);color:#fff}
+    .view-toggle button:hover:not(.active){background:var(--surface2);color:var(--text)}
+
+    /* ── Mini-Map ── */
+    .minimap{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0}
+    .mm-tile{width:90px;border-radius:8px;padding:8px 7px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:transform .1s,box-shadow .1s;border:1px solid transparent;position:relative}
+    .mm-tile:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.35)}
+    .mm-tile .mm-icon{font-size:18px;line-height:1}
+    .mm-tile .mm-name{font-size:10px;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;max-width:76px}
+    .mm-tile .mm-val{font-size:12px;font-weight:700;text-align:center}
+    .mm-tile .mm-sub{font-size:10px;color:rgba(255,255,255,.65);text-align:center}
+    .mm-tile.mm-ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.35);color:#22c55e}
+    .mm-tile.mm-warn{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.35);color:#f59e0b}
+    .mm-tile.mm-crit{background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);color:#ef4444}
+    .mm-tile.mm-off{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#888}
+    .mm-tile.mm-paused{background:rgba(136,136,170,.15);border-color:rgba(136,136,170,.25);color:#8888aa}
+    .mm-tile.mm-nm{box-shadow:inset 0 0 0 1px rgba(168,85,247,.25)}
+    .mm-tile .mm-badge{position:absolute;top:4px;right:5px;font-size:9px;opacity:.7}
+    .mm-empty{color:var(--text-muted);font-size:13px;padding:8px 0}
     tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
     tbody tr:hover{background:var(--surface2)}
     tbody tr:last-child td{border-bottom:none}
@@ -355,7 +389,13 @@
       <span class="nav-badge" id="alert-badge" style="display:none">0</span>
     </a>
   </nav>
-  <div class="sidebar-footer" id="sidebar-version">HashHive</div>
+  <div class="sidebar-footer">
+    <div id="sidebar-version">HashHive</div>
+    <a href="https://github.com/fgrfn/hashhive" target="_blank" rel="noopener">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      fgrfn/hashhive
+    </a>
+  </div>
 </aside>
 
 <!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
@@ -418,23 +458,37 @@
       </div>
 
       <div class="card card-nm">
-        <div class="card-title">NMMiner</div>
-        <div class="table-wrap">
+        <div class="section-header">
+          <div class="card-title mb-0">NMMiner</div>
+          <div class="view-toggle" id="nm-view-toggle">
+            <button class="active" onclick="setDashView('nm','table',this)" title="Table view">☰</button>
+            <button onclick="setDashView('nm','map',this)" title="Map view">⊞</button>
+          </div>
+        </div>
+        <div id="nm-table-view" class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Shares</th><th>Pool</th><th>Uptime</th></tr></thead>
             <tbody id="dash-nm-rows"><tr><td colspan="7" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
+        <div id="nm-map-view" class="minimap" style="display:none"></div>
       </div>
 
       <div class="card card-ax">
-        <div class="card-title">BitAxe / NerdAxe</div>
-        <div class="table-wrap">
+        <div class="section-header">
+          <div class="card-title mb-0">BitAxe / NerdAxe</div>
+          <div class="view-toggle" id="ax-view-toggle">
+            <button class="active" onclick="setDashView('ax','table',this)" title="Table view">☰</button>
+            <button onclick="setDashView('ax','map',this)" title="Map view">⊞</button>
+          </div>
+        </div>
+        <div id="ax-table-view" class="table-wrap">
           <table>
             <thead><tr><th>Name / IP</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Power</th><th>Eff.</th><th>Shares</th><th>Pool</th><th>Uptime</th></tr></thead>
             <tbody id="dash-ax-rows"><tr><td colspan="9" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
+        <div id="ax-map-view" class="minimap" style="display:none"></div>
       </div>
 
       <div class="card">
@@ -684,6 +738,25 @@
         <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="testWeeklySummary()">📊 Send Test Summary Now</button>
       </div>
 
+      <div class="card">
+        <div class="card-title">⚙ Auto-Restart Rule <small class="text-muted" style="font-weight:400;font-size:12px">(AxeOS only)</small></div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Automatically restart a BitAxe/NerdAxe device if its hashrate stays below a percentage of the expected rate for a set duration.</p>
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span>Enable Auto-Restart</span>
+          <label class="toggle"><input type="checkbox" id="s-ar-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Hashrate Threshold (%)</label>
+            <input type="number" id="s-ar-threshold" value="50" min="1" max="99" step="1" title="Restart if actual hashrate falls below this % of expectedHashrate">
+          </div>
+          <div class="form-group">
+            <label>Duration Before Restart (min)</label>
+            <input type="number" id="s-ar-duration" value="10" min="1" step="1" title="Hashrate must stay below threshold for this many minutes before restart is triggered">
+          </div>
+        </div>
+      </div>
+
       <div class="actions-row" style="margin-top:0">
         <button class="btn btn-primary" onclick="saveSettings()">💾 Save</button>
       </div>
@@ -790,6 +863,29 @@
 
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ════════════ DEVICE CHART PANEL ════════════ -->
+<div id="dev-chart-panel">
+  <div class="panel-header">
+    <span class="panel-title" id="dev-chart-title">Hashrate History</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="panel-controls">
+        <label class="text-muted" style="font-size:12px">Range:</label>
+        <select id="dev-chart-hours" onchange="_loadDevChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:12px">
+          <option value="1">1h</option>
+          <option value="3">3h</option>
+          <option value="6">6h</option>
+          <option value="12">12h</option>
+          <option value="24">24h</option>
+        </select>
+      </div>
+      <button class="modal-close" onclick="closeDevChart()" style="font-size:20px">×</button>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div id="dev-chart-wrap"><canvas id="dev-chart-canvas"></canvas></div>
+  </div>
+</div>
 
 <!-- ════════════ BULK FREQUENCY MODAL ════════════ -->
 <div class="modal-overlay" id="bulk-freq-overlay" onclick="if(event.target===this)closeBulkFreqModal()">
@@ -1690,6 +1786,95 @@
     return `${h}h ${m}m`;
   }
 
+  // ── View toggle (table ↔ map) ─────────────────────────────────────────────
+  const _dashView = {
+    nm: localStorage.getItem('hh_view_nm') || 'table',
+    ax: localStorage.getItem('hh_view_ax') || 'table',
+  };
+
+  function setDashView(section, view, btn) {
+    _dashView[section] = view;
+    localStorage.setItem(`hh_view_${section}`, view);
+    // Update toggle button states
+    const toggle = document.getElementById(`${section}-view-toggle`);
+    if (toggle) toggle.querySelectorAll('button').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && view === 'table') || (i === 1 && view === 'map'));
+    });
+    document.getElementById(`${section}-table-view`).style.display = view === 'table' ? '' : 'none';
+    document.getElementById(`${section}-map-view`).style.display   = view === 'map'   ? '' : 'none';
+  }
+
+  function _initDashViewToggles() {
+    ['nm','ax'].forEach(s => {
+      const v = _dashView[s];
+      const toggle = document.getElementById(`${s}-view-toggle`);
+      if (toggle) toggle.querySelectorAll('button').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && v === 'table') || (i === 1 && v === 'map'));
+      });
+      document.getElementById(`${s}-table-view`).style.display = v === 'table' ? '' : 'none';
+      document.getElementById(`${s}-map-view`).style.display   = v === 'map'   ? '' : 'none';
+    });
+  }
+
+  function _mmTileClass(online, temp, tMax, paused) {
+    if (!online) return 'mm-off';
+    if (paused)  return 'mm-paused';
+    if (temp >= tMax)           return 'mm-crit';
+    if (temp >= tMax * 0.85)    return 'mm-warn';
+    return 'mm-ok';
+  }
+
+  function _renderNmMap(devs, tMax) {
+    const el = document.getElementById('nm-map-view');
+    if (!el) return;
+    if (!devs || devs.length === 0) {
+      el.innerHTML = '<span class="mm-empty">No NMMiner data</span>'; return;
+    }
+    el.innerHTML = devs.map(d => {
+      const online = d.online !== false;
+      const temp = parseFloat(String(d.temp || d.temperature || d.chipTemp || 0));
+      const hr = nmHrToKh(d);
+      const cls = _mmTileClass(online, temp, d._temp_max ?? tMax, false);
+      const icon = online ? (temp >= (d._temp_max ?? tMax) ? '🔴' : '⛏') : '🔌';
+      const val = online ? fmtNmHr(hr) : 'offline';
+      const sub = online && temp > 0 ? `${temp.toFixed(0)}°C` : '';
+      const name = (d.hostname || d.name || d.ip || '').slice(0, 10);
+      return `<div class="mm-tile ${cls} mm-nm" onclick="navigateToDevice('nmminer','${d.ip}')" title="${d.hostname||d.ip} · ${fmtNmHr(hr)} · ${temp.toFixed(1)}°C">
+        <span class="mm-badge">NM</span>
+        <span class="mm-icon">${icon}</span>
+        <span class="mm-name">${name}</span>
+        <span class="mm-val">${val}</span>
+        <span class="mm-sub">${sub}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function _renderAxMap(devs, tMax) {
+    const el = document.getElementById('ax-map-view');
+    if (!el) return;
+    if (!devs || devs.length === 0) {
+      el.innerHTML = '<span class="mm-empty">No AxeOS data</span>'; return;
+    }
+    el.innerHTML = devs.map(d => {
+      const online = d._online !== false;
+      const temp = parseFloat(d.temp || 0);
+      const hr = parseFloat(d.hashRate || 0);
+      const paused = !!d.miningPaused;
+      const cls = _mmTileClass(online, temp, d._temp_max ?? tMax, paused);
+      const icon = !online ? '🔌' : paused ? '⏸' : temp >= (d._temp_max ?? tMax) ? '🔴' : '⛏';
+      const val = !online ? 'offline' : paused ? 'paused' : fmtHr(hr);
+      const sub = online && !paused && temp > 0 ? `${temp.toFixed(0)}°C` : '';
+      const name = (d._name || d._ip || '').slice(0, 10);
+      return `<div class="mm-tile ${cls}" onclick="navigateToDevice('axeos','${d._ip}')" title="${d._name||d._ip} · ${fmtHr(hr)} · ${temp.toFixed(1)}°C">
+        <span class="mm-badge">AX</span>
+        <span class="mm-icon">${icon}</span>
+        <span class="mm-name">${name}</span>
+        <span class="mm-val">${val}</span>
+        <span class="mm-sub">${sub}</span>
+      </div>`;
+    }).join('');
+  }
+
   function renderDashboard(data) {
     const tMax = currentConfig.thresholds?.temp_max || 70;
     const nmDevs = Array.isArray(data.nmminer) ? data.nmminer : (data.nmminer?.devices || []);
@@ -1816,6 +2001,10 @@
     }
     // Trend indicator (updated via WS push path)
     _updateHashrateTrend(totalHr);
+    // Mini-map rendering
+    _renderNmMap(nmDevs, tMax);
+    _renderAxMap(axDevs, tMax);
+    _initDashViewToggles();
     return { totalHr, totalPower, onlineCnt, total };
   }
 
@@ -1943,6 +2132,7 @@
         : '<span class="dot-offline">Offline</span>';
       const actions = [
         `<button class="btn btn-secondary btn-sm" onclick="openAxEdit('${d._ip}','${(d._name||d._ip).replace(/'/g,'')}')">✏ Edit</button>`,
+        `<button class="btn btn-secondary btn-sm" onclick="openDevChart('${d._ip}','${(d._name||d._ip).replace(/'/g,'')}')">📈</button>`,
         ...(online ? [
           paused
             ? `<button class="btn btn-secondary btn-sm" onclick="resumeDevice('${d._ip}')">▶ Resume</button>`
@@ -2541,6 +2731,11 @@
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
       document.getElementById('s-kwh-price').value  = cfg.electricity_kwh_price ?? 0.30;
+      // Auto-restart rule
+      const ar = cfg.auto_restart || {};
+      document.getElementById('s-ar-enabled').checked    = !!ar.enabled;
+      document.getElementById('s-ar-threshold').value    = ar.threshold_pct    ?? 50;
+      document.getElementById('s-ar-duration').value     = ar.duration_minutes ?? 10;
       // Weekly summary
       const ws = cfg.weekly_summary || {};
       document.getElementById('s-ws-enabled').checked = !!ws.enabled;
@@ -2782,6 +2977,11 @@
     currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
     currentConfig.alert_cooldown_minutes = parseFloat(document.getElementById('s-alert-cooldown').value) || 30;
     currentConfig.electricity_kwh_price = parseFloat(document.getElementById('s-kwh-price').value) || 0;
+    currentConfig.auto_restart = {
+      enabled:          document.getElementById('s-ar-enabled').checked,
+      threshold_pct:    parseInt(document.getElementById('s-ar-threshold').value) || 50,
+      duration_minutes: parseInt(document.getElementById('s-ar-duration').value)  || 10,
+    };
     currentConfig.weekly_summary = {
       enabled: document.getElementById('s-ws-enabled').checked,
       day:     document.getElementById('s-ws-day').value,
@@ -3016,6 +3216,75 @@
       toast('Alerts cleared', 'success');
     } catch (e) {
       toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  // ── Per-device hashrate chart panel ──────────────────────────────────────
+  let _devChart = null;
+  let _devChartIP = null;
+
+  function openDevChart(ip, name) {
+    _devChartIP = ip;
+    document.getElementById('dev-chart-title').textContent = `📈 ${name || ip} · Hashrate History`;
+    document.getElementById('dev-chart-panel').classList.add('open');
+    _loadDevChart();
+  }
+
+  function closeDevChart() {
+    document.getElementById('dev-chart-panel').classList.remove('open');
+    if (_devChart) { _devChart.destroy(); _devChart = null; }
+    _devChartIP = null;
+  }
+
+  async function _loadDevChart() {
+    if (!_devChartIP) return;
+    const hours = parseInt(document.getElementById('dev-chart-hours').value) || 1;
+    const canvas = document.getElementById('dev-chart-canvas');
+    try {
+      const samples = await apiFetch(`/api/stats/device?ip=${encodeURIComponent(_devChartIP)}&hours=${hours}`);
+      if (_devChart) { _devChart.destroy(); _devChart = null; }
+      if (!samples || samples.length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'var(--text-muted)';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data yet — data is collected every minute while the dashboard is open', canvas.width / 2, 80);
+        return;
+      }
+      const labels = samples.map(s => {
+        const d = new Date(s.ts);
+        return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      });
+      const values = samples.map(s => parseFloat(s.gh) || 0);
+      _devChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Hashrate GH/s',
+            data: values,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168,85,247,.15)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: samples.length > 60 ? 0 : 3,
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8888aa', maxTicksLimit: 10 }, grid: { color: '#2d2d3d' } },
+            y: { ticks: { color: '#8888aa' }, grid: { color: '#2d2d3d' }, beginAtZero: true,
+              title: { display: true, text: 'GH/s', color: '#8888aa', font: { size: 11 } } },
+          },
+        },
+      });
+    } catch (e) {
+      toast('Failed to load device stats: ' + e.message, 'error');
     }
   }
 
@@ -3702,6 +3971,7 @@
       if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) refreshCurrent();
     });
     initLiveLog();
+    _initDashViewToggles();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {
       document.getElementById('sidebar-version').textContent = `HashHive v${d.version}`;
