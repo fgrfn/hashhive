@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HashHive</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f0f13">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -63,7 +67,15 @@
     .table-wrap{overflow-x:auto;border-radius:6px}
     .bulk-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:8px;gap:8px;flex-wrap:wrap}
     table{width:100%;border-collapse:collapse}
-    thead th{text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+    thead th{text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:10;background:var(--surface)}
+    .table-wrap-scroll{overflow-x:auto;overflow-y:auto;max-height:72vh;border-radius:6px}
+    .spark-svg{display:block;margin-top:3px;overflow:visible}
+    .alert-snooze-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 7px;white-space:nowrap;transition:.15s;flex-shrink:0}
+    .alert-snooze-btn:hover{border-color:var(--warning);color:var(--warning)}
+    .alert-snoozed{opacity:.4}
+    .alert-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;margin-bottom:10px;box-sizing:border-box}
+    .alert-search:focus{outline:none;border-color:var(--accent)}
+    .alert-search::placeholder{color:var(--text-muted)}
     tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
     tbody tr:hover{background:var(--surface2)}
     tbody tr:last-child td{border-bottom:none}
@@ -365,11 +377,8 @@
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-label">Total Hashrate</div>
-          <div style="display:flex;align-items:baseline;gap:6px">
-            <div class="stat-value" id="stat-hashrate">–</div>
-            <span id="stat-hashrate-trend" style="font-size:20px;font-weight:700"></span>
-          </div>
-          <div class="stat-unit" id="stat-hashrate-unit">GH/s</div>
+          <div class="stat-value" id="stat-hashrate">–</div>
+          <div class="stat-unit"><span id="stat-hashrate-unit">GH/s</span> <span id="stat-hashrate-trend" style="font-size:13px;font-weight:700"></span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Devices Online</div>
@@ -427,12 +436,16 @@
       <div class="card">
         <div class="section-header" style="margin-bottom:8px">
           <div class="card-title mb-0">📈 Hashrate History</div>
-          <div style="display:flex;gap:6px;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <select id="chart-days" onchange="loadHashrateChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:12px">
               <option value="1" selected>Last 24 h</option>
               <option value="3">Last 3 days</option>
               <option value="7">Last 7 days</option>
             </select>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">
+              <input type="checkbox" id="chart-eff-toggle" onchange="toggleChartEff()" style="accent-color:var(--warning)"> ⚡ Eff.
+            </label>
+            <button class="btn btn-secondary btn-sm" onclick="exportChartCsv()" title="Download CSV">📥 CSV</button>
           </div>
         </div>
         <div class="chart-wrap"><canvas id="hashrate-chart"></canvas></div>
@@ -476,7 +489,7 @@
             <div class="col-picker-drop" id="nm-col-drop"></div>
           </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap table-wrap-scroll">
           <table>
             <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th data-picker="skip">Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
@@ -519,10 +532,10 @@
             <button class="btn btn-secondary btn-sm" onclick="clearBulkSel()">✕ Clear</button>
           </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap table-wrap-scroll">
           <table>
-            <thead><tr><th style="width:32px" data-picker="skip"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th>Share Acc%</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th data-picker="skip">Actions</th></tr></thead>
-            <tbody id="ax-rows"><tr><td colspan="27" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th style="width:32px" data-picker="skip"><input type="checkbox" id="ax-sel-all" onchange="bulkSelectAll(this.checked)" title="Select all"></th><th class="sortable" data-col="0">Name / IP</th><th>ASIC / Board</th><th>Type</th><th>Status</th><th class="sortable" data-col="4">Hashrate (GH/s)</th><th>Spark</th><th>1m Avg</th><th>Expected</th><th>Err %</th><th class="sortable" data-col="8">Temp</th><th>VR Temp</th><th class="sortable" data-col="10">Power (W)</th><th>Eff. (J/TH)</th><th>Voltage</th><th>Freq</th><th>Fan</th><th>Fan RPM</th><th>Fan 2</th><th>Shares OK</th><th>Shares Err</th><th>Share Acc%</th><th class="sortable" data-col="18">Best Diff</th><th>Session Best</th><th>Uptime</th><th>RSSI</th><th>Pool</th><th data-picker="skip">Actions</th></tr></thead>
+            <tbody id="ax-rows"><tr><td colspan="28" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -765,6 +778,7 @@
           </div>
         </div>
         <div id="alert-list">
+          <input type="search" class="alert-search" id="alert-search" placeholder="🔍 Filter alerts…" oninput="filterAlerts(this.value)">
           <div class="empty"><div class="empty-icon">🔔</div>No alerts</div>
         </div>
       </div>
@@ -1167,11 +1181,28 @@
   // ── Hashrate Chart ─────────────────────────────────────────────────────────
 
   let _hrChart = null;
+  let _hrChartSamples = []; // keep raw samples for CSV + live push of eff
+
+  // ── Per-device sparklines ───────────────────────────────────────────────────
+  const _sparkData = {}; // ip → number[] (last 12 hashrate values)
+  function _drawSparkline(vals) {
+    if (!vals || vals.length < 2) return '';
+    const w = 60, h = 20;
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min || 1;
+    const pts = vals.map((v, i) => {
+      const x = (i / (vals.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg class="spark-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
 
   async function loadHashrateChart() {
     const days = parseInt(document.getElementById('chart-days')?.value || '1');
     try {
       const samples = await apiFetch(`/api/stats/hashrate?days=${days}`);
+      _hrChartSamples = samples;
       _renderHashrateChart(samples);
     } catch (_) {}
   }
@@ -1180,11 +1211,19 @@
     const canvas = document.getElementById('hashrate-chart');
     if (!canvas || !window.Chart) return;
 
+    const showEff = document.getElementById('chart-eff-toggle')?.checked;
     const labels = samples.map(s => {
       const d = new Date(s.ts);
       return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     });
     const values = samples.map(s => s.gh);
+    // Rolling average line
+    const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    const avgData = values.map(() => parseFloat(avg.toFixed(4)));
+    // Efficiency J/TH (pwr_W * 1000 / gh_GH)
+    const effValues = samples.map(s =>
+      s.pwr > 0 && s.gh > 0 ? parseFloat((s.pwr * 1000 / s.gh).toFixed(1)) : null
+    );
 
     if (_hrChart) { _hrChart.destroy(); _hrChart = null; }
 
@@ -1192,16 +1231,42 @@
       type: 'line',
       data: {
         labels,
-        datasets: [{
-          label: 'GH/s',
-          data: values,
-          borderColor: '#a855f7',
-          backgroundColor: 'rgba(168,85,247,.12)',
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.3,
-          fill: true,
-        }],
+        datasets: [
+          {
+            label: 'Hashrate',
+            data: values,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168,85,247,.12)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: true,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Avg',
+            data: avgData,
+            borderColor: 'rgba(168,85,247,.45)',
+            borderWidth: 1.5,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            tension: 0,
+            fill: false,
+            yAxisID: 'y',
+          },
+          {
+            label: 'J/TH',
+            data: effValues,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,.08)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'y2',
+            hidden: !showEff,
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -1209,10 +1274,20 @@
         animation: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#8888aa', font: { size: 11 }, boxWidth: 12, padding: 12,
+              filter: item => item.text !== 'Avg' },  // hide Avg from legend (still shown in chart)
+          },
           tooltip: {
             callbacks: {
-              label: ctx => ` ${ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(3) + ' TH/s' : ctx.parsed.y.toFixed(2) + ' GH/s'}`,
+              label: ctx => {
+                if (ctx.dataset.label === 'Avg') return null;
+                if (ctx.dataset.label === 'J/TH') return ctx.parsed.y != null ? ` ${ctx.parsed.y.toFixed(1)} J/TH` : null;
+                const v = ctx.parsed.y;
+                return ` ${v >= 1000 ? (v / 1000).toFixed(3) + ' TH/s' : v.toFixed(2) + ' GH/s'}`;
+              },
             },
           },
         },
@@ -1229,19 +1304,56 @@
             grid: { color: 'rgba(255,255,255,.05)' },
             beginAtZero: true,
           },
+          y2: {
+            display: showEff,
+            position: 'right',
+            ticks: { color: '#f59e0b', font: { size: 11 }, callback: v => v + ' J' },
+            grid: { drawOnChartArea: false },
+          },
         },
       },
     });
   }
 
-  function _pushChartSample(gh) {
+  function toggleChartEff() {
+    if (!_hrChart) return;
+    const show = document.getElementById('chart-eff-toggle')?.checked;
+    _hrChart.data.datasets[2].hidden = !show;
+    _hrChart.options.scales.y2.display = show;
+    _hrChart.update('none');
+  }
+
+  function exportChartCsv() {
+    if (!_hrChartSamples.length) { toast('No data to export', 'error'); return; }
+    const header = 'timestamp,gh,pwr_w,shares,eff_j_th';
+    const rows = _hrChartSamples.map(s => {
+      const eff = s.pwr > 0 && s.gh > 0 ? (s.pwr * 1000 / s.gh).toFixed(1) : '';
+      return `${s.ts},${s.gh},${s.pwr ?? ''},${s.shares ?? ''},${eff}`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hashhive-hashrate-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function _pushChartSample(gh, pwr = 0) {
     if (!_hrChart) return;
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const eff = pwr > 0 && gh > 0 ? parseFloat((pwr * 1000 / gh).toFixed(1)) : null;
     _hrChart.data.labels.push(now);
     _hrChart.data.datasets[0].data.push(gh);
+    _hrChart.data.datasets[2].data.push(eff);
+    // Recompute avg and update dataset
+    const vals = _hrChart.data.datasets[0].data;
+    const avg = vals.reduce((a, b) => a + (b || 0), 0) / vals.length;
+    _hrChart.data.datasets[1].data = vals.map(() => parseFloat(avg.toFixed(4)));
     if (_hrChart.data.labels.length > 1440) {
       _hrChart.data.labels.shift();
-      _hrChart.data.datasets[0].data.shift();
+      _hrChart.data.datasets.forEach(ds => ds.data.shift());
     }
     _hrChart.update('none');
   }
@@ -1336,7 +1448,7 @@
     const cdEl = document.getElementById('refresh-countdown');
     if (cdEl) cdEl.style.display = 'none';
     // Push new data point to chart (live update without full reload)
-    _pushChartSample(_s.totalHr);
+    _pushChartSample(_s.totalHr, _s.totalPower);
     _updateHashrateTrend(_s.totalHr);
     // Update detail pages silently if they are currently visible
     if (currentPage === 'nmminer' && !document.getElementById('nmedit-overlay')?.classList.contains('open')) {
@@ -1700,7 +1812,7 @@
     }
     // Trend indicator (updated via WS push path)
     _updateHashrateTrend(totalHr);
-    return { totalHr, onlineCnt, total };
+    return { totalHr, totalPower, onlineCnt, total };
   }
 
   // ── NMMiner detail page ────────────────────────────────────────────────────
@@ -1779,12 +1891,12 @@
 
   async function loadAxPage() {
     const tbody = document.getElementById('ax-rows');
-    tbody.innerHTML = '<tr><td colspan="27" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="28" class="empty text-muted">Loading…</td></tr>';
     try {
       const data = await apiFetch('/api/axeos/devices');
       renderAxRows(data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="27" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="28" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
       appendLog('critical', `AxeOS load failed: ${e.message}`, 'axeos');
     }
   }
@@ -1794,7 +1906,7 @@
     const tbody   = document.getElementById('ax-rows');
     const summary = document.getElementById('ax-summary');
     if (!devs || devs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="27" class="empty text-muted">No devices configured</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="28" class="empty text-muted">No devices configured</td></tr>';
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -1803,6 +1915,12 @@
       const online = d._online !== false;
       const hr = parseFloat(d.hashRate || 0);
       if (online) { totalGh += hr; onlineCnt++; }
+      // Update sparkline data
+      if (!_sparkData[d._ip]) _sparkData[d._ip] = [];
+      if (hr > 0) {
+        _sparkData[d._ip].push(hr);
+        if (_sparkData[d._ip].length > 12) _sparkData[d._ip].shift();
+      }
       const hr1m = parseFloat(d.hashRate_1m || 0);
       const expHr = parseFloat(d.expectedHashrate || 0);
       const errPct = d.errorPercentage != null ? parseFloat(d.errorPercentage).toFixed(2) + '%' : '–';
@@ -1816,7 +1934,6 @@
       const freq = d.actualFrequency ?? d.frequency ?? d.freqMHz ?? '–';
       const fanRpm = d.fanrpm ?? '–';
       const paused = d.miningPaused;
-      const usingFallback = d.isUsingFallbackStratum === 1 || d.isUsingFallbackStratum === true;
       const statusCell = online
         ? (paused ? '<span class="dot-offline">Paused</span>' : '<span class="dot-online">Online</span>')
         : '<span class="dot-offline">Offline</span>';
@@ -1837,6 +1954,7 @@
         <td>${d._type || '–'}</td>
         <td>${statusCell}</td>
         <td>${hr.toFixed(2)}</td>
+        <td>${_drawSparkline(_sparkData[d._ip] || [])}</td>
         <td>${hr1m > 0 ? hr1m.toFixed(2) : '–'}</td>
         <td>${expHr > 0 ? expHr.toFixed(2) : '–'}</td>
         <td>${errPct}</td>
@@ -2816,22 +2934,62 @@
     }
   }
 
+  // ── Alert snooze ─────────────────────────────────────────────────────────────
+  const _snoozeState = (() => {
+    try { return JSON.parse(localStorage.getItem('hh_snooze')) || {}; } catch { return {}; }
+  })();
+  function _saveSnooze() { try { localStorage.setItem('hh_snooze', JSON.stringify(_snoozeState)); } catch {} }
+  function snoozeAlert(kind, device, minutes) {
+    const key = `${kind}:${device}`;
+    _snoozeState[key] = Date.now() + minutes * 60 * 1000;
+    _saveSnooze();
+    loadAlerts();
+    toast(`Alert snoozed for ${minutes}h`, 'success');
+  }
+  function isAlertSnoozed(kind, device) {
+    const key = `${kind}:${device}`;
+    if (!_snoozeState[key]) return false;
+    if (Date.now() > _snoozeState[key]) { delete _snoozeState[key]; _saveSnooze(); return false; }
+    return true;
+  }
+
+  // ── Alert search ──────────────────────────────────────────────────────────────
+  let _alertSearchQ = '';
+  function filterAlerts(q) {
+    _alertSearchQ = q.trim().toLowerCase();
+    document.querySelectorAll('#alert-list .alert-item').forEach(el => {
+      const text = el.textContent.toLowerCase();
+      el.style.display = _alertSearchQ && !text.includes(_alertSearchQ) ? 'none' : '';
+    });
+  }
+
   function renderAlerts(alerts) {
     const el = document.getElementById('alert-list');
+    // Preserve the search input element across re-renders
+    const searchIn = document.getElementById('alert-search');
     if (!alerts || alerts.length === 0) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div>No alerts</div>';
+      if (searchIn) el.insertBefore(searchIn, el.firstChild);
       return;
     }
     const sorted = [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     const icons = { critical: '🔴', warning: '🟡', info: '🔵' };
-    el.innerHTML = sorted.map(a => `
-      <div class="alert-item ${a.read ? '' : 'unread'}">
-        <div class="alert-sev">${icons[a.severity] || '⚪'}</div>
-        <div class="alert-content">
-          <div class="alert-message sev-${a.severity}">${a.message}</div>
-          <div class="alert-meta">${new Date(a.timestamp).toLocaleString('en-US')} · ${a.kind}</div>
-        </div>
-      </div>`).join('');
+    el.innerHTML = sorted.map(a => {
+      const dev = a.device || a.source || '';
+      const snoozed = isAlertSnoozed(a.kind, dev);
+      return `
+        <div class="alert-item ${a.read ? '' : 'unread'}${snoozed ? ' alert-snoozed' : ''}">
+          <div class="alert-sev">${icons[a.severity] || '⚪'}</div>
+          <div class="alert-content">
+            <div class="alert-message sev-${a.severity}">${a.message}</div>
+            <div class="alert-meta">${new Date(a.timestamp).toLocaleString('en-US')} · ${a.kind}</div>
+          </div>
+          <button class="alert-snooze-btn" title="Snooze 1 hour" onclick="snoozeAlert('${a.kind.replace(/'/g,'')}','${dev.replace(/'/g,'')}',60)">💤 1h</button>
+        </div>`;
+    }).join('');
+    if (searchIn) el.insertBefore(searchIn, el.firstChild);
+    // Re-apply active search filter
+    if (_alertSearchQ) filterAlerts(_alertSearchQ);
   }
 
   async function markAllRead() {
@@ -3525,6 +3683,20 @@
       const btn = document.getElementById('theme-toggle');
       if (btn) btn.textContent = '☀️';
     }
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.target.matches('input,textarea,select,[contenteditable]')) return;
+      // Close open modals with Escape
+      const openModals = document.querySelectorAll('.modal-overlay.open');
+      if (openModals.length) {
+        if (e.key === 'Escape') openModals.forEach(m => m.classList.remove('open'));
+        return;
+      }
+      const pages = ['dashboard','nmminer','axeos','pool','settings','notifications'];
+      const idx = parseInt(e.key) - 1;
+      if (!isNaN(idx) && idx >= 0 && idx < pages.length) { showPage(pages[idx]); return; }
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) refreshCurrent();
+    });
     initLiveLog();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {

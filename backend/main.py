@@ -550,6 +550,20 @@ app.add_middleware(
 )
 
 
+@app.get("/manifest.json", include_in_schema=False)
+async def pwa_manifest():
+    return {
+        "name": "HashHive",
+        "short_name": "HashHive",
+        "description": "Unified Bitcoin mining dashboard",
+        "display": "standalone",
+        "start_url": "/",
+        "theme_color": "#0f0f13",
+        "background_color": "#0f0f13",
+        "icons": [],
+    }
+
+
 @app.get("/", include_in_schema=False)
 async def root():
     index = FRONTEND_DIR / "index.html"
