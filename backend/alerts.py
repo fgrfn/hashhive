@@ -52,7 +52,14 @@ def load_json(path: Path, default: Any) -> Any:
 
 
 def save_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    """Atomically write JSON: write to a temp file then rename to avoid corruption on crash."""
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _today() -> str:
@@ -81,14 +88,17 @@ def _now_iso() -> str:
 
 
 def _make_alert(device_key: str, kind: str, severity: str, message: str) -> dict:
+    now = _now_iso()
+    source = device_key.split(":")[0] if ":" in device_key else "system"
     return {
-        "id": f"{device_key}:{kind}:{_now_iso()}",
+        "id": f"{device_key}:{kind}:{now}",
         "device": device_key,
         "kind": kind,
         "severity": severity,
         "message": message,
-        "timestamp": _now_iso(),
+        "timestamp": now,
         "read": False,
+        "source": source,
     }
 
 

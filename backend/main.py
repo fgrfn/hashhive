@@ -1,5 +1,6 @@
 import json
 import asyncio
+import ipaddress
 import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -20,6 +21,7 @@ CONFIG_FILE = DATA_DIR / "dashboard_config.json"
 ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"  # legacy – migrated on first start
 DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 LOGS_DIR = DATA_DIR / "logs"
+STATS_DIR = DATA_DIR / "stats"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 # App-Version aus version.txt (Single Source of Truth; liegt im Projekt-Root)
@@ -32,6 +34,19 @@ MAX_ENTRIES_PER_DAY = 1000
 KEEP_DAYS = 30
 
 _startup_time = datetime.now(timezone.utc)
+
+
+def _validate_device_ip(ip: str) -> str:
+    """Validate that ip is a valid IP address (no hostname/URL injection).
+    Raises HTTPException 400 for invalid values, 403 for non-private addresses."""
+    ip = ip.strip()
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid IP address: {ip!r}")
+    if not (addr.is_private or addr.is_loopback or addr.is_link_local):
+        raise HTTPException(status_code=403, detail=f"Only private/local IP addresses are allowed: {ip}")
+    return ip
 
 
 def _today() -> str:
@@ -82,6 +97,53 @@ def _load_recent(days: int = 1) -> list:
         date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
         result.extend(_read_day(date_str))
     return result
+
+
+# ── Hashrate stats ─────────────────────────────────────────────────────────────
+
+_STATS_SAMPLE_INTERVAL = 60  # seconds between hashrate samples
+_last_stats_sample_ts: float = 0.0
+
+
+def _stats_file(date_str: str) -> Path:
+    return STATS_DIR / f"{date_str}.json"
+
+
+def _append_hashrate_sample(gh: float, power_w: float = 0.0, shares_accepted: int = 0) -> None:
+    """Write a compact sample to today's stats file (max 1 per minute)."""
+    global _last_stats_sample_ts
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if now_ts - _last_stats_sample_ts < _STATS_SAMPLE_INTERVAL:
+        return
+    _last_stats_sample_ts = now_ts
+    STATS_DIR.mkdir(parents=True, exist_ok=True)
+    date_str = _today()
+    sf = _stats_file(date_str)
+    samples: list = load_json(sf, [])
+    samples.append({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "gh": round(gh, 4),
+        "pwr": round(power_w, 1),
+        "shares": shares_accepted,
+    })
+    # Keep at most 1440 samples/day (one per minute for 24 h)
+    if len(samples) > 1440:
+        samples = samples[-1440:]
+    save_json(sf, samples)
+
+
+def _cleanup_old_stats() -> None:
+    """Delete stats files older than KEEP_DAYS."""
+    if not STATS_DIR.exists():
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
+    for f in STATS_DIR.glob("*.json"):
+        try:
+            file_date = datetime.strptime(f.stem, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if file_date < cutoff:
+                f.unlink()
+        except ValueError:
+            pass
 
 
 def _migrate_legacy() -> None:
@@ -159,6 +221,7 @@ DEFAULT_CONFIG: dict = {
         "time": "08:00",
     },
     "pool_presets": [],
+    "electricity_kwh_price": 0.0,
 }
 
 
@@ -173,7 +236,14 @@ def load_json(path: Path, default: Any) -> Any:
 
 
 def save_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    """Atomically write JSON: write to a temp file then rename to avoid corruption on crash."""
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 # ── WebSocket connection manager ──────────────────────────────────────────────
@@ -234,6 +304,23 @@ async def _dashboard_broadcast_loop():
                     pass
                 today_entries = _read_day(_today())
                 unread = sum(1 for a in today_entries if not a.get("read", False))
+                # ── Compute totals and record a hashrate sample ────────────
+                try:
+                    total_gh = 0.0
+                    total_pwr = 0.0
+                    total_shares = 0
+                    for d in nmminer_data.get("devices", []):
+                        total_gh += float(d.get("GHs5s") or d.get("GHs5") or d.get("GHs1m") or
+                                          d.get("GHsav") or d.get("hashrate") or d.get("currentHashrate") or 0)
+                        total_shares += int(d.get("Accepted") or d.get("accepted") or d.get("sharesAccepted") or 0)
+                    for d in axeos_results:
+                        if d.get("_online"):
+                            total_gh += float(d.get("hashRate") or d.get("hashrate") or 0)
+                            total_pwr += float(d.get("power") or 0)
+                            total_shares += int(d.get("sharesAccepted") or 0)
+                    _append_hashrate_sample(total_gh, total_pwr, total_shares)
+                except Exception:
+                    pass
                 payload = json.dumps({
                     "type": "dashboard",
                     "nmminer": nmminer_data,
@@ -425,10 +512,12 @@ async def _weekly_summary_loop() -> None:
 async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    STATS_DIR.mkdir(parents=True, exist_ok=True)
     load_json(CONFIG_FILE, DEFAULT_CONFIG)
     load_json(DEVICE_STATE_FILE, {})
     _migrate_legacy()
     _cleanup_old_logs()
+    _cleanup_old_stats()
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
     _append_entry({
@@ -515,7 +604,10 @@ async def get_settings() -> dict:
 
 @app.post("/api/settings")
 async def post_settings(data: dict) -> dict:
-    save_json(CONFIG_FILE, data)
+    # Merge with DEFAULT_CONFIG so new keys added in updates are preserved
+    merged = {**DEFAULT_CONFIG, **data}
+    merged.setdefault("thresholds", {}).update({k: v for k, v in DEFAULT_CONFIG["thresholds"].items() if k not in data.get("thresholds", {})})
+    save_json(CONFIG_FILE, merged)
     now = datetime.now(timezone.utc).isoformat()
     _append_entry({
         "id": f"system:config_saved:{now}",
@@ -712,6 +804,7 @@ async def broadcast_nmminer_config(data: dict):
 
 @app.get("/api/nmminer/device-config")
 async def get_nmminer_device_config(ip: str):
+    _validate_device_ip(ip)
     # Query device directly — no master needed for individual config reads
     async with httpx.AsyncClient(timeout=10) as client:
         try:
@@ -737,6 +830,7 @@ async def post_nmminer_device_config(data: dict):
     device_ip = data.get("ip")
     if not device_ip:
         raise HTTPException(status_code=400, detail="ip field required in body")
+    _validate_device_ip(device_ip)
     # Push directly to the device — master is only needed for discovery, not for writes
     async with httpx.AsyncClient(timeout=15) as client:
         try:
@@ -802,6 +896,7 @@ async def patch_axeos_config_all(data: dict):
 
 @app.get("/api/axeos/info/{ip}")
 async def get_axeos_info(ip: str):
+    _validate_device_ip(ip)
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     device_cfg = next((d for d in config.get("axeos_devices", []) if d.get("ip") == ip), {})
     async with httpx.AsyncClient(timeout=10) as client:
@@ -844,8 +939,29 @@ async def patch_device_settings(data: dict):
     return {"status": "ok"}
 
 
+@app.get("/api/axeos/config/{ip}")
+async def get_axeos_config_one(ip: str):
+    """Return only the writeable config fields for a single AxeOS device."""
+    _validate_device_ip(ip)
+    _CONFIG_FIELDS = {
+        "stratumURL", "stratumUser", "stratumPassword", "stratumPort",
+        "fallbackStratumURL", "fallbackStratumUser", "fallbackStratumPassword", "fallbackStratumPort",
+        "frequency", "coreVoltage", "fanspeed", "autofanspeed", "temptarget",
+        "hostname", "ssid",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"http://{ip}/api/system/info")
+            resp.raise_for_status()
+            data = resp.json()
+        return {k: v for k, v in data.items() if k in _CONFIG_FIELDS}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 @app.patch("/api/axeos/config/{ip}")
 async def patch_axeos_config_one(ip: str, data: dict):
+    _validate_device_ip(ip)
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.patch(f"http://{ip}/api/system", json=data)
     return {"ip": ip, "status": resp.status_code}
@@ -854,6 +970,7 @@ async def patch_axeos_config_one(ip: str, data: dict):
 @app.post("/api/axeos/action/{ip}")
 async def axeos_action(ip: str, action: str = Query(...)):
     """Single-device action: pause | resume | restart | identify"""
+    _validate_device_ip(ip)
     valid = {"pause", "resume", "restart", "identify"}
     if action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
@@ -1114,6 +1231,16 @@ async def health():
         "devices": {"nmminer": nm_count, "axeos": ax_count},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/api/stats/hashrate")
+async def get_hashrate_stats(days: int = Query(default=1, ge=1, le=30)):
+    """Return hashrate samples for the last N days (oldest first for charting)."""
+    result: list = []
+    for i in range(days - 1, -1, -1):
+        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        result.extend(load_json(_stats_file(date_str), []))
+    return result
 
 
 # ── Alerts & Logs ─────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HashHive</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg:           #0f0f13;
@@ -264,9 +265,37 @@
     .max-w{max-width:200px;overflow:hidden;text-overflow:ellipsis}
     .highlight-row{animation:rowFlash .6s ease 3}
     @keyframes rowFlash{0%,100%{background:transparent}50%{background:var(--accent-glow)}}
+
+    /* ── Hamburger / mobile ── */
+    #hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:0 6px;line-height:1;flex-shrink:0}
+    #sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
+    @media(max-width:768px){
+      #sidebar{transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);z-index:200}
+      #sidebar.open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.6)}
+      #sidebar-overlay.show{display:block}
+      #main{margin-left:0}
+      .topbar{padding:10px 12px}
+      #hamburger{display:inline-flex}
+      .content{padding:12px}
+      .stat-grid{grid-template-columns:repeat(2,1fr)}
+      .form-grid{grid-template-columns:1fr}
+      thead th,tbody td{padding:6px 8px;font-size:12px}
+    }
+
+    /* ── Hashrate chart ── */
+    .chart-wrap{position:relative;height:180px}
+
+    /* ── Light mode ── */
+    html.light-mode{--bg:#f5f5fa;--surface:#ffffff;--surface2:#ebebf5;--border:#d0d0e0;--text:#1a1a2e;--text-muted:#6060aa;--accent-glow:rgba(168,85,247,.08)}
+
+    /* ── Offline banner ── */
+    #offline-banner{display:none;background:var(--danger);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:500;position:sticky;top:57px;z-index:49;letter-spacing:.01em}
   </style>
 </head>
 <body>
+
+<!-- Sidebar overlay (mobile) -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <!-- ════════════════════════════════════ SIDEBAR ════════════════════════════════════ -->
 <aside id="sidebar">
@@ -316,14 +345,18 @@
 <!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
 <div id="main">
   <div class="topbar">
+    <button id="hamburger" onclick="toggleSidebar()" title="Menu">☰</button>
     <h1 id="page-title">Dashboard</h1>
     <div class="topbar-right">
       <span id="last-update" class="text-muted" style="font-size:12px"></span>
       <span id="refresh-countdown" class="text-muted" style="font-size:12px;display:none">↻ in <span id="refresh-secs">–</span>s</span>
       <span id="ws-status" title="WebSocket" style="font-size:12px;display:none"></span>
+      <button class="btn btn-secondary btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
       <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
     </div>
   </div>
+
+  <div id="offline-banner">⚠ Connection to HashHive lost — retrying…</div>
 
   <div class="content">
 
@@ -332,12 +365,21 @@
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-label">Total Hashrate</div>
-          <div class="stat-value" id="stat-hashrate">–</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <div class="stat-value" id="stat-hashrate">–</div>
+            <span id="stat-hashrate-trend" style="font-size:20px;font-weight:700"></span>
+          </div>
           <div class="stat-unit" id="stat-hashrate-unit">GH/s</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Devices Online</div>
-          <div class="stat-value" id="stat-online">–</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="stat-value" id="stat-online">–</div>
+            <svg id="uptime-ring-svg" width="40" height="40" viewBox="0 0 40 40" style="transform:rotate(-90deg);flex-shrink:0">
+              <circle cx="20" cy="20" r="14" fill="none" stroke="var(--border)" stroke-width="3"/>
+              <circle id="uptime-ring-fg" cx="20" cy="20" r="14" fill="none" stroke="var(--success)" stroke-width="3" stroke-dasharray="0 87.96" stroke-linecap="round" style="transition:stroke-dasharray .4s ease,stroke .4s ease"/>
+            </svg>
+          </div>
           <div class="stat-unit">of <span id="stat-total">–</span></div>
         </div>
         <div class="stat-card">
@@ -354,6 +396,11 @@
           <div class="stat-label">Total Power</div>
           <div class="stat-value" id="stat-power">–</div>
           <div class="stat-unit">W</div>
+        </div>
+        <div class="stat-card" id="stat-cost-card" style="display:none">
+          <div class="stat-label">Est. Cost / Day</div>
+          <div class="stat-value" id="stat-cost">–</div>
+          <div class="stat-unit" id="stat-cost-unit">€</div>
         </div>
       </div>
 
@@ -375,6 +422,20 @@
             <tbody id="dash-ax-rows"><tr><td colspan="9" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header" style="margin-bottom:8px">
+          <div class="card-title mb-0">📈 Hashrate History</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="chart-days" onchange="loadHashrateChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:12px">
+              <option value="1" selected>Last 24 h</option>
+              <option value="3">Last 3 days</option>
+              <option value="7">Last 7 days</option>
+            </select>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="hashrate-chart"></canvas></div>
       </div>
 
       <div class="card" style="margin-bottom:0">
@@ -574,6 +635,7 @@
           <div class="form-group"><label>Refresh Interval (sec)</label><input type="number" id="s-interval" value="30"></div>
           <div class="form-group"><label>Offline Alert Grace (min)</label><input type="number" id="s-offline-grace" value="2" min="0" step="0.5" title="Wait this many minutes before triggering an offline alert"></div>
           <div class="form-group"><label>Alert Repeat Cooldown (min)</label><input type="number" id="s-alert-cooldown" value="30" min="1" step="1" title="Minimum time between repeated alerts of the same type (temp, hashrate, pool)"></div>
+          <div class="form-group"><label>Electricity Price (€/kWh)</label><input type="number" id="s-kwh-price" value="0.30" step="0.01" min="0" title="Used to estimate daily cost in the Dashboard"></div>
         </div>
       </div>
 
@@ -624,6 +686,15 @@
 
     <!-- ── NOTIFICATIONS ── -->
     <div class="page" id="page-notifications">
+      <div class="card">
+        <div class="card-title">Browser Notifications</div>
+        <div class="toggle-row">
+          <span>Enable browser notifications for critical alerts</span>
+          <label class="toggle"><input type="checkbox" id="n-browser-notif" onchange="toggleBrowserNotif(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin-top:10px" id="n-browser-notif-status"></p>
+      </div>
+
       <div class="card">
         <div class="card-title">Telegram</div>
         <div class="toggle-row"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-tg-on"><span class="toggle-slider"></span></label></div>
@@ -972,6 +1043,7 @@
     if (navEl) navEl.classList.add('active');
     document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
     currentPage = name;
+    closeSidebar();  // close mobile sidebar on navigation
 
     if (name !== 'dashboard') stopAutoRefresh();
 
@@ -1002,6 +1074,178 @@
     setTimeout(() => attempt(10), 150);
   }
 
+  // ── Mobile sidebar ─────────────────────────────────────────────────────────
+
+  function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('sidebar-overlay');
+    const isOpen = sb.classList.contains('open');
+    sb.classList.toggle('open', !isOpen);
+    ov.classList.toggle('show', !isOpen);
+  }
+
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  }
+
+  // ── Dark/Light mode ────────────────────────────────────────────────────────
+
+  function toggleTheme() {
+    const isLight = document.documentElement.classList.toggle('light-mode');
+    localStorage.setItem('hh_theme', isLight ? 'light' : 'dark');
+    const btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+  }
+
+  // ── Offline banner ─────────────────────────────────────────────────────────
+
+  let _failCount = 0;
+  function _onFetchSuccess() {
+    _failCount = 0;
+    document.getElementById('offline-banner').style.display = 'none';
+  }
+  function _onFetchFail() {
+    _failCount++;
+    if (_failCount >= 2) document.getElementById('offline-banner').style.display = '';
+  }
+
+  // ── Hashrate trend ─────────────────────────────────────────────────────────
+
+  const _hrSamples = [];
+  function _updateHashrateTrend(gh) {
+    _hrSamples.push(gh);
+    if (_hrSamples.length > 10) _hrSamples.shift();
+    if (_hrSamples.length < 3) return;
+    const recent = _hrSamples.slice(-5);
+    const avgRecent = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const first = _hrSamples[0];
+    const threshold = avgRecent * 0.02;
+    const el = document.getElementById('stat-hashrate-trend');
+    if (!el) return;
+    if (avgRecent - first > threshold)       { el.textContent = '↑'; el.style.color = 'var(--success)'; }
+    else if (first - avgRecent > threshold)  { el.textContent = '↓'; el.style.color = 'var(--danger)'; }
+    else                                     { el.textContent = '→'; el.style.color = 'var(--text-muted)'; }
+  }
+
+  // ── Browser notifications ──────────────────────────────────────────────────
+
+  function toggleBrowserNotif(enable) {
+    if (!enable) { localStorage.setItem('hh_browser_notif', 'false'); return; }
+    if (!('Notification' in window)) {
+      toast('Browser notifications not supported', 'error');
+      document.getElementById('n-browser-notif').checked = false;
+      return;
+    }
+    Notification.requestPermission().then(permission => {
+      const granted = permission === 'granted';
+      localStorage.setItem('hh_browser_notif', granted ? 'true' : 'false');
+      document.getElementById('n-browser-notif').checked = granted;
+      updateBrowserNotifStatus();
+      if (granted) toast('Browser notifications enabled', 'success');
+      else toast('Permission denied — check browser settings', 'error');
+    });
+  }
+
+  function updateBrowserNotifStatus() {
+    const el = document.getElementById('n-browser-notif-status');
+    if (!el) return;
+    if (!('Notification' in window)) { el.textContent = 'Not supported by this browser'; return; }
+    const p = Notification.permission;
+    el.textContent = p === 'granted' ? '✓ Permission granted'
+      : p === 'denied' ? '✗ Permission denied — reset in browser settings'
+      : 'Not yet requested — enable the toggle to request permission';
+  }
+
+  function _maybePushBrowserNotif(severity, message) {
+    if (severity !== 'critical') return;
+    if (localStorage.getItem('hh_browser_notif') !== 'true') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try { new Notification('HashHive Alert 🐝', { body: message, tag: 'hashhive-critical' }); } catch (_) {}
+  }
+
+  // ── Hashrate Chart ─────────────────────────────────────────────────────────
+
+  let _hrChart = null;
+
+  async function loadHashrateChart() {
+    const days = parseInt(document.getElementById('chart-days')?.value || '1');
+    try {
+      const samples = await apiFetch(`/api/stats/hashrate?days=${days}`);
+      _renderHashrateChart(samples);
+    } catch (_) {}
+  }
+
+  function _renderHashrateChart(samples) {
+    const canvas = document.getElementById('hashrate-chart');
+    if (!canvas || !window.Chart) return;
+
+    const labels = samples.map(s => {
+      const d = new Date(s.ts);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    });
+    const values = samples.map(s => s.gh);
+
+    if (_hrChart) { _hrChart.destroy(); _hrChart = null; }
+
+    _hrChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'GH/s',
+          data: values,
+          borderColor: '#a855f7',
+          backgroundColor: 'rgba(168,85,247,.12)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(3) + ' TH/s' : ctx.parsed.y.toFixed(2) + ' GH/s'}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#8888aa', font: { size: 11 }, maxTicksLimit: 8, maxRotation: 0 },
+            grid: { color: 'rgba(255,255,255,.05)' },
+          },
+          y: {
+            ticks: {
+              color: '#8888aa', font: { size: 11 },
+              callback: v => v >= 1000 ? (v / 1000).toFixed(1) + ' T' : v.toFixed(1),
+            },
+            grid: { color: 'rgba(255,255,255,.05)' },
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+  }
+
+  function _pushChartSample(gh) {
+    if (!_hrChart) return;
+    const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    _hrChart.data.labels.push(now);
+    _hrChart.data.datasets[0].data.push(gh);
+    if (_hrChart.data.labels.length > 1440) {
+      _hrChart.data.labels.shift();
+      _hrChart.data.datasets[0].data.shift();
+    }
+    _hrChart.update('none');
+  }
+
   // ── API helper ─────────────────────────────────────────────────────────────
 
   async function apiFetch(path, opts = {}) {
@@ -1020,6 +1264,7 @@
       lastDashboard = await apiFetch('/api/dashboard');
       currentConfig = lastDashboard.config || {};
       const _s = renderDashboard(lastDashboard);
+      _onFetchSuccess();
       appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`, 'system');
       document.getElementById('last-update').textContent =
         'Updated: ' + new Date().toLocaleTimeString('en-US');
@@ -1034,6 +1279,7 @@
       const secsEl = document.getElementById('refresh-secs');
       if (secsEl) secsEl.textContent = currentConfig.refresh_interval || 30;
     } catch (e) {
+      _onFetchFail();
       appendLog('critical', 'Load error: ' + e.message, 'system');
       toast('Load error: ' + e.message, 'error');
     }
@@ -1074,6 +1320,7 @@
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg.type !== 'dashboard') return;
     currentConfig = msg.config || {};
+    _onFetchSuccess();
     const _s = renderDashboard(msg);
     appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`, 'system');
     document.getElementById('last-update').textContent =
@@ -1088,6 +1335,9 @@
     // Show server-side interval as "live" indicator instead of countdown
     const cdEl = document.getElementById('refresh-countdown');
     if (cdEl) cdEl.style.display = 'none';
+    // Push new data point to chart (live update without full reload)
+    _pushChartSample(_s.totalHr);
+    _updateHashrateTrend(_s.totalHr);
     // Update detail pages silently if they are currently visible
     if (currentPage === 'nmminer' && !document.getElementById('nmedit-overlay')?.classList.contains('open')) {
       const nmDevs = msg.nmminer?.devices;
@@ -1143,6 +1393,7 @@
     _wsConnect();
     // Always do an immediate HTTP load so data appears instantly
     loadDashboard();
+    loadHashrateChart();
     // Polling fallback — will be cleared once WS connects
     const interval = (currentConfig.refresh_interval || 30) * 1000;
     refreshTimer = setInterval(() => {
@@ -1413,6 +1664,16 @@
     onlineEl.style.color = total === 0 ? 'var(--accent)'
       : onlineCnt === total ? 'var(--success)'
       : 'var(--danger)';
+    // Uptime ring
+    const ringFg = document.getElementById('uptime-ring-fg');
+    if (ringFg && total > 0) {
+      const circ = 87.96; // 2 * π * 14
+      const frac = onlineCnt / total;
+      ringFg.setAttribute('stroke-dasharray', `${(frac * circ).toFixed(2)} ${circ}`);
+      ringFg.setAttribute('stroke', onlineCnt === total ? 'var(--success)' : onlineCnt > 0 ? 'var(--warning)' : 'var(--danger)');
+    } else if (ringFg) {
+      ringFg.setAttribute('stroke-dasharray', `0 87.96`);
+    }
     const tempEl = document.getElementById('stat-maxtemp');
     tempEl.textContent = maxTemp > 0 ? maxTemp.toFixed(1) : '–';
     tempEl.style.color = maxTemp <= 0 ? 'var(--accent)'
@@ -1424,6 +1685,21 @@
       powerEl.textContent = totalPower > 0 ? totalPower.toFixed(1) : '–';
       powerEl.style.color = 'var(--accent)';
     }
+    // Power cost estimate
+    const kwhPrice = parseFloat(currentConfig.electricity_kwh_price) || 0;
+    const costCard = document.getElementById('stat-cost-card');
+    const costEl = document.getElementById('stat-cost');
+    if (costCard && costEl) {
+      if (kwhPrice > 0 && totalPower > 0) {
+        const costPerDay = (totalPower / 1000) * kwhPrice * 24;
+        costEl.textContent = costPerDay.toFixed(2);
+        costCard.style.display = '';
+      } else {
+        costCard.style.display = 'none';
+      }
+    }
+    // Trend indicator (updated via WS push path)
+    _updateHashrateTrend(totalHr);
     return { totalHr, onlineCnt, total };
   }
 
@@ -1496,6 +1772,7 @@
       summary.style.display = 'flex';
     }
     initSortable('nm-rows');
+    _applySavedSort('nm-rows');
     filterTable('nm-rows','nm-filter','nm-filter-count');
     initColPicker('nm-rows', 'nm-col-drop');
   }
@@ -1589,6 +1866,7 @@
       summary.style.display = 'flex';
     }
     initSortable('ax-rows');
+    _applySavedSort('ax-rows');
     filterTable('ax-rows','ax-filter','ax-filter-count');
     initColPicker('ax-rows', 'ax-col-drop');
     // Reset bulk selection state after re-render
@@ -2140,6 +2418,7 @@
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
+      document.getElementById('s-kwh-price').value  = cfg.electricity_kwh_price ?? 0.30;
       // Weekly summary
       const ws = cfg.weekly_summary || {};
       document.getElementById('s-ws-enabled').checked = !!ws.enabled;
@@ -2380,6 +2659,7 @@
     currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
     currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
     currentConfig.alert_cooldown_minutes = parseFloat(document.getElementById('s-alert-cooldown').value) || 30;
+    currentConfig.electricity_kwh_price = parseFloat(document.getElementById('s-kwh-price').value) || 0;
     currentConfig.weekly_summary = {
       enabled: document.getElementById('s-ws-enabled').checked,
       day:     document.getElementById('s-ws-day').value,
@@ -2440,6 +2720,13 @@
       document.getElementById('n-go-on').checked    = !!n.gotify_enabled;
       document.getElementById('n-go-url').value     = n.gotify_url        || '';
       document.getElementById('n-go-token').value   = n.gotify_token      || '';
+      // Browser notifications
+      const browserEl = document.getElementById('n-browser-notif');
+      if (browserEl) {
+        browserEl.checked = localStorage.getItem('hh_browser_notif') === 'true'
+          && ('Notification' in window) && Notification.permission === 'granted';
+      }
+      updateBrowserNotifStatus();
       // Alert type toggles (default: enabled for all except low-noise info types)
       const at = cfg.alert_types || {};
       const atDefaults = {
@@ -2914,17 +3201,47 @@
 
   // ── Sortable tables ────────────────────────────────────────────────────────
 
-  const _sortState = {};
+  const _sortState = (() => {
+    try { return JSON.parse(localStorage.getItem('hh_sortState')) || {}; } catch { return {}; }
+  })();
+
+  function _saveSortState() {
+    try { localStorage.setItem('hh_sortState', JSON.stringify(_sortState)); } catch {}
+  }
+
+  function _applySavedSort(tableId) {
+    const table = document.getElementById(tableId)?.closest('table');
+    if (!table) return;
+    const activeKey = Object.keys(_sortState).find(k => k.startsWith(tableId + ':'));
+    if (!activeKey) return;
+    const col = parseInt(activeKey.split(':')[1]);
+    const asc = _sortState[activeKey];
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    const rows = [...tbody.querySelectorAll('tr')];
+    rows.sort((a, b) => {
+      const ta = a.cells[col]?.textContent.trim() || '';
+      const tb = b.cells[col]?.textContent.trim() || '';
+      const na = parseFloat(ta.replace(/[^\d.\-]/g,'')), nb = parseFloat(tb.replace(/[^\d.\-]/g,''));
+      const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : ta.localeCompare(tb);
+      return asc ? cmp : -cmp;
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  }
 
   function initSortable(tableId) {
     const table = document.getElementById(tableId)?.closest('table');
     if (!table) return;
     table.querySelectorAll('th.sortable').forEach(th => {
+      const col = parseInt(th.dataset.col);
+      const key = tableId + ':' + col;
+      // Restore visual sort indicator from saved state
+      th.classList.remove('asc', 'desc');
+      if (key in _sortState) th.classList.add(_sortState[key] ? 'asc' : 'desc');
       th.addEventListener('click', () => {
-        const col = parseInt(th.dataset.col);
-        const key = tableId + ':' + col;
         const asc = _sortState[key] !== true;
         _sortState[key] = asc;
+        _saveSortState();
         table.querySelectorAll('th.sortable').forEach(h => { h.classList.remove('asc','desc'); });
         th.classList.add(asc ? 'asc' : 'desc');
         const tbody = table.querySelector('tbody');
@@ -3080,6 +3397,7 @@
     if (bucket.length > _MAX_LOG) bucket.length = _MAX_LOG;
     _saveLogs();
     _renderLiveLog();
+    _maybePushBrowserNotif(severity, message);
     // Persist notable entries to backend so they survive browser restart
     // Skip: routine "Refreshed" ok lines to avoid flooding alert_history
     const isRoutineRefresh = severity === 'ok' && message.startsWith('Refreshed');
@@ -3201,6 +3519,12 @@
   // ── Init ───────────────────────────────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Restore theme
+    if (localStorage.getItem('hh_theme') === 'light') {
+      document.documentElement.classList.add('light-mode');
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = '☀️';
+    }
     initLiveLog();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {
