@@ -8,7 +8,7 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -560,8 +560,35 @@ async def pwa_manifest():
         "start_url": "/",
         "theme_color": "#0f0f13",
         "background_color": "#0f0f13",
-        "icons": [],
+        "icons": [
+            {"src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png"},
+        ],
     }
+
+
+_FAVICON_FILES = {
+    "favicon.ico": "image/x-icon",
+    "favicon-16x16.png": "image/png",
+    "favicon-32x32.png": "image/png",
+    "apple-touch-icon.png": "image/png",
+    "android-chrome-192x192.png": "image/png",
+    "android-chrome-512x512.png": "image/png",
+}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon-16x16.png", include_in_schema=False)
+@app.get("/favicon-32x32.png", include_in_schema=False)
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+@app.get("/android-chrome-192x192.png", include_in_schema=False)
+@app.get("/android-chrome-512x512.png", include_in_schema=False)
+async def serve_favicon(request: Request):
+    filename = request.url.path.lstrip("/")
+    f = FRONTEND_DIR / filename
+    if f.exists():
+        return FileResponse(str(f), media_type=_FAVICON_FILES.get(filename, "image/png"))
+    raise HTTPException(status_code=404)
 
 
 @app.get("/", include_in_schema=False)
