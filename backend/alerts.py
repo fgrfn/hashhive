@@ -251,6 +251,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
         paused = bool(device.get("miningPaused"))
         uptime = device.get("uptimeSeconds")
         best_diff = device.get("bestDiff")
+        session_diff = device.get("bestSessionDiff")
 
         current_state[key] = {
             "online": is_online,
@@ -261,6 +262,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             "paused": paused,
             "uptime": uptime,
             "best_diff": best_diff,
+            "session_diff": session_diff,
             "last_alerted": prev.get("last_alerted", {}),
         }
 
@@ -363,6 +365,46 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                     new_alerts.append(_make_alert(key, "new_best_diff", "info",
                                                   f"{name}: new best difficulty! {_fmt_diff(best_diff)} "
                                                   f"(was {_fmt_diff(prev_best)}) 🎉"))
+
+            # ── New session best difficulty ───────────────────────────────────
+            prev_session = prev.get("session_diff")
+            if (session_diff is not None and prev_session is not None
+                    and float(session_diff) > float(prev_session)
+                    and _type_enabled("new_session_best_diff")):
+                new_alerts.append(_make_alert(key, "new_session_best_diff", "info",
+                                              f"{name}: new session best difficulty! {_fmt_diff(session_diff)} "
+                                              f"(was {_fmt_diff(prev_session)}) 🎯"))
+
+    # ── Global best difficulty (across all AxeOS devices) ────────────────────
+    global_prev = previous_state.get("_global", {})
+    global_prev_best = global_prev.get("best_diff")
+    global_best_val: float | None = None
+    global_best_name: str = ""
+    for device in axeos_data.get("devices", []):
+        bd = device.get("bestDiff")
+        if bd is None:
+            continue
+        try:
+            bd_f = float(bd)
+        except (TypeError, ValueError):
+            continue
+        if global_best_val is None or bd_f > global_best_val:
+            global_best_val = bd_f
+            global_best_name = device.get("_name", device.get("_ip", ""))
+    current_state["_global"] = {
+        "best_diff": global_best_val,
+        "device": global_best_name,
+    }
+    if (global_best_val is not None and global_prev_best is not None
+            and global_best_val > float(global_prev_best)
+            and _type_enabled("new_global_best_diff")):
+        prev_holder = global_prev.get("device", "")
+        prev_label = f" (prev holder: {prev_holder})" if prev_holder and prev_holder != global_best_name else ""
+        new_alerts.append(_make_alert(
+            "system:global", "new_global_best_diff", "info",
+            f"🌐 New global best difficulty! {_fmt_diff(global_best_val)} by {global_best_name}"
+            f" (was {_fmt_diff(global_prev_best)}{prev_label}) 🏅"
+        ))
 
     # ── Persist state & history ───────────────────────────────────────────────
     save_json(DEVICE_STATE_FILE, current_state)
