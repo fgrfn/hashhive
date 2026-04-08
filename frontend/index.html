@@ -828,7 +828,9 @@
           <div class="toggle-row"><span>🔵 Primary Pool Restored</span><label class="toggle"><input type="checkbox" id="at-fallback-recovered"><span class="toggle-slider"></span></label></div>
           <div class="toggle-row"><span>🟡 Mining Paused</span><label class="toggle"><input type="checkbox" id="at-mining-paused" checked><span class="toggle-slider"></span></label></div>
           <div class="toggle-row"><span>🟡 Unexpected Reboot</span><label class="toggle"><input type="checkbox" id="at-device-rebooted" checked><span class="toggle-slider"></span></label></div>
-          <div class="toggle-row"><span>🔵 New Best Difficulty</span><label class="toggle"><input type="checkbox" id="at-new-best-diff"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🔵 New Best Difficulty (per device)</span><label class="toggle"><input type="checkbox" id="at-new-best-diff" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🎯 New Session Best Difficulty (per device)</span><label class="toggle"><input type="checkbox" id="at-new-session-best-diff"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>🌐 New Global Best Difficulty (all devices)</span><label class="toggle"><input type="checkbox" id="at-new-global-best-diff"><span class="toggle-slider"></span></label></div>
           <div class="toggle-row"><span>🏆 Block Found</span><label class="toggle"><input type="checkbox" id="at-block-found" checked><span class="toggle-slider"></span></label></div>
         </div>
       </div>
@@ -3056,7 +3058,7 @@
         'hashrate-low': true, 'error-rate-high': true, 'fan-failure': true,
         'pool-lost': true, 'pool-connected': false, 'fallback-active': true,
         'fallback-recovered': false, 'mining-paused': true, 'device-rebooted': true,
-        'new-best-diff': false, 'block-found': true,
+        'new-best-diff': true, 'new-session-best-diff': false, 'new-global-best-diff': true, 'block-found': true,
       };
       for (const [id, def] of Object.entries(atDefaults)) {
         const el = document.getElementById(`at-${id}`);
@@ -3080,7 +3082,7 @@
     };
     const atIds = ['offline','online','temp-high','vr-temp-high','hashrate-low','error-rate-high',
                    'fan-failure','pool-lost','pool-connected','fallback-active','fallback-recovered',
-                   'mining-paused','device-rebooted','new-best-diff','block-found'];
+                   'mining-paused','device-rebooted','new-best-diff','new-session-best-diff','new-global-best-diff','block-found'];
     currentConfig.alert_types = {};
     for (const id of atIds) {
       const el = document.getElementById(`at-${id}`);
