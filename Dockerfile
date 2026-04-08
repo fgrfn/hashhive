@@ -4,7 +4,8 @@ WORKDIR /app
 
 # Abhängigkeiten zuerst (Layer-Caching)
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    mkdir -p /run/secrets
 
 # Backend + Frontend + Version kopieren
 COPY backend/ ./backend/
