@@ -1097,30 +1097,29 @@ async def patch_axeos_config_one(ip: str, data: dict):
     return {"ip": ip, "status": resp.status_code}
 
 
-@app.post("/api/axeos/action/{ip}")
-async def axeos_action(ip: str, action: str = Query(...)):
-    """Single-device action: pause | resume | restart | identify"""
-    _validate_device_ip(ip)
+@app.post("/api/axeos/action/batch")
+async def axeos_action_batch(data: dict):
+    """Batch action across multiple AxeOS devices. Body: {action, ips: [...]}"""
+    action = data.get("action", "")
+    ips: list[str] = data.get("ips", [])
     valid = {"pause", "resume", "restart", "identify"}
     if action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            resp = await client.post(f"http://{ip}/api/system/{action}")
-            now = datetime.now(timezone.utc).isoformat()
-            _append_entry({
-                "id": f"axeos:{ip}:{action}:{now}",
-                "device": f"axeos:{ip}",
-                "kind": f"device_{action}",
-                "severity": "warning" if action == "restart" else "info",
-                "message": f"{ip}: {action} triggered",
-                "timestamp": now,
-                "read": True,
-                "source": "axeos",
-            })
-            return {"ip": ip, "action": action, "status": resp.status_code}
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+    if not ips:
+        # Fall back to all configured devices
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
+    results = []
+    limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
+    async with httpx.AsyncClient(timeout=15, limits=limits) as client:
+        async def _act(ip: str):
+            try:
+                resp = await client.post(f"http://{ip}/api/system/{action}")
+                results.append({"ip": ip, "status": resp.status_code})
+            except Exception as exc:
+                results.append({"ip": ip, "error": str(exc)})
+        await asyncio.gather(*[_act(ip) for ip in ips])
+    return {"action": action, "results": results}
 
 
 @app.patch("/api/axeos/config/batch")
@@ -1147,29 +1146,30 @@ async def patch_axeos_config_batch(data: dict):
     return {"results": results}
 
 
-@app.post("/api/axeos/action/batch")
-async def axeos_action_batch(data: dict):
-    """Batch action across multiple AxeOS devices. Body: {action, ips: [...]}"""
-    action = data.get("action", "")
-    ips: list[str] = data.get("ips", [])
+@app.post("/api/axeos/action/{ip}")
+async def axeos_action(ip: str, action: str = Query(...)):
+    """Single-device action: pause | resume | restart | identify"""
+    _validate_device_ip(ip)
     valid = {"pause", "resume", "restart", "identify"}
     if action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    if not ips:
-        # Fall back to all configured devices
-        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-        ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
-    results = []
-    limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
-    async with httpx.AsyncClient(timeout=15, limits=limits) as client:
-        async def _act(ip: str):
-            try:
-                resp = await client.post(f"http://{ip}/api/system/{action}")
-                results.append({"ip": ip, "status": resp.status_code})
-            except Exception as exc:
-                results.append({"ip": ip, "error": str(exc)})
-        await asyncio.gather(*[_act(ip) for ip in ips])
-    return {"action": action, "results": results}
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            resp = await client.post(f"http://{ip}/api/system/{action}")
+            now = datetime.now(timezone.utc).isoformat()
+            _append_entry({
+                "id": f"axeos:{ip}:{action}:{now}",
+                "device": f"axeos:{ip}",
+                "kind": f"device_{action}",
+                "severity": "warning" if action == "restart" else "info",
+                "message": f"{ip}: {action} triggered",
+                "timestamp": now,
+                "read": True,
+                "source": "axeos",
+            })
+            return {"ip": ip, "action": action, "status": resp.status_code}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/api/axeos/scan")
