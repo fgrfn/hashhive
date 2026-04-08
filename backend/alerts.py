@@ -252,6 +252,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
         uptime = device.get("uptimeSeconds")
         best_diff = device.get("bestDiff")
         session_diff = device.get("bestSessionDiff")
+        block_found_count = device.get("blockFound")
 
         current_state[key] = {
             "online": is_online,
@@ -263,6 +264,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
             "uptime": uptime,
             "best_diff": best_diff,
             "session_diff": session_diff,
+            "block_found_count": block_found_count,
             "last_alerted": prev.get("last_alerted", {}),
         }
 
@@ -351,20 +353,36 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                 new_alerts.append(_make_alert(key, "device_rebooted", "warning",
                                               f"{name}: unexpected reboot detected (uptime reset to {uptime}s)"))
 
-            # ── New best difficulty / Block found 🎉 ─────────────────────────
+            # ── Block found (primary: blockFound counter) ─────────────────────
+            prev_block_count = prev.get("block_found_count")
+            block_via_counter = (
+                block_found_count is not None
+                and prev_block_count is not None
+                and int(block_found_count) > int(prev_block_count)
+            )
+            # Fallback: bestDiff crossed network difficulty
             prev_best = prev.get("best_diff")
-            if (best_diff is not None and prev_best is not None
-                    and float(best_diff) > float(prev_best)):
-                if network_difficulty and float(best_diff) >= network_difficulty:
-                    if _type_enabled("block_found"):
-                        new_alerts.append(_make_alert(key, "block_found", "critical",
-                                                      f"🏆 {name} FOUND A BLOCK! "
-                                                      f"Diff: {_fmt_diff(best_diff)} "
-                                                      f"(network: {_fmt_diff(network_difficulty)}) 🎉🎉🎉"))
-                elif _type_enabled("new_best_diff"):
-                    new_alerts.append(_make_alert(key, "new_best_diff", "info",
-                                                  f"{name}: new best difficulty! {_fmt_diff(best_diff)} "
-                                                  f"(was {_fmt_diff(prev_best)}) 🎉"))
+            best_diff_increased = (
+                best_diff is not None
+                and prev_best is not None
+                and float(best_diff) > float(prev_best)
+            )
+            block_via_diff = (
+                best_diff_increased
+                and network_difficulty is not None
+                and float(best_diff) >= network_difficulty
+            )
+            if (block_via_counter or block_via_diff) and _type_enabled("block_found"):
+                diff_label = _fmt_diff(best_diff) if best_diff is not None else "?"
+                net_label = _fmt_diff(network_difficulty) if network_difficulty else "?"
+                new_alerts.append(_make_alert(key, "block_found", "critical",
+                                              f"🏆 {name} FOUND A BLOCK! "
+                                              f"Diff: {diff_label} "
+                                              f"(network: {net_label}) 🎉🎉🎉"))
+            elif best_diff_increased and _type_enabled("new_best_diff"):
+                new_alerts.append(_make_alert(key, "new_best_diff", "info",
+                                              f"{name}: new best difficulty! {_fmt_diff(best_diff)} "
+                                              f"(was {_fmt_diff(prev_best)}) 🎉"))
 
             # ── New session best difficulty ───────────────────────────────────
             prev_session = prev.get("session_diff")
