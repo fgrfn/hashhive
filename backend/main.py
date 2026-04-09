@@ -1493,6 +1493,25 @@ async def _fetch_nmminer_safe(
             resp.raise_for_status()
             result = _normalize(resp.json())
             if result is not None:
+                # Also fetch master config to get PrimaryPool / PrimaryAddress (wallet)
+                # so pool dashboard links can be generated in the frontend.
+                try:
+                    cfg_resp = await client.get(f"http://{master}/config")
+                    cfg_resp.raise_for_status()
+                    master_cfg = cfg_resp.json()
+                    if isinstance(master_cfg, dict):
+                        # /config may return {"configs": [...]} or the config directly
+                        cfg_list = master_cfg.get("configs") if "configs" in master_cfg else None
+                        first_cfg = (cfg_list[0] if isinstance(cfg_list, list) and cfg_list else master_cfg)
+                        primary_pool = first_cfg.get("PrimaryPool") or first_cfg.get("pool") or ""
+                        primary_addr = first_cfg.get("PrimaryAddress") or first_cfg.get("user") or ""
+                        for dev in result.get("devices", []):
+                            if primary_pool and not dev.get("PrimaryPool"):
+                                dev["PrimaryPool"] = primary_pool
+                            if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
+                                dev["PrimaryAddress"] = primary_addr
+                except Exception:
+                    pass  # config fetch is best-effort; swarm data still usable
                 # Enrich with per-device config overrides by IP
                 if nm_devices:
                     cfg_by_ip = {d["ip"]: d for d in nm_devices if d.get("ip")}
@@ -1516,8 +1535,26 @@ async def _fetch_nmminer_safe(
                 data = r.json()
                 devs = data if isinstance(data, list) else data.get("devices", [data])
                 devs = devs if isinstance(devs, list) else [devs]
+                # Also fetch config to get wallet/pool for pool links
+                primary_pool = ""
+                primary_addr = ""
+                try:
+                    cr = await client.get(f"http://{ip}/config")
+                    cr.raise_for_status()
+                    cfg = cr.json()
+                    if isinstance(cfg, dict):
+                        cfg_list = cfg.get("configs")
+                        first = (cfg_list[0] if isinstance(cfg_list, list) and cfg_list else cfg)
+                        primary_pool = first.get("PrimaryPool") or first.get("pool") or ""
+                        primary_addr = first.get("PrimaryAddress") or first.get("user") or ""
+                except Exception:
+                    pass
                 for dev in devs:
                     dev["_temp_max"] = cfg_by_ip.get(ip, {}).get("temp_max")
+                    if primary_pool and not dev.get("PrimaryPool"):
+                        dev["PrimaryPool"] = primary_pool
+                    if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
+                        dev["PrimaryAddress"] = primary_addr
                 all_devs.extend(devs)
             except Exception:
                 all_devs.append({"ip": ip, "online": False, "_temp_max": cfg_by_ip.get(ip, {}).get("temp_max")})
