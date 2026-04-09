@@ -104,6 +104,7 @@ def _load_recent(days: int = 1) -> list:
 _STATS_SAMPLE_INTERVAL = 60  # seconds between hashrate samples
 _last_stats_sample_ts: float = 0.0
 _last_dev_sample_ts: float = 0.0
+_last_bestdiff_sample_ts: float = 0.0
 
 
 def _stats_file(date_str: str) -> Path:
@@ -112,6 +113,45 @@ def _stats_file(date_str: str) -> Path:
 
 def _dev_stats_file(date_str: str) -> Path:
     return STATS_DIR / f"dev_{date_str}.json"
+
+
+def _bestdiff_file(date_str: str) -> Path:
+    return STATS_DIR / f"bestdiff_{date_str}.json"
+
+
+def _append_bestdiff_samples(all_devices: list) -> None:
+    """Store per-device best-diff samples (max 1 per minute).
+    all_devices: list of dicts with keys _ip/_name and bestDiff/best_diff/bestShare.
+    """
+    global _last_bestdiff_sample_ts
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if now_ts - _last_bestdiff_sample_ts < _STATS_SAMPLE_INTERVAL:
+        return
+    _last_bestdiff_sample_ts = now_ts
+    STATS_DIR.mkdir(parents=True, exist_ok=True)
+    date_str = _today()
+    path = _bestdiff_file(date_str)
+    data: dict = load_json(path, {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for d in all_devices:
+        ip = d.get("_ip") or d.get("ip", "")
+        if not ip:
+            continue
+        raw = d.get("bestDiff") or d.get("best_diff") or d.get("bestShare") or d.get("best_share")
+        if raw is None:
+            continue
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            continue
+        name = d.get("_name") or d.get("hostname") or d.get("name") or ip
+        if ip not in data:
+            data[ip] = {"name": name, "samples": []}
+        data[ip]["name"] = name  # refresh name
+        data[ip]["samples"].append({"ts": now_iso, "diff": val})
+        if len(data[ip]["samples"]) > 1440:
+            data[ip]["samples"] = data[ip]["samples"][-1440:]
+    save_json(path, data)
 
 
 def _append_device_samples(devices: list) -> None:
@@ -220,6 +260,7 @@ DEFAULT_CONFIG: dict = {
         "hashrate_min": 0,
         "error_rate_max": 2.0,
         "share_rate_min": 80,
+        "rssi_min": -75,
     },
     "notifications": {
         "telegram_enabled": False,
@@ -247,6 +288,7 @@ DEFAULT_CONFIG: dict = {
         "device-rebooted": True,
         "new-best-diff": False,
         "block-found": True,
+        "rssi-low": True,
     },
     "weekly_summary": {
         "enabled": False,
@@ -394,8 +436,13 @@ async def _dashboard_broadcast_loop():
                 idx += len(sparkminer_devices)
                 axeos_results = list(results[idx:])
                 axeos_data = {"devices": axeos_results}
+                new_alerts: list = []
                 try:
-                    await check_alerts(config, nmminer_data, axeos_data)
+                    new_alerts = await check_alerts(
+                        config, nmminer_data, axeos_data,
+                        {"devices": nerdminer_results},
+                        {"devices": sparkminer_results},
+                    )
                 except Exception:
                     pass
                 today_entries = _read_day(_today())
@@ -416,6 +463,14 @@ async def _dashboard_broadcast_loop():
                             total_shares += int(d.get("sharesAccepted") or 0)
                     _append_hashrate_sample(total_gh, total_pwr, total_shares)
                     _append_device_samples(axeos_results)
+                    # ── BestDiff samples (all device types) ───────────────
+                    all_bd = (
+                        list(nmminer_data.get("devices", []))
+                        + nerdminer_results
+                        + sparkminer_results
+                        + axeos_results
+                    )
+                    _append_bestdiff_samples(all_bd)
                 except Exception:
                     pass
                 # ── Auto-restart check ─────────────────────────────────────
@@ -431,6 +486,7 @@ async def _dashboard_broadcast_loop():
                     "sparkminer": {"devices": sparkminer_results},
                     "axeos": axeos_data,
                     "unread_alerts": unread,
+                    "new_alerts": new_alerts,
                     "config": config,
                 })
                 await _ws_manager.broadcast(payload)
@@ -1109,6 +1165,55 @@ async def scan_solominer_devices():
     }
 
 
+@app.post("/api/solominer/config")
+async def post_solominer_config(data: dict):
+    """Push pool config to a NerdMiner v2 or SparkMiner device.
+
+    Accepts: {ip, poolUrl, poolPort, walletAddress, workerName (optional)}
+    Tries POST /settings then POST /config on the device.
+    """
+    ip = data.get("ip", "")
+    if not ip:
+        raise HTTPException(status_code=400, detail="ip required")
+    _validate_device_ip(ip)
+
+    pool_url   = data.get("poolUrl", "")
+    pool_port  = data.get("poolPort", 3333)
+    wallet     = data.get("walletAddress", "")
+    worker     = data.get("workerName", "")
+
+    # NerdMiner v2 / SparkMiner settings payload
+    payload = {
+        "poolUrl":       pool_url,
+        "poolPort":      int(pool_port),
+        "walletAddress": wallet,
+    }
+    if worker:
+        payload["workerName"] = worker
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        last_exc: str = ""
+        for path in ("/settings", "/config"):
+            try:
+                resp = await client.post(f"http://{ip}{path}", json=payload)
+                if resp.status_code < 400:
+                    now = datetime.now(timezone.utc).isoformat()
+                    _append_entry({
+                        "id": f"solominer:{ip}:config_saved:{now}",
+                        "device": f"solominer:{ip}",
+                        "kind": "config_saved",
+                        "severity": "info",
+                        "message": f"SoloMiner {ip} pool config saved",
+                        "timestamp": now,
+                        "read": True,
+                        "source": "nerdminer",
+                    })
+                    return {"status": resp.status_code, "detail": resp.text[:200]}
+            except Exception as exc:
+                last_exc = str(exc)
+        raise HTTPException(status_code=502, detail=last_exc or "Device unreachable")
+
+
 # ── AxeOS ─────────────────────────────────────────────────────────────────────
 
 async def _fetch_axeos_device(client: httpx.AsyncClient, device: dict) -> dict:
@@ -1459,7 +1564,11 @@ async def get_dashboard():
     axeos_data = {"devices": axeos_results}
 
     try:
-        await check_alerts(config, nmminer_data, axeos_data)
+        await check_alerts(
+            config, nmminer_data, axeos_data,
+            {"devices": nerdminer_results},
+            {"devices": sparkminer_results},
+        )
     except Exception:
         pass  # Never let alert checks break the dashboard
 
@@ -1535,6 +1644,24 @@ async def get_device_stats(ip: str = Query(...), hours: int = Query(default=1, g
             except Exception:
                 pass
     result.sort(key=lambda x: x.get("ts", ""))
+    return result
+
+
+@app.get("/api/stats/bestdiff")
+async def get_bestdiff_stats(days: int = Query(default=7, ge=1, le=30)):
+    """Return per-device best-difficulty samples for the last N days (oldest first)."""
+    result: dict = {}  # ip → {name, samples[]}
+    now_utc = datetime.now(timezone.utc)
+    for i in range(days - 1, -1, -1):
+        date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
+        data: dict = load_json(_bestdiff_file(date_str), {})
+        for ip, entry in data.items():
+            if ip not in result:
+                result[ip] = {"name": entry.get("name", ip), "samples": []}
+            result[ip]["samples"].extend(entry.get("samples", []))
+    # Sort each device's samples by timestamp
+    for entry in result.values():
+        entry["samples"].sort(key=lambda s: s.get("ts", ""))
     return result
 
 

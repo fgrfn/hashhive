@@ -519,6 +519,21 @@
         <div class="chart-wrap"><canvas id="hashrate-chart"></canvas></div>
       </div>
 
+      <div class="card" id="bestdiff-chart-card" style="display:none">
+        <div class="section-header" style="margin-bottom:8px">
+          <div class="card-title mb-0">🏆 Best Difficulty Verlauf</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="bestdiff-days" onchange="loadBestDiffChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:12px">
+              <option value="1">Last 24 h</option>
+              <option value="3">Last 3 days</option>
+              <option value="7" selected>Last 7 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="bestdiff-chart"></canvas></div>
+      </div>
+
       <div class="card" style="margin-bottom:0">
         <div class="section-header" style="margin-bottom:6px">
           <div class="card-title mb-0">🖥 Live Log</div>
@@ -579,8 +594,8 @@
         </div>
         <div class="table-wrap table-wrap-scroll">
           <table>
-            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th></tr></thead>
-            <tbody id="nerdminer-rows"><tr><td colspan="11" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th><th></th></tr></thead>
+            <tbody id="nerdminer-rows"><tr><td colspan="12" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -599,8 +614,8 @@
         </div>
         <div class="table-wrap table-wrap-scroll">
           <table>
-            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th></tr></thead>
-            <tbody id="sparkminer-rows"><tr><td colspan="11" class="empty text-muted">No data</td></tr></tbody>
+            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th><th></th></tr></thead>
+            <tbody id="sparkminer-rows"><tr><td colspan="12" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -783,6 +798,7 @@
           <div class="form-group"><label>Min. Hashrate GH/s (0 = off)</label><input type="number" id="s-hr-min" value="0" step="0.1"></div>
           <div class="form-group"><label>Max. Error Rate % (0 = off)</label><input type="number" id="s-error-rate-max" value="2" step="0.1" min="0" title="Alert when hash error rate exceeds this percentage"></div>
           <div class="form-group"><label>Min. Share Rate (%)</label><input type="number" id="s-share-min" value="80"></div>
+          <div class="form-group"><label>Min. WiFi RSSI (dBm)</label><input type="number" id="s-rssi-min" value="-75" step="1" max="-1" title="Alert when WiFi signal drops below this value (e.g. -75)"></div>
           <div class="form-group"><label>Refresh Interval (sec)</label><input type="number" id="s-interval" value="30"></div>
           <div class="form-group"><label>Offline Alert Grace (min)</label><input type="number" id="s-offline-grace" value="2" min="0" step="0.5" title="Wait this many minutes before triggering an offline alert"></div>
           <div class="form-group"><label>Alert Repeat Cooldown (min)</label><input type="number" id="s-alert-cooldown" value="30" min="1" step="1" title="Minimum time between repeated alerts of the same type (temp, hashrate, pool)"></div>
@@ -912,6 +928,7 @@
           <div class="toggle-row"><span>🎯 New Session Best Difficulty (per device)</span><label class="toggle"><input type="checkbox" id="at-new-session-best-diff"><span class="toggle-slider"></span></label></div>
           <div class="toggle-row"><span>🌐 New Global Best Difficulty (all devices)</span><label class="toggle"><input type="checkbox" id="at-new-global-best-diff"><span class="toggle-slider"></span></label></div>
           <div class="toggle-row"><span>🏆 Block Found</span><label class="toggle"><input type="checkbox" id="at-block-found" checked><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><span>📶 Weak WiFi Signal (RSSI)</span><label class="toggle"><input type="checkbox" id="at-rssi-low" checked><span class="toggle-slider"></span></label></div>
         </div>
       </div>
 
@@ -1098,6 +1115,38 @@
   </div>
 </div>
 
+<!-- ════════════ SOLO MINER (NerdMiner/SparkMiner) POOL CONFIG MODAL ════════════ -->
+<div class="modal-overlay" id="soloedit-overlay" onclick="if(event.target===this)closeSoloEdit()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        ⚙ Pool Config
+        <small id="soloedit-ip-title"></small>
+      </div>
+      <button class="modal-close" onclick="closeSoloEdit()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="soloedit-loading" class="empty text-muted" style="padding:24px">Loading…</div>
+      <div id="soloedit-form" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title">🔵 Pool Settings</div>
+          <div class="form-group"><label>Pool Hostname</label><input type="text" id="se-pool-url" placeholder="solo.ckpool.org"></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Pool Port</label><input type="number" id="se-pool-port" placeholder="3333" min="1" max="65535"></div>
+            <div class="form-group"><label>Worker Name (optional)</label><input type="text" id="se-worker" placeholder="miner1"></div>
+          </div>
+          <div class="form-group"><label>Wallet Address</label><input type="text" id="se-wallet" placeholder="bc1q…" style="font-family:monospace;font-size:13px"></div>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin-top:4px">Config is pushed via HTTP to the device firmware. Works with NerdMiner v2 and SparkMiner firmwares that support the settings API.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeSoloEdit()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSoloEdit()">📡 Push Config</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════ AXEOS DEVICE CONFIG MODAL ════════════ -->
 <div class="modal-overlay" id="axedit-overlay" onclick="if(event.target===this)closeAxEdit()">
   <div class="modal">
@@ -1244,7 +1293,7 @@
     if (name !== 'dashboard') stopAutoRefresh();
 
     switch (name) {
-      case 'dashboard':    startAutoRefresh(); break;
+      case 'dashboard':    startAutoRefresh(); loadBestDiffChart(); break;
       case 'nmminer':      document.getElementById('nm-filter').value=''; loadNmPage(); break;
       case 'axeos':        document.getElementById('ax-filter').value=''; loadAxPage(); break;
       case 'settings':     loadSettingsForm(); break;
@@ -1540,6 +1589,130 @@
     _hrChart.update('none');
   }
 
+  // ── BestDiff chart ─────────────────────────────────────────────────────────
+
+  let _bdChart = null;
+  const _BD_COLORS = ['#a855f7','#3b82f6','#22c55e','#f59e0b','#ef4444','#06b6d4','#f97316','#8b5cf6'];
+
+  async function loadBestDiffChart() {
+    const days = parseInt(document.getElementById('bestdiff-days')?.value || '7');
+    const card = document.getElementById('bestdiff-chart-card');
+    try {
+      const data = await apiFetch(`/api/stats/bestdiff?days=${days}`);
+      const devices = Object.values(data || {});
+      if (!devices.length || devices.every(d => !d.samples?.length)) {
+        if (card) card.style.display = 'none';
+        return;
+      }
+      if (card) card.style.display = '';
+      _renderBestDiffChart(data);
+    } catch (_) {
+      if (card) card.style.display = 'none';
+    }
+  }
+
+  function _renderBestDiffChart(deviceMap) {
+    const canvas = document.getElementById('bestdiff-chart');
+    if (!canvas || !window.Chart) return;
+
+    // Collect all unique timestamps across all devices (sorted)
+    const allTs = new Set();
+    Object.values(deviceMap).forEach(d => (d.samples || []).forEach(s => allTs.add(s.ts)));
+    const sortedTs = [...allTs].sort();
+    const labels = sortedTs.map(ts => {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    });
+
+    const datasets = Object.entries(deviceMap).map(([ip, info], idx) => {
+      const color = _BD_COLORS[idx % _BD_COLORS.length];
+      const tsMap = new Map((info.samples || []).map(s => [s.ts, s.diff]));
+
+      // Identify record-high samples (running max per device)
+      let runningMax = 0;
+      const recordTsSet = new Set();
+      (info.samples || []).forEach(s => {
+        if (s.diff > runningMax) { runningMax = s.diff; recordTsSet.add(s.ts); }
+      });
+
+      const pointData = sortedTs.map(ts => tsMap.has(ts) ? tsMap.get(ts) : null);
+      const pointStyles = sortedTs.map(ts => recordTsSet.has(ts) ? 'star' : 'circle');
+      const pointRadii = sortedTs.map(ts => recordTsSet.has(ts) ? 7 : 0);
+      const pointColors = sortedTs.map(ts => recordTsSet.has(ts) ? '#ffd700' : color);
+
+      return {
+        label: info.name || ip,
+        data: pointData,
+        borderColor: color,
+        backgroundColor: color + '20',
+        borderWidth: 2,
+        pointStyle: pointStyles,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        tension: 0.2,
+        fill: false,
+        spanGaps: true,
+      };
+    });
+
+    if (_bdChart) { _bdChart.destroy(); _bdChart = null; }
+
+    _bdChart = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { color: '#8888aa', font: { size: 11 }, boxWidth: 12, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                if (v == null) return null;
+                const isRec = ctx.dataset.pointStyle?.[ctx.dataIndex] === 'star';
+                return ` ${ctx.dataset.label}: ${fmtDiff(v)}${isRec ? ' 🏆 New Record!' : ''}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { color: '#8888aa', font: { size: 11 }, maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(255,255,255,.05)' } },
+          y: {
+            ticks: { color: '#8888aa', font: { size: 11 }, callback: v => fmtDiff(v) },
+            grid: { color: 'rgba(255,255,255,.05)' },
+            beginAtZero: false,
+          },
+        },
+      },
+    });
+  }
+
+  // ── Block-Found sound (Web Audio API) ───────────────────────────────────────
+
+  function _playBlockFoundSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // 3-note ascending fanfare: C5 → E5 → G5
+      [[523.25, 0, 0.18], [659.25, 0.18, 0.18], [783.99, 0.36, 0.45]].forEach(([freq, start, dur]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, ctx.currentTime + start);
+        gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + start + 0.02);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur + 0.01);
+      });
+    } catch (_) {}
+  }
+
   // ── API helper ─────────────────────────────────────────────────────────────
 
   async function apiFetch(path, opts = {}) {
@@ -1632,6 +1805,16 @@
     // Push new data point to chart (live update without full reload)
     _pushChartSample(_s.totalHr, _s.totalPower);
     _updateHashrateTrend(_s.totalHr);
+    // Check for block-found alert → play sound + special notification
+    const newAlerts = Array.isArray(msg.new_alerts) ? msg.new_alerts : [];
+    newAlerts.forEach(a => {
+      if (a.kind === 'block_found') {
+        _playBlockFoundSound();
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('🏆 BLOCK FOUND!', { body: a.message, icon: '/favicon.ico' });
+        }
+      }
+    });
     // Update detail pages silently if they are currently visible
     if (currentPage === 'nmminer' && !document.getElementById('nmedit-overlay')?.classList.contains('open')) {
       const nmDevs = msg.nmminer?.devices;
@@ -1692,6 +1875,7 @@
     // Always do an immediate HTTP load so data appears instantly
     loadDashboard();
     loadHashrateChart();
+    loadBestDiffChart();
     // Polling fallback — will be cleared once WS connects
     const interval = (currentConfig.refresh_interval || 30) * 1000;
     refreshTimer = setInterval(() => {
@@ -1752,12 +1936,18 @@
       // e.g. digi.hmpool.io → /miner.html?address=wallet
       href = `https://${host}/miner.html?address=${encodeURIComponent(wallet)}`;
     } else if (host.endsWith('ckpool.org')) {
-      // e.g. eusolostats.ckpool.org → /users/wallet
-      href = `https://${host}/users/${encodeURIComponent(wallet)}`;
+      // Stats page is always at eusolostats.ckpool.org
+      href = 'https://eusolostats.ckpool.org/';
     } else if (host === 'atlaspool.io' || host.endsWith('.atlaspool.io')) {
       href = `https://atlaspool.io/dashboard.html?wallet=${encodeURIComponent(wallet)}`;
     } else if (host.endsWith('public-pool.io') || host === 'public-pool.io') {
       href = `https://${host}/#/app/${encodeURIComponent(wallet)}`;
+    } else if (host === 'ocean.xyz' || host.endsWith('.ocean.xyz')) {
+      href = `https://ocean.xyz/stats/${encodeURIComponent(wallet)}`;
+    } else if (host === 'pool.braiins.com' || host.endsWith('.braiins.com')) {
+      href = `https://pool.braiins.com/stats/${encodeURIComponent(wallet)}`;
+    } else if (host === 'luckpool.net' || host.endsWith('.luckpool.net')) {
+      href = `https://luckpool.net/pool/worker/${encodeURIComponent(wallet)}`;
     }
     if (!href) return '';
     return `<a href="${href}" target="_blank" rel="noopener" title="Pool Dashboard öffnen" style="margin-left:4px;color:var(--accent);font-size:10px;text-decoration:none" onclick="event.stopPropagation()">↗</a>`;
@@ -2205,13 +2395,13 @@
     const tbodyId = type === 'sparkminer' ? 'sparkminer-rows' : 'nerdminer-rows';
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="11" class="empty text-muted">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty text-muted">Loading…</td></tr>';
     try {
       const endpoint = type === 'sparkminer' ? '/api/sparkminer/devices' : '/api/nerdminer/devices';
       const data = await apiFetch(endpoint);
       renderSoloMinerRows(type, data.devices || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="11" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
     }
   }
 
@@ -2222,7 +2412,7 @@
     const sumOnId   = type === 'sparkminer' ? 'sparkminer-sum-online' : 'nerdminer-sum-online';
     const filterId  = type === 'sparkminer' ? 'sparkminer-filter' : 'nerdminer-filter';
     const countId   = type === 'sparkminer' ? 'sparkminer-filter-count' : 'nerdminer-filter-count';
-    const colSpan   = 11;
+    const colSpan   = 12;
     const tbody   = document.getElementById(tbodyId);
     const summary = document.getElementById(summaryId);
     const tMax    = currentConfig.thresholds?.temp_max || 70;
@@ -2247,8 +2437,9 @@
       const stratumUrl = poolUrl ? `stratum+tcp://${poolUrl}` : '';
       const poolDisplay = poolUrl ? `${poolUrl}${poolPort}` : '–';
       const poolLink = poolPageLink(stratumUrl, wallet);
-      return `<tr data-ip="${d._ip || d.ip}">
-        <td><span class="copy-ip" onclick="copyIP('${d._ip || d.ip}')" title="Copy IP">${d._ip || d.ip || '–'}</span></td>
+      const devIp = d._ip || d.ip || '';
+      return `<tr data-ip="${devIp}">
+        <td><span class="copy-ip" onclick="copyIP('${devIp}')" title="Copy IP">${devIp || '–'}</span></td>
         <td><small>${d.hostname || d.minerName || d._name || '–'}</small></td>
         <td>${fmtStatus(online)}</td>
         <td>${fmtNmHr(hr)}</td>
@@ -2259,6 +2450,7 @@
         <td><small class="text-muted">${tmpl}</small></td>
         <td><small>${fmtUptime(uptime)}</small></td>
         <td><small class="text-muted">${d.version || '–'}</small></td>
+        <td><button class="btn btn-secondary btn-xs" onclick="openSoloEdit('${devIp}','${type}')" title="Push pool config">⚙</button></td>
       </tr>`;
     }).join('');
     if (summary) {
@@ -2989,6 +3181,7 @@
       document.getElementById('s-hr-min').value     = cfg.thresholds?.hashrate_min ?? 0;
       document.getElementById('s-error-rate-max').value = cfg.thresholds?.error_rate_max ?? 2;
       document.getElementById('s-share-min').value  = cfg.thresholds?.share_rate_min ?? 80;
+      document.getElementById('s-rssi-min').value   = cfg.thresholds?.rssi_min ?? -75;
       document.getElementById('s-interval').value   = cfg.refresh_interval ?? 30;
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
@@ -3332,6 +3525,7 @@
       hashrate_min:   parseFloat(document.getElementById('s-hr-min').value)         || 0,
       error_rate_max: parseFloat(document.getElementById('s-error-rate-max').value) || 0,
       share_rate_min: parseInt(document.getElementById('s-share-min').value)        || 80,
+      rssi_min:       parseInt(document.getElementById('s-rssi-min').value)         || -75,
     };
     currentConfig.refresh_interval = parseInt(document.getElementById('s-interval').value) || 30;
     currentConfig.offline_grace_minutes = parseFloat(document.getElementById('s-offline-grace').value) || 2;
@@ -3417,6 +3611,7 @@
         'pool-lost': true, 'pool-connected': false, 'fallback-active': true,
         'fallback-recovered': false, 'mining-paused': true, 'device-rebooted': true,
         'new-best-diff': true, 'new-session-best-diff': false, 'new-global-best-diff': true, 'block-found': true,
+        'rssi-low': true,
       };
       for (const [id, def] of Object.entries(atDefaults)) {
         const el = document.getElementById(`at-${id}`);
@@ -3440,7 +3635,8 @@
     };
     const atIds = ['offline','online','temp-high','vr-temp-high','hashrate-low','error-rate-high',
                    'fan-failure','pool-lost','pool-connected','fallback-active','fallback-recovered',
-                   'mining-paused','device-rebooted','new-best-diff','new-session-best-diff','new-global-best-diff','block-found'];
+                   'mining-paused','device-rebooted','new-best-diff','new-session-best-diff','new-global-best-diff','block-found',
+                   'rssi-low'];
     currentConfig.alert_types = {};
     for (const id of atIds) {
       const el = document.getElementById(`at-${id}`);
@@ -3765,6 +3961,80 @@
     document.getElementById('nmedit-overlay').classList.remove('open');
     _nmEditIP = null;
     _nmEditRawConfig = null;
+  }
+
+  // ── Solo Miner (NerdMiner/SparkMiner) pool config modal ───────────────────
+
+  let _soloEditIP   = null;
+  let _soloEditType = null;
+
+  async function openSoloEdit(ip, type) {
+    _soloEditIP   = ip;
+    _soloEditType = type || 'nerdminer';
+    const overlay = document.getElementById('soloedit-overlay');
+    const loading = document.getElementById('soloedit-loading');
+    const form    = document.getElementById('soloedit-form');
+    document.getElementById('soloedit-ip-title').textContent = ip;
+    loading.style.color   = 'var(--text-muted)';
+    loading.textContent   = 'Loading…';
+    loading.style.display = 'block';
+    form.style.display    = 'none';
+    overlay.classList.add('open');
+    try {
+      const endpoint = type === 'sparkminer' ? '/api/sparkminer/devices' : '/api/nerdminer/devices';
+      const data = await apiFetch(endpoint);
+      const dev  = (data.devices || []).find(d => (d._ip || d.ip) === ip);
+      if (dev) {
+        document.getElementById('se-pool-url').value  = dev.poolUrl  || dev.pool     || '';
+        document.getElementById('se-pool-port').value = dev.poolPort || '';
+        document.getElementById('se-wallet').value    = dev.walletAddress || dev.wallet || '';
+        document.getElementById('se-worker').value    = dev.workerName   || dev.worker || '';
+      }
+      loading.style.display = 'none';
+      form.style.display    = '';
+    } catch (e) {
+      loading.style.color = 'var(--danger)';
+      loading.textContent = 'Failed to load: ' + e.message;
+    }
+  }
+
+  async function saveSoloEdit() {
+    if (!_soloEditIP) return;
+    const poolUrl  = document.getElementById('se-pool-url').value.trim();
+    const poolPort = document.getElementById('se-pool-port').value.trim();
+    const wallet   = document.getElementById('se-wallet').value.trim();
+    const worker   = document.getElementById('se-worker').value.trim();
+    if (!poolUrl || !poolPort || !wallet) {
+      toast('Pool URL, Port and Wallet are required', 'error');
+      return;
+    }
+    try {
+      await apiFetch('/api/solominer/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip: _soloEditIP,
+          pool_url: poolUrl,
+          pool_port: parseInt(poolPort),
+          wallet_address: wallet,
+          worker_name: worker || null,
+        }),
+      });
+      appendLog('ok', `Pool config pushed → ${_soloEditIP}`, 'nmminer');
+      toast(`Config pushed to ${_soloEditIP}`, 'success');
+      const t = _soloEditType;
+      closeSoloEdit();
+      if (t) loadSoloMinerPage(t);
+    } catch (e) {
+      appendLog('critical', `Solo config push failed — ${_soloEditIP}: ${e.message}`, 'nmminer');
+      toast('Error: ' + e.message, 'error');
+    }
+  }
+
+  function closeSoloEdit() {
+    document.getElementById('soloedit-overlay').classList.remove('open');
+    _soloEditIP   = null;
+    _soloEditType = null;
   }
 
   // ── AxeOS device config modal ─────────────────────────────────────────────
