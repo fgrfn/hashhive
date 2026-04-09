@@ -208,6 +208,8 @@ def _migrate_legacy() -> None:
 DEFAULT_CONFIG: dict = {
     "nmminer_master": "",
     "nmminer_devices": [],
+    "nerdminer_devices": [],
+    "sparkminer_devices": [],
     "axeos_devices": [],
     "refresh_interval": 30,
     "offline_grace_minutes": 2,
@@ -366,19 +368,31 @@ async def _dashboard_broadcast_loop():
             config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
             interval = max(5, int(config.get("refresh_interval", 30)))
             if _ws_manager.count > 0:
-                # Re-use the same logic as GET /api/dashboard
                 master = config.get("nmminer_master", "")
                 nm_devices = config.get("nmminer_devices", [])
+                nerdminer_devices = config.get("nerdminer_devices", [])
+                sparkminer_devices = config.get("sparkminer_devices", [])
                 axeos_devices = config.get("axeos_devices", [])
                 has_nmminer = bool(master or nm_devices)
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
                         coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+                    coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
+                    coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
                     coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
                     results = await asyncio.gather(*coros) if coros else []
-                nmminer_data = results[0] if (has_nmminer and results) else {"devices": []}
-                axeos_results = list(results[1:]) if has_nmminer else list(results)
+                idx = 0
+                if has_nmminer:
+                    nmminer_data = results[idx] if results else {"devices": []}
+                    idx += 1
+                else:
+                    nmminer_data = {"devices": []}
+                nerdminer_results = list(results[idx:idx + len(nerdminer_devices)])
+                idx += len(nerdminer_devices)
+                sparkminer_results = list(results[idx:idx + len(sparkminer_devices)])
+                idx += len(sparkminer_devices)
+                axeos_results = list(results[idx:])
                 axeos_data = {"devices": axeos_results}
                 try:
                     await check_alerts(config, nmminer_data, axeos_data)
@@ -413,6 +427,8 @@ async def _dashboard_broadcast_loop():
                 payload = json.dumps({
                     "type": "dashboard",
                     "nmminer": nmminer_data,
+                    "nerdminer": {"devices": nerdminer_results},
+                    "sparkminer": {"devices": sparkminer_results},
                     "axeos": axeos_data,
                     "unread_alerts": unread,
                     "config": config,
@@ -982,6 +998,117 @@ async def post_nmminer_device_config(data: dict):
             raise HTTPException(status_code=502, detail=str(exc))
 
 
+# ── NerdMiner / SparkMiner ────────────────────────────────────────────────────
+
+async def _fetch_solo_miner(client: httpx.AsyncClient, device: dict) -> dict:
+    """Fetch stats from a NerdMiner v2 or SparkMiner device via GET /stats."""
+    ip = device.get("ip", "")
+    name = device.get("name", ip)
+    device_type = device.get("type", "nerdminer")
+    temp_max = device.get("temp_max")
+    try:
+        resp = await client.get(f"http://{ip}/stats")
+        resp.raise_for_status()
+        data = resp.json()
+        data.update({
+            "_ip": ip,
+            "_name": name,
+            "_type": device_type,
+            "_online": True,
+            "_temp_max": temp_max,
+            # Normalize key fields for unified rendering
+            "ip": ip,
+            "hostname": data.get("hostname") or data.get("minerName") or name,
+            "hashRate": data.get("hashRate") or data.get("hashes") or "0KH/s",
+            "temp": data.get("temp") or data.get("temperature") or 0,
+            "walletAddress": data.get("walletAddress") or data.get("wallet") or "",
+            "poolUrl": data.get("poolUrl") or data.get("pool") or "",
+            "poolPort": data.get("poolPort") or data.get("port") or 0,
+            "bestDiff": str(data.get("bestDiff") or data.get("best_diff") or ""),
+            "uptime": data.get("runningTime") or data.get("uptime") or data.get("uptimeSeconds") or 0,
+            "version": data.get("version") or "",
+            "online": True,
+        })
+        return data
+    except Exception:
+        return {
+            "_ip": ip, "_name": name, "_type": device_type,
+            "_online": False, "_temp_max": temp_max,
+            "ip": ip, "hostname": name, "online": False,
+        }
+
+
+@app.get("/api/nerdminer/devices")
+async def get_nerdminer_devices():
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    devices = config.get("nerdminer_devices", [])
+    async with httpx.AsyncClient(timeout=10) as client:
+        results = await asyncio.gather(*[_fetch_solo_miner(client, d) for d in devices])
+    return {"devices": list(results)}
+
+
+@app.get("/api/sparkminer/devices")
+async def get_sparkminer_devices():
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    devices = config.get("sparkminer_devices", [])
+    async with httpx.AsyncClient(timeout=10) as client:
+        results = await asyncio.gather(*[_fetch_solo_miner(client, d) for d in devices])
+    return {"devices": list(results)}
+
+
+@app.get("/api/solominer/scan")
+async def scan_solominer_devices():
+    """Scan local /24 subnet for NerdMiner v2 and SparkMiner devices."""
+    import socket as _socket
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not determine local network interface")
+
+    subnet = ".".join(local_ip.split(".")[:3])
+    SOLO_FIELDS = {"hashRate", "walletAddress", "poolUrl", "minerName", "runningTime"}
+    found: list[dict] = []
+    sem = asyncio.Semaphore(60)
+    limits = httpx.Limits(max_connections=60, max_keepalive_connections=0)
+
+    async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
+        async def _probe(ip: str):
+            async with sem:
+                try:
+                    resp = await client.get(f"http://{ip}/stats")
+                    if resp.status_code != 200:
+                        return
+                    data = resp.json()
+                    if not (SOLO_FIELDS & set(data.keys())):
+                        return
+                    miner_name = str(data.get("minerName", "")).lower()
+                    if "spark" in miner_name:
+                        dev_type = "sparkminer"
+                    else:
+                        dev_type = "nerdminer"
+                    found.append({
+                        "ip": ip,
+                        "name": data.get("hostname") or data.get("minerName") or ip,
+                        "type": dev_type,
+                        "hashrate": data.get("hashRate", "0KH/s"),
+                        "temp": data.get("temp", 0),
+                        "version": data.get("version", ""),
+                    })
+                except Exception:
+                    pass
+
+        await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
+
+    return {
+        "subnet": f"{subnet}.0/24",
+        "local_ip": local_ip,
+        "found": sorted(found, key=lambda x: [int(p) for p in x["ip"].split(".")]),
+    }
+
+
 # ── AxeOS ─────────────────────────────────────────────────────────────────────
 
 async def _fetch_axeos_device(client: httpx.AsyncClient, device: dict) -> dict:
@@ -1301,6 +1428,8 @@ async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("nmminer_master", "")
     nm_devices = config.get("nmminer_devices", [])
+    nerdminer_devices = config.get("nerdminer_devices", [])
+    sparkminer_devices = config.get("sparkminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
     has_nmminer = bool(master or nm_devices)
 
@@ -1308,16 +1437,24 @@ async def get_dashboard():
         coros: list = []
         if has_nmminer:
             coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+        coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
+        coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
 
         results = await asyncio.gather(*coros) if coros else []
 
+    idx = 0
     if has_nmminer:
-        nmminer_data = results[0] if results else {"devices": []}
-        axeos_results = list(results[1:])
+        nmminer_data = results[idx] if results else {"devices": []}
+        idx += 1
     else:
         nmminer_data = {"devices": []}
-        axeos_results = list(results)
+
+    nerdminer_results = list(results[idx:idx + len(nerdminer_devices)])
+    idx += len(nerdminer_devices)
+    sparkminer_results = list(results[idx:idx + len(sparkminer_devices)])
+    idx += len(sparkminer_devices)
+    axeos_results = list(results[idx:])
 
     axeos_data = {"devices": axeos_results}
 
@@ -1332,6 +1469,10 @@ async def get_dashboard():
         if not d.get("online", True):
             key = f"nmminer:{d.get('ip', '')}"
             d["_offline_since"] = device_state.get(key, {}).get("offline_since")
+    for d in nerdminer_results + sparkminer_results:
+        if not d.get("_online", True):
+            key = f"{d.get('_type', 'nerdminer')}:{d.get('_ip', '')}"
+            d["_offline_since"] = device_state.get(key, {}).get("offline_since")
     for d in axeos_data.get("devices", []):
         if not d.get("_online", True):
             key = f"axeos:{d.get('_ip', '')}"
@@ -1342,6 +1483,8 @@ async def get_dashboard():
 
     return {
         "nmminer": nmminer_data,
+        "nerdminer": {"devices": nerdminer_results},
+        "sparkminer": {"devices": sparkminer_results},
         "axeos": axeos_data,
         "unread_alerts": unread,
         "config": config,

@@ -381,7 +381,7 @@
   </div>
   <nav>
     <a id="nav-dashboard"      onclick="showPage('dashboard')">      <span class="nav-icon">📊</span> Dashboard</a>
-    <a id="nav-nmminer"        onclick="showPage('nmminer')">        <span class="nav-icon">⛏️</span> NMMiner</a>
+    <a id="nav-nmminer"        onclick="showPage('nmminer')">        <span class="nav-icon">⛏️</span> Solo Miners</a>
     <a id="nav-axeos"          onclick="showPage('axeos')">          <span class="nav-icon">🔧</span> BitAxe / NerdAxe</a>
     <a id="nav-pool"           onclick="showPage('pool')">           <span class="nav-icon">🌐</span> Pool</a>
     <a id="nav-settings"       onclick="showPage('settings')">       <span class="nav-icon">⚙️</span> Settings</a>
@@ -474,6 +474,16 @@
         <div id="nm-map-view" class="minimap" style="display:none"></div>
       </div>
 
+      <div class="card card-solo" id="dash-solo-card" style="display:none">
+        <div class="card-title mb-0">NerdMiner / SparkMiner</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name / IP</th><th>Type</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>BestDiff</th><th>Uptime</th></tr></thead>
+            <tbody id="dash-solo-rows"><tr><td colspan="8" class="empty text-muted">No data</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card card-ax">
         <div class="section-header">
           <div class="card-title mb-0">BitAxe / NerdAxe</div>
@@ -551,6 +561,46 @@
           <table>
             <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th data-picker="skip">Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── NerdMiner v2 ── -->
+      <div class="card">
+        <div class="card-title">NerdMiner v2 Devices</div>
+        <div id="nerdminer-summary" class="group-summary" style="display:none">
+          <div class="sum-chip"><div class="sum-chip-val" id="nerdminer-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
+          <div class="sum-chip"><div class="sum-chip-val sum-ok" id="nerdminer-sum-online">–</div><div class="sum-chip-label">Online</div></div>
+        </div>
+        <div class="filter-bar">
+          <input type="search" id="nerdminer-filter" placeholder="🔍 IP, Hostname, Pool …" oninput="filterTable('nerdminer-rows','nerdminer-filter','nerdminer-filter-count')">
+          <span class="filter-count" id="nerdminer-filter-count"></span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('nerdminer-filter').value='';filterTable('nerdminer-rows','nerdminer-filter','nerdminer-filter-count')">✕</button>
+        </div>
+        <div class="table-wrap table-wrap-scroll">
+          <table>
+            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th></tr></thead>
+            <tbody id="nerdminer-rows"><tr><td colspan="11" class="empty text-muted">No data</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SparkMiner ── -->
+      <div class="card">
+        <div class="card-title">SparkMiner Devices</div>
+        <div id="sparkminer-summary" class="group-summary" style="display:none">
+          <div class="sum-chip"><div class="sum-chip-val" id="sparkminer-sum-hr">–</div><div class="sum-chip-label">Total Hashrate</div></div>
+          <div class="sum-chip"><div class="sum-chip-val sum-ok" id="sparkminer-sum-online">–</div><div class="sum-chip-label">Online</div></div>
+        </div>
+        <div class="filter-bar">
+          <input type="search" id="sparkminer-filter" placeholder="🔍 IP, Hostname, Pool …" oninput="filterTable('sparkminer-rows','sparkminer-filter','sparkminer-filter-count')">
+          <span class="filter-count" id="sparkminer-filter-count"></span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sparkminer-filter').value='';filterTable('sparkminer-rows','sparkminer-filter','sparkminer-filter-count')">✕</button>
+        </div>
+        <div class="table-wrap table-wrap-scroll">
+          <table>
+            <thead><tr><th>IP</th><th>Name / Miner</th><th>Status</th><th>Hashrate</th><th>Temp</th><th>Pool</th><th>Wallet</th><th>BestDiff</th><th>Templates</th><th>Uptime</th><th>Version</th></tr></thead>
+            <tbody id="sparkminer-rows"><tr><td colspan="11" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -679,6 +729,36 @@
           <li class="text-muted" style="padding:8px">No devices configured</li>
         </ul>
         <div id="nm-discover-list" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title mb-0">NerdMiner v2</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="addSoloMinerDevice('nerdminer')">+ Add Device</button>
+            <button class="btn btn-secondary btn-sm" onclick="scanSoloMiners()">📶 Auto Scan Network</button>
+          </div>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin:8px 0 8px">ESP32-basierter Bitcoin Solo-Miner. Gibt Stats via <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">GET /stats</code> aus.</p>
+        <ul class="device-list" id="nerdminer-device-list">
+          <li class="text-muted" style="padding:8px">No devices configured</li>
+        </ul>
+        <div id="nerdminer-discover-list" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title mb-0">SparkMiner</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="addSoloMinerDevice('sparkminer')">+ Add Device</button>
+            <button class="btn btn-secondary btn-sm" onclick="scanSoloMiners()">📶 Auto Scan Network</button>
+          </div>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin:8px 0 8px">ESP32-basierter Bitcoin Solo-Miner. Gibt Stats via <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">GET /stats</code> aus.</p>
+        <ul class="device-list" id="sparkminer-device-list">
+          <li class="text-muted" style="padding:8px">No devices configured</li>
+        </ul>
+        <div id="sparkminer-discover-list" style="margin-top:8px"></div>
       </div>
 
       <div class="card">
@@ -1556,6 +1636,10 @@
     if (currentPage === 'nmminer' && !document.getElementById('nmedit-overlay')?.classList.contains('open')) {
       const nmDevs = msg.nmminer?.devices;
       if (Array.isArray(nmDevs)) renderNmRows(nmDevs);
+      const nerdDevs = msg.nerdminer?.devices;
+      if (Array.isArray(nerdDevs)) renderSoloMinerRows('nerdminer', nerdDevs);
+      const sparkDevs = msg.sparkminer?.devices;
+      if (Array.isArray(sparkDevs)) renderSoloMinerRows('sparkminer', sparkDevs);
     }
     if (currentPage === 'axeos' && !document.getElementById('axedit-overlay')?.classList.contains('open')) {
       const axDevs = msg.axeos?.devices;
@@ -1648,6 +1732,37 @@
     return url.replace(/^stratum\+(?:tcp|ssl|tls):\/\//i, '');
   }
 
+  /**
+   * Generate a pool dashboard link from pool URL + worker address.
+   * The base wallet is extracted by stripping everything after the first dot.
+   * Returns an <a> tag string or empty string if pool is not recognised.
+   */
+  function poolPageLink(poolUrl, workerAddress) {
+    if (!poolUrl || !workerAddress) return '';
+    // Extract hostname from stratum URL (stratum+tcp://host:port or host:port)
+    const hostMatch = poolUrl.match(/(?:stratum\+(?:tcp|ssl|tls):\/\/|stratum:\/\/)?([^/:]+)/i);
+    if (!hostMatch) return '';
+    const host = hostMatch[1].toLowerCase();
+    // Base wallet = everything before the first dot in the worker string
+    const wallet = workerAddress.split('.')[0];
+    if (!wallet) return '';
+
+    let href = '';
+    if (host.endsWith('hmpool.io')) {
+      // e.g. digi.hmpool.io → /miner.html?address=wallet
+      href = `https://${host}/miner.html?address=${encodeURIComponent(wallet)}`;
+    } else if (host.endsWith('ckpool.org')) {
+      // e.g. eusolostats.ckpool.org → /users/wallet
+      href = `https://${host}/users/${encodeURIComponent(wallet)}`;
+    } else if (host === 'atlaspool.io' || host.endsWith('.atlaspool.io')) {
+      href = `https://atlaspool.io/dashboard.html?wallet=${encodeURIComponent(wallet)}`;
+    } else if (host.endsWith('public-pool.io') || host === 'public-pool.io') {
+      href = `https://${host}/#/app/${encodeURIComponent(wallet)}`;
+    }
+    if (!href) return '';
+    return `<a href="${href}" target="_blank" rel="noopener" title="Pool Dashboard öffnen" style="margin-left:4px;color:var(--accent);font-size:10px;text-decoration:none" onclick="event.stopPropagation()">↗</a>`;
+  }
+
   // Rich pool cell: shows active/fallback indicator + hover tooltip with full details
   function fmtPoolCell(d, type = 'axeos') {
     if (type === 'nmminer') {
@@ -1659,7 +1774,21 @@
         worker    ? `Worker:  ${worker}`    : '',
         secondary ? `Backup:  ${secondary}` : '',
       ].filter(Boolean).join('\n');
-      return `<span title="${tip.replace(/"/g,'&quot;')}">${fmtPool(primary)}</span>`;
+      return `<span title="${tip.replace(/"/g,'&quot;')}">${fmtPool(primary)}</span>${poolPageLink(primary, worker)}`;
+    }
+    if (type === 'solominer') {
+      // NerdMiner / SparkMiner: poolUrl + walletAddress
+      const poolUrl  = d.poolUrl  || d.pool || '';
+      const poolPort = d.poolPort ? `:${d.poolPort}` : '';
+      const wallet   = d.walletAddress || d.wallet || '';
+      const display  = poolUrl ? `${poolUrl}${poolPort}` : '–';
+      const tip = [
+        poolUrl  ? `Pool: ${display}` : '',
+        wallet   ? `Wallet: ${wallet}` : '',
+      ].filter(Boolean).join('\n');
+      // Build stratum-style URL for poolPageLink
+      const stratumUrl = poolUrl ? `stratum+tcp://${poolUrl}` : '';
+      return `<span title="${tip.replace(/"/g,'&quot;')}">${display}</span>${poolPageLink(stratumUrl, wallet)}`;
     }
     // AxeOS
     const primary  = d.stratumURL  || '';
@@ -1674,10 +1803,13 @@
       fallback ? `Fallback: ${fallback}${fPort}` : '',
       using    ? '⚠ Currently using fallback!' : '',
     ].filter(Boolean).join('\n');
+    const activePool   = using ? (fallback || primary) : primary;
+    const activePort   = using ? fPort : pPort;
+    const activeWorker = worker;
     const display = using
       ? `<span style="color:var(--warning)" title="${tip.replace(/"/g,'&quot;')}">⚠ ${fmtPool(fallback || primary)}${fPort}</span>`
       : `<span title="${tip.replace(/"/g,'&quot;')}">${fmtPool(primary)}${pPort}</span>`;
-    return display;
+    return display + poolPageLink(activePool, activeWorker);
   }
 
   function fmtHr(v) {
@@ -1879,8 +2011,11 @@
 
   function renderDashboard(data) {
     const tMax = currentConfig.thresholds?.temp_max || 70;
-    const nmDevs = Array.isArray(data.nmminer) ? data.nmminer : (data.nmminer?.devices || []);
-    const axDevs = data.axeos?.devices || [];
+    const nmDevs   = Array.isArray(data.nmminer) ? data.nmminer : (data.nmminer?.devices || []);
+    const nerdDevs = data.nerdminer?.devices || [];
+    const sparkDevs = data.sparkminer?.devices || [];
+    const soloDevs = [...nerdDevs, ...sparkDevs];
+    const axDevs   = data.axeos?.devices || [];
 
     let totalHr = 0, onlineCnt = 0, maxTemp = 0, totalPower = 0;
 
@@ -1921,6 +2056,39 @@
       }).join('');
     }
 
+    // NerdMiner / SparkMiner rows
+    const soloCard = document.getElementById('dash-solo-card');
+    const soloBody = document.getElementById('dash-solo-rows');
+    if (soloDevs.length === 0) {
+      if (soloCard) soloCard.style.display = 'none';
+    } else {
+      if (soloCard) soloCard.style.display = '';
+      soloBody.innerHTML = soloDevs.map(d => {
+        const online = d._online !== false && d.online !== false;
+        const hr = nmHrToKh(d);
+        const temp = parseFloat(String(d.temp || d.temperature || 0));
+        if (online) { totalHr += hr / 1e6; onlineCnt++; }
+        if (temp > maxTemp) maxTemp = temp;
+        const devType = d._type || 'nerdminer';
+        const typeLabel = devType === 'sparkminer' ? 'SparkMiner' : 'NerdMiner';
+        const poolUrl  = d.poolUrl  || d.pool || '';
+        const poolPort = d.poolPort ? `:${d.poolPort}` : '';
+        const wallet   = d.walletAddress || d.wallet || '';
+        const stratumUrl = poolUrl ? `stratum+tcp://${poolUrl}` : '';
+        const soloUptime = online ? fmtUptime(d.runningTime ?? d.uptime ?? d.uptimeSeconds) : '–';
+        return `<tr data-ip="${d._ip || d.ip}" onclick="navigateToDevice('nmminer','${d._ip || d.ip}')" style="cursor:pointer">
+          <td>${d.hostname || d.minerName || d._name || d._ip || '–'}<br><small class="text-muted">${d._ip || d.ip || ''}</small></td>
+          <td><span style="font-size:11px;color:var(--info)">${typeLabel}</span></td>
+          <td>${fmtStatus(online)}</td>
+          <td>${fmtNmHr(hr)}</td>
+          <td>${fmtTemp(temp, d._temp_max ?? tMax)}</td>
+          <td class="max-w"><small>${poolUrl ? `${poolUrl}${poolPort}` : '–'}${poolPageLink(stratumUrl, wallet)}</small></td>
+          <td><small>${fmtDiff(d.bestDiff || d.best_diff)}</small></td>
+          <td>${soloUptime}</td>
+        </tr>`;
+      }).join('');
+    }
+
     // AxeOS rows
     const axBody = document.getElementById('dash-ax-rows');
     if (axDevs.length === 0) {
@@ -1956,7 +2124,7 @@
       }).join('');
     }
 
-    const total = nmDevs.length + axDevs.length;
+    const total = nmDevs.length + soloDevs.length + axDevs.length;
     document.getElementById('stat-hashrate').textContent = totalHr >= 1000
       ? (totalHr / 1000).toFixed(3) + ' TH'
       : totalHr.toFixed(2);
@@ -2021,13 +2189,84 @@
       if (devs.length === 0 && data._error) {
         tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">NMMiner unreachable: ${data._error}</td></tr>`;
         appendLog('critical', `NMMiner swarm error: ${data._error}`, 'nmminer');
-        return;
+      } else {
+        renderNmRows(devs);
       }
-      renderNmRows(devs);
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="19" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
       appendLog('critical', `NMMiner load failed: ${e.message}`, 'nmminer');
     }
+    // Also load NerdMiner and SparkMiner
+    loadSoloMinerPage('nerdminer');
+    loadSoloMinerPage('sparkminer');
+  }
+
+  async function loadSoloMinerPage(type) {
+    const tbodyId = type === 'sparkminer' ? 'sparkminer-rows' : 'nerdminer-rows';
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="11" class="empty text-muted">Loading…</td></tr>';
+    try {
+      const endpoint = type === 'sparkminer' ? '/api/sparkminer/devices' : '/api/nerdminer/devices';
+      const data = await apiFetch(endpoint);
+      renderSoloMinerRows(type, data.devices || []);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="11" class="empty" style="color:var(--danger)">${e.message}</td></tr>`;
+    }
+  }
+
+  function renderSoloMinerRows(type, devs) {
+    const tbodyId   = type === 'sparkminer' ? 'sparkminer-rows'   : 'nerdminer-rows';
+    const summaryId = type === 'sparkminer' ? 'sparkminer-summary' : 'nerdminer-summary';
+    const sumHrId   = type === 'sparkminer' ? 'sparkminer-sum-hr'  : 'nerdminer-sum-hr';
+    const sumOnId   = type === 'sparkminer' ? 'sparkminer-sum-online' : 'nerdminer-sum-online';
+    const filterId  = type === 'sparkminer' ? 'sparkminer-filter' : 'nerdminer-filter';
+    const countId   = type === 'sparkminer' ? 'sparkminer-filter-count' : 'nerdminer-filter-count';
+    const colSpan   = 11;
+    const tbody   = document.getElementById(tbodyId);
+    const summary = document.getElementById(summaryId);
+    const tMax    = currentConfig.thresholds?.temp_max || 70;
+    if (!devs || devs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty text-muted">No ${type === 'sparkminer' ? 'SparkMiner' : 'NerdMiner'} configured</td></tr>`;
+      if (summary) summary.style.display = 'none';
+      return;
+    }
+    let totalKh = 0, onlineCnt = 0;
+    tbody.innerHTML = devs.map(d => {
+      const online   = d._online !== false && d.online !== false;
+      const hr       = nmHrToKh(d);
+      const temp     = parseFloat(String(d.temp || d.temperature || 0));
+      const poolUrl  = d.poolUrl  || d.pool || '';
+      const poolPort = d.poolPort ? `:${d.poolPort}` : '';
+      const wallet   = d.walletAddress || d.wallet || '';
+      const best     = d.bestDiff || d.best_diff || '–';
+      const tmpl     = d.templates ?? d.hashes ?? '–';
+      const uptime   = d.runningTime ?? d.uptime ?? d.uptimeSeconds;
+      if (online) { totalKh += hr; onlineCnt++; }
+      // Build stratum URL for poolPageLink
+      const stratumUrl = poolUrl ? `stratum+tcp://${poolUrl}` : '';
+      const poolDisplay = poolUrl ? `${poolUrl}${poolPort}` : '–';
+      const poolLink = poolPageLink(stratumUrl, wallet);
+      return `<tr data-ip="${d._ip || d.ip}">
+        <td><span class="copy-ip" onclick="copyIP('${d._ip || d.ip}')" title="Copy IP">${d._ip || d.ip || '–'}</span></td>
+        <td><small>${d.hostname || d.minerName || d._name || '–'}</small></td>
+        <td>${fmtStatus(online)}</td>
+        <td>${fmtNmHr(hr)}</td>
+        <td>${fmtTemp(temp, d._temp_max ?? tMax)}</td>
+        <td class="max-w"><small>${poolDisplay}${poolLink}</small></td>
+        <td><small class="text-muted" style="font-size:10px;word-break:break-all">${wallet ? wallet.substring(0, 20) + (wallet.length > 20 ? '…' : '') : '–'}</small></td>
+        <td><small>${fmtDiff(best)}</small></td>
+        <td><small class="text-muted">${tmpl}</small></td>
+        <td><small>${fmtUptime(uptime)}</small></td>
+        <td><small class="text-muted">${d.version || '–'}</small></td>
+      </tr>`;
+    }).join('');
+    if (summary) {
+      document.getElementById(sumHrId).textContent = fmtNmHr(totalKh);
+      document.getElementById(sumOnId).textContent = `${onlineCnt} / ${devs.length}`;
+      summary.style.display = 'flex';
+    }
+    filterTable(tbodyId, filterId, countId);
   }
 
   function renderNmRows(devs) {
@@ -2447,13 +2686,34 @@
       rows.push(`<tr>
         <td>${d.hostname || d.ip || '–'}</td>
         <td><span style="font-size:11px;color:var(--accent)">nmminer</span></td>
-        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${pool}">${pool}</td>
+        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${pool}">${pool}${poolPageLink(pool, worker)}</td>
         <td style="font-size:11px">${worker}</td>
         <td><span style="color:var(--success);font-size:11px">Primary</span></td>
         <td>${sharesOk}</td>
         <td>${sharesErr}</td>
         <td>${fmtShareAcc(sharesOk, sharesErr)}</td>
       </tr>`);
+    }
+    // NerdMiner / SparkMiner devices
+    for (const [key, label, color] of [['nerdminer', 'NerdMiner', 'var(--info)'], ['sparkminer', 'SparkMiner', 'var(--warning)']]) {
+      for (const d of (data[key]?.devices || [])) {
+        if (!d._online && d.online === false) continue;
+        const poolUrl = d.poolUrl || d.pool || '';
+        const poolPort = d.poolPort ? `:${d.poolPort}` : '';
+        const pool = poolUrl ? `${poolUrl}${poolPort}` : '–';
+        const wallet = d.walletAddress || d.wallet || '–';
+        const stratumUrl = poolUrl ? `stratum+tcp://${poolUrl}` : '';
+        rows.push(`<tr>
+          <td>${d.hostname || d.minerName || d._name || d._ip || '–'}</td>
+          <td><span style="font-size:11px;color:${color}">${label}</span></td>
+          <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${pool}">${pool}${poolPageLink(stratumUrl, wallet)}</td>
+          <td style="font-size:11px">${wallet}</td>
+          <td><span style="color:var(--success);font-size:11px">Primary</span></td>
+          <td>–</td>
+          <td>–</td>
+          <td>–</td>
+        </tr>`);
+      }
     }
     if (rows.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" class="empty text-muted">No online devices found</td></tr>';
@@ -2744,6 +3004,8 @@
       document.getElementById('s-ws-day').value = ws.day || 'monday';
       document.getElementById('s-ws-time').value = ws.time || '08:00';
       renderNmDeviceList(cfg.nmminer_devices || []);
+      renderSoloMinerDeviceList('nerdminer', cfg.nerdminer_devices || []);
+      renderSoloMinerDeviceList('sparkminer', cfg.sparkminer_devices || []);
       renderAxeDeviceList(cfg.axeos_devices || []);
     } catch (e) {
       toast('Failed to load settings', 'error');
@@ -2911,6 +3173,102 @@
     devs.splice(i, 1);
     currentConfig.axeos_devices = devs;
     renderAxeDeviceList(devs);
+  }
+
+  // ── NerdMiner / SparkMiner Settings ─────────────────────────────────────────
+
+  function renderSoloMinerDeviceList(type, devs) {
+    const listId = type === 'sparkminer' ? 'sparkminer-device-list' : 'nerdminer-device-list';
+    const list = document.getElementById(listId);
+    if (!list) return;
+    if (!devs || devs.length === 0) {
+      list.innerHTML = '<li class="text-muted" style="padding:8px">No devices configured</li>';
+      return;
+    }
+    list.innerHTML = devs.map((d, i) => `
+      <li class="device-item">
+        <div class="device-item-info">
+          <span class="device-item-name">${d.name || d.ip}</span>
+          <span class="device-item-ip">${d.ip}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeSoloMinerDevice('${type}',${i})">✕</button>
+      </li>`).join('');
+  }
+
+  function addSoloMinerDevice(type) {
+    const ip   = prompt('IP address:');  if (!ip) return;
+    const name = prompt('Name:') || ip;
+    const key  = type === 'sparkminer' ? 'sparkminer_devices' : 'nerdminer_devices';
+    const devs = currentConfig[key] || [];
+    devs.push({ ip: ip.trim(), name: name.trim(), type });
+    currentConfig[key] = devs;
+    renderSoloMinerDeviceList(type, devs);
+  }
+
+  function removeSoloMinerDevice(type, i) {
+    const key  = type === 'sparkminer' ? 'sparkminer_devices' : 'nerdminer_devices';
+    const devs = currentConfig[key] || [];
+    devs.splice(i, 1);
+    currentConfig[key] = devs;
+    renderSoloMinerDeviceList(type, devs);
+  }
+
+  async function scanSoloMiners() {
+    const nmOut = document.getElementById('nerdminer-discover-list');
+    const smOut = document.getElementById('sparkminer-discover-list');
+    if (nmOut) nmOut.innerHTML = '<p class="text-muted" style="font-size:12px">Scanning /24 subnet — up to 10 seconds…</p>';
+    if (smOut) smOut.innerHTML = '';
+    try {
+      const result = await apiFetch('/api/solominer/scan');
+      const found  = result.found || [];
+      const nerd   = found.filter(d => d.type === 'nerdminer');
+      const spark  = found.filter(d => d.type === 'sparkminer');
+
+      _renderSoloDiscoverResults(nmOut, 'nerdminer', nerd, result.subnet || '');
+      _renderSoloDiscoverResults(smOut, 'sparkminer', spark, result.subnet || '');
+    } catch (e) {
+      if (nmOut) nmOut.innerHTML = `<p style="color:var(--danger);font-size:13px">Scan error: ${e.message}</p>`;
+    }
+  }
+
+  function _renderSoloDiscoverResults(out, type, devs, subnet) {
+    if (!out) return;
+    if (devs.length === 0) {
+      out.innerHTML = `<p class="text-muted" style="font-size:13px">No ${type === 'sparkminer' ? 'SparkMiner' : 'NerdMiner'} found${subnet ? ' on ' + subnet : ''}.</p>`;
+      return;
+    }
+    const key = type === 'sparkminer' ? 'sparkminer_devices' : 'nerdminer_devices';
+    const existingIps = new Set((currentConfig[key] || []).map(d => d.ip));
+    out.innerHTML = `<p class="text-muted" style="font-size:12px;margin-bottom:6px">Found ${devs.length} device(s):</p>` +
+      devs.map(d => {
+        const already = existingIps.has(d.ip);
+        return `<div class="pool-dev-item" style="margin-bottom:4px">
+          <input type="checkbox" id="solo-disc-${type}-${d.ip}" value="${d.ip}" data-name="${d.name || d.ip}" data-type="${type}" checked>
+          <label for="solo-disc-${type}-${d.ip}" style="flex:1">${d.name || d.ip}
+            <span class="pool-dev-meta">${d.ip} · ${d.hashrate || '?'}${already ? ' · already saved' : ''}</span>
+          </label>
+        </div>`;
+      }).join('');
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.style.marginTop = '10px';
+    btn.textContent = '⬇ Import Selected';
+    btn.onclick = () => {
+      const checked = [...out.querySelectorAll('input[type=checkbox]:checked')];
+      const existing = currentConfig[key] || [];
+      const seen = new Set(existing.map(d => d.ip));
+      checked.forEach(cb => {
+        if (!seen.has(cb.value)) {
+          existing.push({ ip: cb.value, name: cb.dataset.name || cb.value, type });
+          seen.add(cb.value);
+        }
+      });
+      currentConfig[key] = existing;
+      renderSoloMinerDeviceList(type, existing);
+      out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${existing.length} device(s) imported. Click 💾 Save to persist.</p>`;
+      toast(`${checked.length} device(s) imported`, 'success');
+    };
+    out.appendChild(btn);
   }
 
   async function scanAxeNetwork() {
