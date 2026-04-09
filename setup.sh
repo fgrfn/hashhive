@@ -56,6 +56,38 @@ echo "✓  Dependencies installed."
 echo ""
 read -rp "Enable autostart as systemd service? [y/N] " answer
 
+# ── HTTPS option ─────────────────────────────────────────────────────────────
+echo ""
+read -rp "Enable HTTPS? (self-signed certificate will be generated) [y/N] " https_answer
+
+SSL_ARGS=""
+PROTOCOL="http"
+PORT=8000
+CERT_DIR="$SCRIPT_DIR/backend/data/ssl"
+
+if [[ "$https_answer" =~ ^[jJyY] ]]; then
+    read -rp "Port for HTTPS [8443]: " https_port
+    PORT="${https_port:-8443}"
+
+    CERT_FILE="$CERT_DIR/cert.pem"
+    KEY_FILE="$CERT_DIR/key.pem"
+
+    if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+        echo "Generating self-signed certificate …"
+        mkdir -p "$CERT_DIR"
+        "$VENV_DIR/bin/python" "$BACKEND_DIR/gen_cert.py" "$CERT_FILE" "$KEY_FILE"
+    else
+        echo "✓  Reusing existing certificate in $CERT_DIR"
+    fi
+
+    SSL_ARGS="--ssl-certfile $CERT_FILE --ssl-keyfile $KEY_FILE"
+    PROTOCOL="https"
+    echo "✓  HTTPS configured (port $PORT)."
+else
+    read -rp "Port [8000]: " http_port
+    PORT="${http_port:-8000}"
+fi
+
 if [[ "$answer" =~ ^[jJyY] ]]; then
     USER_NAME="$(whoami)"
     SERVICE_FILE="/etc/systemd/system/hashhive.service"
@@ -68,7 +100,7 @@ After=network.target
 Type=simple
 User=$USER_NAME
 WorkingDirectory=$BACKEND_DIR
-ExecStart=$UVICORN main:app --host 0.0.0.0 --port 8000
+ExecStart=$UVICORN main:app --host 0.0.0.0 --port $PORT $SSL_ARGS
 Restart=on-failure
 RestartSec=5
 
@@ -98,9 +130,18 @@ echo ""
 echo "══════════════════════════════════════════════════════════════"
 echo " Start manually:"
 echo "   cd backend"
-echo "   ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+if [ -n "$SSL_ARGS" ]; then
+echo "   ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT $SSL_ARGS"
+else
+echo "   ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT"
+fi
 echo ""
-echo " Dashboard: http://localhost:8000"
-echo " API-Docs:  http://localhost:8000/docs"
+echo " Dashboard: $PROTOCOL://localhost:$PORT"
+echo " API-Docs:  $PROTOCOL://localhost:$PORT/docs"
+if [[ "$https_answer" =~ ^[jJyY] ]]; then
+echo ""
+echo " NOTE: Self-signed cert – import $CERT_FILE into your browser/OS"
+echo "       trust store to remove the security warning."
+fi
 echo "══════════════════════════════════════════════════════════════"
 echo ""
