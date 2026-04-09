@@ -1752,8 +1752,8 @@
       // e.g. digi.hmpool.io → /miner.html?address=wallet
       href = `https://${host}/miner.html?address=${encodeURIComponent(wallet)}`;
     } else if (host.endsWith('ckpool.org')) {
-      // e.g. eusolostats.ckpool.org → /users/wallet
-      href = `https://${host}/users/${encodeURIComponent(wallet)}`;
+      // Stats page is always at eusolostats.ckpool.org
+      href = 'https://eusolostats.ckpool.org/';
     } else if (host === 'atlaspool.io' || host.endsWith('.atlaspool.io')) {
       href = `https://atlaspool.io/dashboard.html?wallet=${encodeURIComponent(wallet)}`;
     } else if (host.endsWith('public-pool.io') || host === 'public-pool.io') {
