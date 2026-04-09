@@ -135,7 +135,13 @@ def _fmt_diff(val) -> str:
     return f"{n:.0f}"
 
 
-async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> list[dict]:
+async def check_alerts(
+    config: dict,
+    nmminer_data: dict,
+    axeos_data: dict,
+    nerdminer_data: dict | None = None,
+    sparkminer_data: dict | None = None,
+) -> list[dict]:
     network_difficulty = await _get_network_difficulty()
     previous_state: dict = load_json(DEVICE_STATE_FILE, {})
     thresholds = config.get("thresholds", {})
@@ -143,6 +149,7 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
     vr_temp_max: float = float(thresholds.get("vr_temp_max", 85))
     hashrate_min: float = float(thresholds.get("hashrate_min", 0))
     error_rate_max: float = float(thresholds.get("error_rate_max", 2.0))
+    rssi_min: int = int(thresholds.get("rssi_min", -75))
     grace_seconds: float = float(config.get("offline_grace_minutes", 2)) * 60
     cooldown_seconds: float = float(config.get("alert_cooldown_minutes", 30)) * 60
 
@@ -225,6 +232,128 @@ async def check_alerts(config: dict, nmminer_data: dict, axeos_data: dict) -> li
                 elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
                     new_alerts.append(_make_alert(key, "pool_connected", "info", f"NMMiner {ip}: pool connected"))
                     _mark_alerted(current_state[key], "pool_connected")
+                # ── RSSI ──────────────────────────────────────────────────────
+                rssi = device.get("rssi")
+                if rssi is not None:
+                    try:
+                        rssi_val = int(float(rssi))
+                        current_state[key]["rssi"] = rssi_val
+                        if rssi_val < rssi_min and _should_alert(prev, "rssi_low", cooldown_seconds) and _type_enabled("rssi_low"):
+                            new_alerts.append(_make_alert(key, "rssi_low", "warning",
+                                                          f"NMMiner {ip}: weak WiFi signal {rssi_val} dBm (min {rssi_min} dBm)"))
+                            _mark_alerted(current_state[key], "rssi_low")
+                    except (TypeError, ValueError):
+                        pass
+
+    # ── NerdMiner / SparkMiner devices ───────────────────────────────────────
+    for solo_data, dev_prefix in [
+        (nerdminer_data or {}, "nerdminer"),
+        (sparkminer_data or {}, "sparkminer"),
+    ]:
+        for device in solo_data.get("devices", []):
+            ip = device.get("_ip", "") or device.get("ip", "")
+            if not ip:
+                continue
+            name = device.get("hostname") or device.get("minerName") or device.get("_name") or ip
+            key = f"{dev_prefix}:{ip}"
+            is_online = bool(device.get("_online", False) or device.get("online", False))
+            temp = float(device.get("temp") or device.get("temperature") or 0)
+            pool = str(device.get("poolUrl") or device.get("pool") or "")
+            best_diff = device.get("bestDiff") or device.get("best_diff")
+            valid_blocks = device.get("validBlocks") or device.get("valid_blocks") or device.get("blockFound")
+            rssi_raw = device.get("rssi")
+            dev_temp_max = device.get("_temp_max")
+            effective_temp_max = float(dev_temp_max) if dev_temp_max is not None else temp_max
+
+            prev = previous_state.get(key, {})
+            was_online = prev.get("online", True)
+
+            current_state[key] = {
+                "online": is_online,
+                "temp": temp,
+                "pool": pool,
+                "best_diff": best_diff,
+                "valid_blocks": valid_blocks,
+                "last_alerted": prev.get("last_alerted", {}),
+            }
+
+            # ── Offline / Online ─────────────────────────────────────────────
+            if was_online and not is_online:
+                current_state[key]["offline_since"] = _now_iso()
+                current_state[key]["offline_alerted"] = False
+            elif not was_online and not is_online:
+                offline_since = prev.get("offline_since", _now_iso())
+                alerted = prev.get("offline_alerted", False)
+                current_state[key]["offline_since"] = offline_since
+                current_state[key]["offline_alerted"] = alerted
+                if not alerted:
+                    try:
+                        elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(offline_since)).total_seconds()
+                        if elapsed >= grace_seconds and _type_enabled("offline"):
+                            new_alerts.append(_make_alert(key, "offline", "critical", f"{name} ({ip}) is offline"))
+                            current_state[key]["offline_alerted"] = True
+                    except Exception:
+                        pass
+            elif not was_online and is_online:
+                if prev.get("offline_alerted", False) and _type_enabled("online"):
+                    new_alerts.append(_make_alert(key, "online", "info", f"{name} ({ip}) is back online"))
+
+            if is_online:
+                # ── Temperature ──────────────────────────────────────────────
+                if temp > effective_temp_max and _should_alert(prev, "temp_high", cooldown_seconds) and _type_enabled("temp_high"):
+                    new_alerts.append(_make_alert(key, "temp_high", "critical",
+                                                  f"{name}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C"))
+                    _mark_alerted(current_state[key], "temp_high")
+
+                # ── Pool ─────────────────────────────────────────────────────
+                prev_pool = prev.get("pool", "")
+                if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
+                    new_alerts.append(_make_alert(key, "pool_lost", "critical", f"{name}: pool connection lost"))
+                    _mark_alerted(current_state[key], "pool_lost")
+                elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
+                    new_alerts.append(_make_alert(key, "pool_connected", "info", f"{name}: pool connected"))
+                    _mark_alerted(current_state[key], "pool_connected")
+
+                # ── Block found / Best diff ───────────────────────────────────
+                prev_blocks = prev.get("valid_blocks")
+                block_via_counter = (
+                    valid_blocks is not None
+                    and prev_blocks is not None
+                    and int(valid_blocks) > int(prev_blocks)
+                )
+                prev_best = prev.get("best_diff")
+                best_diff_increased = (
+                    best_diff is not None
+                    and prev_best is not None
+                    and float(best_diff) > float(prev_best)
+                )
+                block_via_diff = (
+                    best_diff_increased
+                    and network_difficulty is not None
+                    and float(best_diff) >= network_difficulty
+                )
+                if (block_via_counter or block_via_diff) and _type_enabled("block_found"):
+                    diff_label = _fmt_diff(best_diff) if best_diff is not None else "?"
+                    net_label = _fmt_diff(network_difficulty) if network_difficulty else "?"
+                    new_alerts.append(_make_alert(key, "block_found", "critical",
+                                                  f"🏆 {name} FOUND A BLOCK! "
+                                                  f"Diff: {diff_label} (network: {net_label}) 🎉🎉🎉"))
+                elif best_diff_increased and _type_enabled("new_best_diff"):
+                    new_alerts.append(_make_alert(key, "new_best_diff", "info",
+                                                  f"{name}: new best difficulty! {_fmt_diff(best_diff)} "
+                                                  f"(was {_fmt_diff(prev_best)}) 🎉"))
+
+                # ── RSSI ──────────────────────────────────────────────────────
+                if rssi_raw is not None:
+                    try:
+                        rssi_val = int(float(rssi_raw))
+                        current_state[key]["rssi"] = rssi_val
+                        if rssi_val < rssi_min and _should_alert(prev, "rssi_low", cooldown_seconds) and _type_enabled("rssi_low"):
+                            new_alerts.append(_make_alert(key, "rssi_low", "warning",
+                                                          f"{name}: weak WiFi signal {rssi_val} dBm (min {rssi_min} dBm)"))
+                            _mark_alerted(current_state[key], "rssi_low")
+                    except (TypeError, ValueError):
+                        pass
 
     # ── AxeOS devices ────────────────────────────────────────────────────────
     for device in axeos_data.get("devices", []):
@@ -480,6 +609,7 @@ _KIND_LABEL = {
     "device_rebooted":   "Unexpected Reboot",
     "new_best_diff":     "New Best Difficulty",
     "block_found":       "⚡ BLOCK FOUND",
+    "rssi_low":          "Weak WiFi Signal",
 }
 
 
