@@ -564,6 +564,8 @@ async def check_alerts(
             notifications.get("telegram_enabled"),
             notifications.get("discord_enabled"),
             notifications.get("gotify_enabled"),
+            notifications.get("ntfy_enabled"),
+            notifications.get("pushover_enabled"),
         ]):
             asyncio.create_task(_send_notifications(notifications, new_alerts))
 
@@ -656,6 +658,7 @@ def _gotify_message(alerts: list[dict]) -> str:
 async def _send_notifications(notifications: dict, alerts: list[dict]) -> None:
     has_critical = any(a["severity"] == "critical" for a in alerts)
     has_block = any(a.get("kind") == "block_found" for a in alerts)
+    title = "🏆 BLOCK FOUND!" if has_block else "🐝 HashHive Alert"
 
     async with httpx.AsyncClient(timeout=10) as client:
         if notifications.get("telegram_enabled") and notifications.get("telegram_token"):
@@ -692,11 +695,49 @@ async def _send_notifications(notifications: dict, alerts: list[dict]) -> None:
                 await client.post(
                     f"{url}/message",
                     json={
-                        "title": "🐝 HashHive Alert",
+                        "title": title,
                         "message": _gotify_message(alerts),
                         "priority": priority,
                     },
                     headers={"X-Gotify-Key": token},
                 )
+            except Exception:
+                pass
+
+        if notifications.get("ntfy_enabled") and notifications.get("ntfy_topic"):
+            ntfy_base = (notifications.get("ntfy_url") or "https://ntfy.sh").rstrip("/")
+            ntfy_topic = notifications["ntfy_topic"].strip()
+            ntfy_token = (notifications.get("ntfy_token") or "").strip()
+            priority = "max" if has_block else ("high" if has_critical else "default")
+            headers: dict[str, str] = {
+                "Title": title,
+                "Priority": priority,
+                "Tags": "pick,axe",
+            }
+            if ntfy_token:
+                headers["Authorization"] = f"Bearer {ntfy_token}"
+            try:
+                await client.post(
+                    f"{ntfy_base}/{ntfy_topic}",
+                    content=_gotify_message(alerts).encode("utf-8"),
+                    headers=headers,
+                )
+            except Exception:
+                pass
+
+        if notifications.get("pushover_enabled") and notifications.get("pushover_user_key") and notifications.get("pushover_app_token"):
+            po_priority = 2 if has_block else (1 if has_critical else 0)
+            payload: dict = {
+                "token":   notifications["pushover_app_token"],
+                "user":    notifications["pushover_user_key"],
+                "message": _gotify_message(alerts),
+                "title":   title,
+                "priority": po_priority,
+            }
+            if po_priority == 2:  # emergency — requires retry + expire
+                payload["retry"] = 60
+                payload["expire"] = 3600
+            try:
+                await client.post("https://api.pushover.net/1/messages.json", data=payload)
             except Exception:
                 pass

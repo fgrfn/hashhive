@@ -1,7 +1,10 @@
 import json
 import asyncio
+import hashlib
 import ipaddress
 import os
+import secrets
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -271,6 +274,13 @@ DEFAULT_CONFIG: dict = {
         "gotify_enabled": False,
         "gotify_url": "",
         "gotify_token": "",
+        "ntfy_enabled": False,
+        "ntfy_url": "https://ntfy.sh",
+        "ntfy_topic": "",
+        "ntfy_token": "",
+        "pushover_enabled": False,
+        "pushover_user_key": "",
+        "pushover_app_token": "",
     },
     "alert_types": {
         "offline": True,
@@ -301,6 +311,19 @@ DEFAULT_CONFIG: dict = {
         "enabled": False,
         "threshold_pct": 50,
         "duration_minutes": 10,
+    },
+    "auto_restart_solo": {
+        "enabled": False,
+        "zero_hr_minutes": 10,
+    },
+    "market": {
+        "enabled": True,
+        "coin_id": "bitcoin",
+        "currency": "eur",
+    },
+    "auth": {
+        "enabled": False,
+        "password_hash": "",
     },
 }
 
@@ -357,7 +380,15 @@ class _WSManager:
 _ws_manager = _WSManager()
 
 # ── Auto-restart state ────────────────────────────────────────────────────────
-_low_hr_since: dict[str, float] = {}  # ip → unix timestamp when low hashrate first detected
+_low_hr_since: dict[str, float] = {}        # AxeOS: ip → ts when low hashrate first seen
+_solo_zero_hr_since: dict[str, float] = {}  # NerdMiner/SparkMiner: ip → ts when hr=0 first seen
+
+# ── Market price cache ────────────────────────────────────────────────────────
+_price_cache: dict = {"ts": 0.0, "data": {}}
+
+# ── Auth sessions ─────────────────────────────────────────────────────────────
+_sessions: dict[str, float] = {}  # token → expiry unix timestamp
+_SESSION_TTL = 86400 * 30         # 30 days
 
 
 async def _check_auto_restart(config: dict, axeos_results: list, client: httpx.AsyncClient) -> None:
@@ -401,6 +432,61 @@ async def _check_auto_restart(config: dict, axeos_results: list, client: httpx.A
                 _low_hr_since.pop(ip, None)
         else:
             _low_hr_since.pop(ip, None)
+
+
+async def _check_auto_restart_solo(
+    config: dict,
+    nerdminer: list,
+    sparkminer: list,
+    client: httpx.AsyncClient,
+) -> None:
+    """Restart NerdMiner/SparkMiner devices whose hashrate has been 0 for too long."""
+    ar = config.get("auto_restart_solo", {})
+    if not ar.get("enabled"):
+        _solo_zero_hr_since.clear()
+        return
+    duration_secs = float(ar.get("zero_hr_minutes") or 10) * 60.0
+    now = time.time()
+    for dev in nerdminer + sparkminer:
+        ip = dev.get("_ip") or dev.get("ip") or ""
+        if not ip or not dev.get("_online"):
+            _solo_zero_hr_since.pop(ip, None)
+            continue
+        # Parse hashrate string like "1.03 MH/s" or numeric 0
+        hr_raw = dev.get("hashRate") or dev.get("hashrate") or 0
+        try:
+            hr = float(str(hr_raw).split()[0])
+        except Exception:
+            hr = 0.0
+        if hr > 0:
+            _solo_zero_hr_since.pop(ip, None)
+            continue
+        if ip not in _solo_zero_hr_since:
+            _solo_zero_hr_since[ip] = now
+            continue
+        if now - _solo_zero_hr_since[ip] >= duration_secs:
+            name = dev.get("hostname") or dev.get("minerName") or dev.get("_name") or ip
+            restarted = False
+            for path in ("/restart", "/api/restart", "/reboot"):
+                try:
+                    resp = await client.post(f"http://{ip}{path}", timeout=5)
+                    if resp.status_code < 400:
+                        restarted = True
+                        break
+                except Exception:
+                    continue
+            if restarted:
+                _append_entry({
+                    "id": f"solo:{ip}:auto-restart:{datetime.now(timezone.utc).isoformat()}",
+                    "device": f"solo:{ip}",
+                    "kind": "auto-restart",
+                    "severity": "warning",
+                    "message": f"Auto-restarted {name} ({ip}): hashrate=0 for >{ar.get('zero_hr_minutes',10)} min",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "read": False,
+                    "source": "nmminer",
+                })
+                _solo_zero_hr_since.pop(ip, None)
 
 
 async def _dashboard_broadcast_loop():
@@ -477,6 +563,9 @@ async def _dashboard_broadcast_loop():
                 try:
                     async with httpx.AsyncClient(timeout=10) as ar_client:
                         await _check_auto_restart(config, axeos_results, ar_client)
+                        await _check_auto_restart_solo(
+                            config, nerdminer_results, sparkminer_results, ar_client
+                        )
                 except Exception:
                     pass
                 payload = json.dumps({
@@ -1635,6 +1724,97 @@ async def get_dashboard():
         "unread_alerts": unread,
         "config": config,
     }
+
+
+@app.get("/api/market/prices")
+async def get_market_prices():
+    """Return cached live coin price from CoinGecko (5-minute cache)."""
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    market = config.get("market", {})
+    coin_id = (market.get("coin_id") or "bitcoin").strip().lower()
+    currency = (market.get("currency") or "eur").strip().lower()
+    now = time.time()
+    cached = _price_cache
+    if now - cached["ts"] < 300 and cached["data"]:
+        return cached["data"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.coingecko.com/api/v3/simple/price",
+                params={"ids": coin_id, "vs_currencies": currency},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        _price_cache["ts"] = now
+        _price_cache["data"] = {"prices": data, "coin_id": coin_id, "currency": currency}
+        return _price_cache["data"]
+    except Exception as e:
+        # Return stale cache rather than error
+        if cached["data"]:
+            return cached["data"]
+        raise HTTPException(status_code=503, detail=f"Price fetch failed: {e}")
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+def _hash_pw(pw: str) -> str:
+    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+
+
+def _session_valid(request: Request) -> bool:
+    token = request.cookies.get("hh_session", "")
+    return bool(token and token in _sessions and _sessions[token] > time.time())
+
+
+@app.get("/api/auth/check")
+async def auth_check(request: Request) -> dict:
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    enabled = config.get("auth", {}).get("enabled", False)
+    if not enabled:
+        return {"authenticated": True, "auth_enabled": False}
+    return {"authenticated": _session_valid(request), "auth_enabled": True}
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request, data: dict) -> JSONResponse:
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    auth_cfg = config.get("auth", {})
+    if not auth_cfg.get("enabled"):
+        return JSONResponse({"ok": True, "message": "auth disabled"})
+    pw_hash = _hash_pw(data.get("password", ""))
+    if pw_hash != auth_cfg.get("password_hash", ""):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    token = secrets.token_hex(32)
+    _sessions[token] = time.time() + _SESSION_TTL
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie("hh_session", token, max_age=_SESSION_TTL, httponly=True, samesite="lax")
+    return resp
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request) -> JSONResponse:
+    token = request.cookies.get("hh_session", "")
+    _sessions.pop(token, None)
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie("hh_session")
+    return resp
+
+
+@app.middleware("http")
+async def _auth_middleware(request: Request, call_next):
+    """Block API access for unauthenticated requests when auth is enabled.
+    The frontend itself is always served (it renders its own login modal)."""
+    path = request.url.path
+    # Always allow: auth endpoints, static assets, frontend
+    open_paths = {"/api/auth/login", "/api/auth/check", "/api/auth/logout"}
+    if path in open_paths or not path.startswith("/api/"):
+        return await call_next(request)
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    if not config.get("auth", {}).get("enabled"):
+        return await call_next(request)
+    if _session_valid(request):
+        return await call_next(request)
+    return JSONResponse({"detail": "Not authenticated"}, status_code=401)
 
 
 @app.get("/api/health")

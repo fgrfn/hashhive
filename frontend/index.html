@@ -406,8 +406,10 @@
     <div class="topbar-right">
       <span id="last-update" class="text-muted" style="font-size:12px"></span>
       <span id="refresh-countdown" class="text-muted" style="font-size:12px;display:none">↻ in <span id="refresh-secs">–</span>s</span>
+      <span id="price-ticker" style="font-size:12px;color:var(--text-muted);display:none;cursor:pointer" title="Live coin price (CoinGecko)" onclick="loadMarketPrice(true)"></span>
       <span id="ws-status" title="WebSocket" style="font-size:12px;display:none"></span>
       <button class="btn btn-secondary btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="display:none" onclick="authLogout()" title="Logout">⎋ Logout</button>
       <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
     </div>
   </div>
@@ -454,6 +456,21 @@
           <div class="stat-label">Est. Cost / Day</div>
           <div class="stat-value" id="stat-cost">–</div>
           <div class="stat-unit" id="stat-cost-unit">€</div>
+        </div>
+        <div class="stat-card" id="stat-prob-card" style="display:none">
+          <div class="stat-label">Time to Block</div>
+          <div class="stat-value" id="stat-prob">–</div>
+          <div class="stat-unit">estimated</div>
+        </div>
+        <div class="stat-card" id="stat-lucky-card" style="display:none">
+          <div class="stat-label">Lucky Factor</div>
+          <div class="stat-value" id="stat-lucky">–</div>
+          <div class="stat-unit" id="stat-lucky-unit">% (30d)</div>
+        </div>
+        <div class="stat-card" id="stat-profit-card" style="display:none">
+          <div class="stat-label">Est. Reward / Day</div>
+          <div class="stat-value" id="stat-profit">–</div>
+          <div class="stat-unit" id="stat-profit-unit">€</div>
         </div>
       </div>
 
@@ -853,6 +870,62 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">🔄 Auto-Restart Rule <small class="text-muted" style="font-weight:400;font-size:12px">(NerdMiner / SparkMiner)</small></div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Automatically reboot a NerdMiner or SparkMiner device if its hashrate stays at 0 for the configured duration.</p>
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span>Enable Auto-Restart</span>
+          <label class="toggle"><input type="checkbox" id="s-ars-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Zero-Hashrate Duration (min)</label>
+            <input type="number" id="s-ars-duration" value="10" min="1" step="1" title="Restart device if hashrate stays at 0 for this many minutes">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💰 Live Price &amp; Profitability</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Show live coin price in the header and estimated block reward value on the dashboard. Prices fetched from CoinGecko (free, 5-min cache).</p>
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span>Enable Price Ticker</span>
+          <label class="toggle"><input type="checkbox" id="s-market-enabled" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Coin (CoinGecko ID)</label>
+            <input type="text" id="s-market-coin" value="bitcoin" placeholder="bitcoin / digibyte / litecoin">
+          </div>
+          <div class="form-group">
+            <label>Currency</label>
+            <select id="s-market-currency" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px 10px;width:100%">
+              <option value="eur">EUR (€)</option>
+              <option value="usd">USD ($)</option>
+              <option value="gbp">GBP (£)</option>
+              <option value="chf">CHF</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Block Reward (coins)</label>
+            <input type="number" id="s-block-reward" value="3.125" step="0.001" min="0" title="Expected block reward in the mined coin (e.g. 3.125 BTC)">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔐 Password Protection</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Protect the dashboard with a password. Recommended when HTTPS is enabled and the dashboard is accessible from outside your LAN. Sessions last 30 days.</p>
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span>Enable Password Protection</span>
+          <label class="toggle"><input type="checkbox" id="s-auth-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-group" style="max-width:340px">
+          <label>New Password <small class="text-muted">(leave empty to keep current)</small></label>
+          <input type="password" id="s-auth-password" placeholder="Enter new password…" autocomplete="new-password">
+        </div>
+      </div>
+
       <div class="actions-row" style="margin-top:0">
         <button class="btn btn-primary" onclick="saveSettings()">💾 Save</button>
       </div>
@@ -904,6 +977,27 @@
         <div class="form-grid" style="margin-top:14px">
           <div class="form-group"><label>Server URL</label><input type="text" id="n-go-url" placeholder="https://gotify.example.com"></div>
           <div class="form-group"><label>App Token</label><input type="text" id="n-go-token" placeholder="Axxxxxx"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">ntfy</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Self-hosted or cloud push notifications via <a href="https://ntfy.sh" target="_blank" rel="noopener" style="color:var(--accent)">ntfy.sh</a>.</p>
+        <div class="toggle-row" style="margin-bottom:14px"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-ntfy-on"><span class="toggle-slider"></span></label></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Server URL</label><input type="text" id="n-ntfy-url" placeholder="https://ntfy.sh"></div>
+          <div class="form-group"><label>Topic</label><input type="text" id="n-ntfy-topic" placeholder="hashhive-alerts"></div>
+          <div class="form-group"><label>Token (optional)</label><input type="text" id="n-ntfy-token" placeholder="tk_…"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Pushover</div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Push notifications via <a href="https://pushover.net" target="_blank" rel="noopener" style="color:var(--accent)">Pushover</a>.</p>
+        <div class="toggle-row" style="margin-bottom:14px"><span>Enable</span><label class="toggle"><input type="checkbox" id="n-po-on"><span class="toggle-slider"></span></label></div>
+        <div class="form-grid">
+          <div class="form-group"><label>User Key</label><input type="text" id="n-po-user" placeholder="uXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"></div>
+          <div class="form-group"><label>App Token</label><input type="text" id="n-po-token" placeholder="aXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"></div>
         </div>
       </div>
 
@@ -1111,6 +1205,26 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeNmEdit()">Cancel</button>
       <button class="btn btn-primary" onclick="saveNmEdit()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ AUTH LOGIN MODAL ════════════ -->
+<div class="modal-overlay" id="auth-overlay" style="z-index:2000">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">🔐 HashHive Login</div>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:13px;margin-bottom:16px">Password protection is enabled. Enter your password to continue.</p>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')authLogin()" style="font-size:15px">
+      </div>
+      <div id="auth-error" style="color:var(--danger);font-size:13px;margin-top:8px;display:none">Incorrect password.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="width:100%" onclick="authLogin()">🔓 Login</button>
     </div>
   </div>
 </div>
@@ -1605,13 +1719,18 @@
         return;
       }
       if (card) card.style.display = '';
-      _renderBestDiffChart(data);
+      // Pass the current network difficulty for the reference line (from last dashboard)
+      const nmDevs = Array.isArray(lastDashboard?.nmminer) ? lastDashboard.nmminer
+        : (lastDashboard?.nmminer?.devices || []);
+      let netDiff = null;
+      for (const d of nmDevs) { const v = parseDiffStr(d.netDiff); if (v) { netDiff = v; break; } }
+      _renderBestDiffChart(data, netDiff);
     } catch (_) {
       if (card) card.style.display = 'none';
     }
   }
 
-  function _renderBestDiffChart(deviceMap) {
+  function _renderBestDiffChart(deviceMap, netDiff) {
     const canvas = document.getElementById('bestdiff-chart');
     if (!canvas || !window.Chart) return;
 
@@ -1655,6 +1774,23 @@
         spanGaps: true,
       };
     });
+
+    // Optional network difficulty reference line
+    if (netDiff && sortedTs.length > 0) {
+      datasets.push({
+        label: 'Network Diff',
+        data: sortedTs.map(() => netDiff),
+        borderColor: 'rgba(239,68,68,0.7)',
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        backgroundColor: 'transparent',
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        spanGaps: true,
+        order: -1,
+      });
+    }
 
     if (_bdChart) { _bdChart.destroy(); _bdChart = null; }
 
@@ -2036,6 +2172,19 @@
     return String(Math.round(n));
   }
 
+  // Parse a difficulty string like "94.87 T" / "12.5 G" / numeric → raw number
+  function parseDiffStr(v) {
+    if (v == null || v === '' || v === '–') return null;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    const m = s.match(/^([\d.]+)\s*([KMGTP])?/i);
+    if (!m) return null;
+    const num = parseFloat(m[1]);
+    const sfx = (m[2] || '').toUpperCase();
+    const mul = { K: 1e3, M: 1e6, G: 1e9, T: 1e12, P: 1e15 };
+    return num * (mul[sfx] || 1);
+  }
+
   function fmtNmHr(kh) {
     const n = parseFloat(kh);
     if (!n && n !== 0) return '–';
@@ -2365,7 +2514,36 @@
     _renderNmMap(nmDevs, tMax);
     _renderAxMap(axDevs, tMax);
     _initDashViewToggles();
-    return { totalHr, totalPower, onlineCnt, total };
+
+    // ── Network difficulty: pick from first available device ──────────────
+    let netDiffRaw = null;
+    for (const d of nmDevs) {
+      const v = parseDiffStr(d.netDiff);
+      if (v) { netDiffRaw = v; break; }
+    }
+    if (!netDiffRaw) {
+      for (const d of soloDevs) {
+        const v = parseDiffStr(d.globalDiff ?? d.networkDiff ?? d.netDiff);
+        if (v) { netDiffRaw = v; break; }
+      }
+    }
+    if (!netDiffRaw) {
+      for (const d of axDevs) {
+        const v = parseDiffStr(d.networkDifficulty ?? d.difficulty);
+        if (v) { netDiffRaw = v; break; }
+      }
+    }
+
+    // ── Block probability, lucky %, profitability ─────────────────────────
+    const blocksFound = (data.alerts || []).filter(a => a.type === 'block_found');
+    calcBlockProbability(totalHr, netDiffRaw);
+    calcLucky(totalHr, netDiffRaw, blocksFound);
+    updateProfitability(totalHr, netDiffRaw);
+
+    // ── Update price ticker with current config ───────────────────────────
+    loadMarketPrice(false);
+
+    return { totalHr, totalPower, onlineCnt, total, netDiffRaw };
   }
 
   // ── NMMiner detail page ────────────────────────────────────────────────────
@@ -3186,11 +3364,25 @@
       document.getElementById('s-offline-grace').value = cfg.offline_grace_minutes ?? 2;
       document.getElementById('s-alert-cooldown').value = cfg.alert_cooldown_minutes ?? 30;
       document.getElementById('s-kwh-price').value  = cfg.electricity_kwh_price ?? 0.30;
-      // Auto-restart rule
+      // Auto-restart rule (AxeOS)
       const ar = cfg.auto_restart || {};
       document.getElementById('s-ar-enabled').checked    = !!ar.enabled;
       document.getElementById('s-ar-threshold').value    = ar.threshold_pct    ?? 50;
       document.getElementById('s-ar-duration').value     = ar.duration_minutes ?? 10;
+      // Auto-restart rule (Solo miners)
+      const ars = cfg.auto_restart_solo || {};
+      document.getElementById('s-ars-enabled').checked  = !!ars.enabled;
+      document.getElementById('s-ars-duration').value   = ars.zero_hr_minutes ?? 10;
+      // Market / price
+      const mkt = cfg.market || {};
+      document.getElementById('s-market-enabled').checked = mkt.enabled !== false;
+      document.getElementById('s-market-coin').value    = mkt.coin_id   || 'bitcoin';
+      const currEl = document.getElementById('s-market-currency');
+      if (currEl) currEl.value = mkt.currency || 'eur';
+      document.getElementById('s-block-reward').value   = mkt.block_reward ?? 3.125;
+      // Auth
+      const auth = cfg.auth || {};
+      document.getElementById('s-auth-enabled').checked = !!auth.enabled;
       // Weekly summary
       const ws = cfg.weekly_summary || {};
       document.getElementById('s-ws-enabled').checked = !!ws.enabled;
@@ -3536,6 +3728,28 @@
       threshold_pct:    parseInt(document.getElementById('s-ar-threshold').value) || 50,
       duration_minutes: parseInt(document.getElementById('s-ar-duration').value)  || 10,
     };
+    currentConfig.auto_restart_solo = {
+      enabled:          document.getElementById('s-ars-enabled').checked,
+      zero_hr_minutes:  parseInt(document.getElementById('s-ars-duration').value) || 10,
+    };
+    currentConfig.market = {
+      enabled:      document.getElementById('s-market-enabled').checked,
+      coin_id:      document.getElementById('s-market-coin').value.trim() || 'bitcoin',
+      currency:     document.getElementById('s-market-currency').value || 'eur',
+      block_reward: parseFloat(document.getElementById('s-block-reward').value) || 3.125,
+    };
+    // Auth — only update password_hash if a new password was entered
+    const newPw = document.getElementById('s-auth-password').value;
+    const authEnabled = document.getElementById('s-auth-enabled').checked;
+    if (!currentConfig.auth) currentConfig.auth = {};
+    currentConfig.auth.enabled = authEnabled;
+    if (newPw) {
+      // SHA-256 hash in the browser; backend stores and compares the same way
+      const msgBuffer = new TextEncoder().encode(newPw);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      currentConfig.auth.password_hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    document.getElementById('s-auth-password').value = '';
     currentConfig.weekly_summary = {
       enabled: document.getElementById('s-ws-enabled').checked,
       day:     document.getElementById('s-ws-day').value,
@@ -3596,6 +3810,13 @@
       document.getElementById('n-go-on').checked    = !!n.gotify_enabled;
       document.getElementById('n-go-url').value     = n.gotify_url        || '';
       document.getElementById('n-go-token').value   = n.gotify_token      || '';
+      document.getElementById('n-ntfy-on').checked  = !!n.ntfy_enabled;
+      document.getElementById('n-ntfy-url').value   = n.ntfy_url  || 'https://ntfy.sh';
+      document.getElementById('n-ntfy-topic').value = n.ntfy_topic || '';
+      document.getElementById('n-ntfy-token').value = n.ntfy_token || '';
+      document.getElementById('n-po-on').checked    = !!n.pushover_enabled;
+      document.getElementById('n-po-user').value    = n.pushover_user_key  || '';
+      document.getElementById('n-po-token').value   = n.pushover_app_token || '';
       // Browser notifications
       const browserEl = document.getElementById('n-browser-notif');
       if (browserEl) {
@@ -3632,6 +3853,13 @@
       gotify_enabled:    document.getElementById('n-go-on').checked,
       gotify_url:        document.getElementById('n-go-url').value.trim(),
       gotify_token:      document.getElementById('n-go-token').value.trim(),
+      ntfy_enabled:      document.getElementById('n-ntfy-on').checked,
+      ntfy_url:          document.getElementById('n-ntfy-url').value.trim() || 'https://ntfy.sh',
+      ntfy_topic:        document.getElementById('n-ntfy-topic').value.trim(),
+      ntfy_token:        document.getElementById('n-ntfy-token').value.trim(),
+      pushover_enabled:  document.getElementById('n-po-on').checked,
+      pushover_user_key: document.getElementById('n-po-user').value.trim(),
+      pushover_app_token:document.getElementById('n-po-token').value.trim(),
     };
     const atIds = ['offline','online','temp-high','vr-temp-high','hashrate-low','error-rate-high',
                    'fan-failure','pool-lost','pool-connected','fallback-active','fallback-recovered',
@@ -4577,6 +4805,162 @@
     }
   }
 
+  // ── Market price ticker ────────────────────────────────────────────────────
+
+  let _priceCache = { ts: 0, data: {} };
+
+  async function loadMarketPrice(force) {
+    const cfg = currentConfig.market || {};
+    if (!cfg.enabled) { document.getElementById('price-ticker').style.display = 'none'; return; }
+    const coin = cfg.coin_id || 'bitcoin';
+    const currency = (cfg.currency || 'eur').toLowerCase();
+    const now = Date.now();
+    if (!force && _priceCache.ts > now - 300000 && _priceCache.data[coin]) {
+      _applyPriceTicker(_priceCache.data, coin, currency);
+      return;
+    }
+    try {
+      const data = await apiFetch(`/api/market/prices?coin=${encodeURIComponent(coin)}&currency=${encodeURIComponent(currency)}`);
+      if (data && data[coin]) {
+        _priceCache = { ts: now, data };
+        _applyPriceTicker(data, coin, currency);
+      }
+    } catch (_) {}
+  }
+
+  function _applyPriceTicker(data, coin, currency) {
+    const el = document.getElementById('price-ticker');
+    if (!el) return;
+    const price = data[coin]?.[currency];
+    const change = data[coin]?.[currency + '_24h_change'];
+    if (price == null) { el.style.display = 'none'; return; }
+    const sym = currency === 'eur' ? '€' : currency === 'usd' ? '$' : currency.toUpperCase();
+    const chStr = change != null ? ` ${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%` : '';
+    const chColor = change == null ? '' : change >= 0 ? 'color:var(--success)' : 'color:var(--danger)';
+    const coinLabel = coin.charAt(0).toUpperCase() + coin.slice(1, 3).toUpperCase();
+    el.innerHTML = `${coinLabel} ${sym}${price.toLocaleString()}<span style="${chColor};font-size:11px">${chStr}</span>`;
+    el.style.display = '';
+  }
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
+
+  async function _checkAuth() {
+    try {
+      const r = await fetch('/api/auth/check');
+      const d = await r.json();
+      if (d.auth_enabled) {
+        document.getElementById('btn-logout').style.display = '';
+        if (!d.authenticated) {
+          document.getElementById('auth-overlay').classList.add('open');
+          document.getElementById('auth-password').focus();
+        }
+      } else {
+        document.getElementById('btn-logout').style.display = 'none';
+      }
+    } catch (_) {}
+  }
+
+  async function authLogin() {
+    const pw = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.style.display = 'none';
+    try {
+      const msgBuffer = new TextEncoder().encode(pw);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+      const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ password_hash: hash }) });
+      if (r.ok) {
+        document.getElementById('auth-overlay').classList.remove('open');
+        document.getElementById('auth-password').value = '';
+        document.getElementById('btn-logout').style.display = '';
+        loadDashboard();
+      } else {
+        errEl.style.display = '';
+        document.getElementById('auth-password').select();
+      }
+    } catch (e) {
+      errEl.textContent = 'Login error: ' + e.message;
+      errEl.style.display = '';
+    }
+  }
+
+  async function authLogout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+    document.getElementById('btn-logout').style.display = 'none';
+    document.getElementById('auth-overlay').classList.add('open');
+    document.getElementById('auth-password').value = '';
+    document.getElementById('auth-password').focus();
+  }
+
+  // ── Block probability & lucky factor ───────────────────────────────────────
+
+  function calcBlockProbability(totalHrGhs, netDiff) {
+    const card = document.getElementById('stat-prob-card');
+    const el = document.getElementById('stat-prob');
+    const unit = el?.nextElementSibling;
+    if (!card) return;
+    if (!totalHrGhs || !netDiff || totalHrGhs <= 0 || netDiff <= 0) {
+      card.style.display = 'none';
+      return;
+    }
+    // netDiff is in hashes; totalHrGhs is GH/s → convert to H/s
+    const hrHs = totalHrGhs * 1e9;
+    const days = netDiff / (hrHs * 86400);
+    card.style.display = '';
+    if (days < 1) {
+      el.textContent = (days * 24).toFixed(1);
+      if (unit) unit.textContent = 'Std. bis Block (est.)';
+    } else if (days > 365 * 3) {
+      el.textContent = Math.round(days / 365);
+      if (unit) unit.textContent = 'Jahre bis Block (est.)';
+    } else {
+      el.textContent = Math.round(days);
+      if (unit) unit.textContent = 'Tage bis Block (est.)';
+    }
+  }
+
+  function calcLucky(totalHrGhs, netDiff, blocksFoundArr) {
+    const card = document.getElementById('stat-lucky-card');
+    const el = document.getElementById('stat-lucky');
+    if (!card) return;
+    if (!totalHrGhs || !netDiff || totalHrGhs <= 0 || netDiff <= 0) {
+      card.style.display = 'none';
+      return;
+    }
+    // Estimate expected blocks in 30 days based on current hashrate
+    const hrHs = totalHrGhs * 1e9;
+    const days30 = 30;
+    const expectedBlocks = (hrHs * 86400 * days30) / netDiff;
+    const actualBlocks = Array.isArray(blocksFoundArr) ? blocksFoundArr.length : 0;
+    if (expectedBlocks < 0.0001) { card.style.display = 'none'; return; }
+    const lucky = actualBlocks > 0 ? (actualBlocks / expectedBlocks) * 100 : 0;
+    card.style.display = '';
+    el.textContent = lucky.toFixed(1) + '%';
+    el.style.color = lucky >= 100 ? 'var(--success)' : lucky >= 50 ? 'var(--warning)' : 'var(--accent)';
+  }
+
+  function updateProfitability(totalHrGhs, netDiff) {
+    const card = document.getElementById('stat-profit-card');
+    const el = document.getElementById('stat-profit');
+    const unit = document.getElementById('stat-profit-unit');
+    if (!card) return;
+    const cfg = currentConfig.market || {};
+    const price = _priceCache.data?.[cfg.coin_id]?.[cfg.currency];
+    const blockReward = parseFloat(cfg.block_reward) || 3.125;
+    if (!price || !totalHrGhs || !netDiff || totalHrGhs <= 0 || netDiff <= 0) {
+      card.style.display = 'none';
+      return;
+    }
+    const hrHs = totalHrGhs * 1e9;
+    // Expected blocks per day
+    const blocksPerDay = (hrHs * 86400) / netDiff;
+    const rewardPerDay = blocksPerDay * blockReward * price;
+    const sym = (cfg.currency || 'eur') === 'usd' ? '$' : '€';
+    card.style.display = '';
+    el.textContent = rewardPerDay >= 0.01 ? rewardPerDay.toFixed(2) : rewardPerDay.toExponential(2);
+    if (unit) unit.textContent = `${sym}/Tag (est.)`;
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -4600,12 +4984,20 @@
       if (!isNaN(idx) && idx >= 0 && idx < pages.length) { showPage(pages[idx]); return; }
       if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) refreshCurrent();
     });
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
     initLiveLog();
     _initDashViewToggles();
+    _checkAuth();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {
       document.getElementById('sidebar-version').textContent = `HashHive v${d.version}`;
     }).catch(() => { document.getElementById('sidebar-version').textContent = 'HashHive'; });
+    // Start price ticker (refresh every 5 min)
+    loadMarketPrice(false);
+    setInterval(() => loadMarketPrice(false), 300000);
   });
 </script>
 </body>
