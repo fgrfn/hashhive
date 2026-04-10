@@ -2065,7 +2065,8 @@
     const host = hostMatch[1].toLowerCase();
     // Base wallet = everything before the first dot in the worker string
     const wallet = workerAddress.split('.')[0];
-    if (!wallet) return '';
+    // Reject clearly invalid wallet values (empty, literal dash placeholder, too short)
+    if (!wallet || wallet === '–' || wallet.length < 5) return '';
 
     let href = '';
     if (host.endsWith('hmpool.io')) {
@@ -2661,7 +2662,7 @@
       const shareMin = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.share_rate_min) || 80;
       const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
       return `<tr data-ip="${d.ip}">
-        <td><span class="copy-ip" onclick="copyIP('${d.ip}')" title="Copy IP">${d.ip || '–'}</span></td>
+        <td><span class="copy-ip" data-ip="${d.ip||''}" onclick="event.stopPropagation();copyIP(this.dataset.ip)" title="Copy IP">${d.ip || '–'}</span></td>
         <td>${d.hostname || d.name || '–'}</td>
         <td><small class="text-muted">${d.boardtype || d.boardType || d.board || '–'}</small></td>
         <td>${fmtStatus(online)}</td>
@@ -3051,8 +3052,31 @@
       if (!d._online && d.online === false) continue;
       const pool = d.pool || d.stratumURL || d.stratum_url || d.poolURL || d.PrimaryPool || '–';
       const worker = d.worker || d.stratumUser || d.user || d.PrimaryAddress || '–';
-      const sharesOk = d.Accepted ?? d.accepted ?? d.sharesAccepted ?? '–';
-      const sharesErr = d.Rejected ?? d.rejected ?? d.sharesRejected ?? '–';
+      // Try dedicated fields first; fall back to parsing the combined share string ("ok/total/pct%")
+      const _nmShareStr = d.share || d.shares || '';
+      let sharesOk = d.Accepted ?? d.accepted ?? d.sharesAccepted;
+      let sharesErr = d.Rejected ?? d.rejected ?? d.sharesRejected;
+      if (sharesOk == null && _nmShareStr) {
+        const _parts = String(_nmShareStr).split('/');
+        if (_parts.length >= 2) {
+          const _n0 = parseInt(_parts[0], 10), _n1 = parseInt(_parts[1], 10);
+          if (!isNaN(_n0) && !isNaN(_n1)) { sharesOk = _n0; sharesErr = Math.max(0, _n1 - _n0); }
+        }
+      }
+      sharesOk = sharesOk ?? '–';
+      sharesErr = sharesErr ?? '–';
+      // For acc% prefer the percentage already in the share string when we had to parse it
+      const nmAccPct = (() => {
+        if (typeof sharesOk === 'number' && typeof sharesErr === 'number') return fmtShareAcc(sharesOk, sharesErr);
+        const m = String(_nmShareStr).match(/(\d+(?:\.\d+))%/);
+        if (m) {
+          const pct = parseFloat(m[1]);
+          const shareMin = currentConfig?.thresholds?.share_rate_min || 80;
+          const col = pct >= shareMin ? 'var(--success)' : pct >= shareMin * 0.9 ? 'var(--warning)' : 'var(--danger)';
+          return `<span style="color:${col};font-weight:600">${pct.toFixed(1)}%</span>`;
+        }
+        return '–';
+      })();
       rows.push(`<tr>
         <td>${d.hostname || d.ip || '–'}</td>
         <td><span style="font-size:11px;color:var(--accent)">nmminer</span></td>
@@ -3061,7 +3085,7 @@
         <td><span style="color:var(--success);font-size:11px">Primary</span></td>
         <td>${sharesOk}</td>
         <td>${sharesErr}</td>
-        <td>${fmtShareAcc(sharesOk, sharesErr)}</td>
+        <td>${nmAccPct}</td>
       </tr>`);
     }
     // NerdMiner / SparkMiner devices

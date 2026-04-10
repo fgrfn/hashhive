@@ -941,32 +941,10 @@ async def restore_config(data: dict) -> dict:
 async def get_nmminer_swarm():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("nmminer_master", "")
-    # Prefer master (returns aggregated swarm stats in one request)
-    if master:
-        async with httpx.AsyncClient(timeout=10) as client:
-            try:
-                resp = await client.get(f"http://{master}/swarm")
-                resp.raise_for_status()
-                return resp.json()
-            except Exception:
-                pass  # fall through to per-device queries
-    # Fallback: query each known device individually
-    devices = config.get("nmminer_devices", [])
-    if not devices:
-        return {"devices": []}
-    results = []
-    async with httpx.AsyncClient(timeout=5) as client:
-        async def _fetch(ip: str):
-            try:
-                r = await client.get(f"http://{ip}/swarm")
-                r.raise_for_status()
-                data = r.json()
-                devs = data if isinstance(data, list) else data.get("devices", [data])
-                results.extend(devs)
-            except Exception:
-                results.append({"ip": ip, "online": False})
-        await asyncio.gather(*[_fetch(d["ip"]) for d in devices if d.get("ip")])
-    return {"devices": results}
+    nm_devices = config.get("nmminer_devices", [])
+    # Use the same enriched fetch as the dashboard so pool/worker data is available
+    async with httpx.AsyncClient(timeout=10) as client:
+        return await _fetch_nmminer_safe(client, master, nm_devices)
 
 
 @app.get("/api/nmminer/config")
@@ -1591,14 +1569,25 @@ async def _fetch_nmminer_safe(
                     if isinstance(master_cfg, dict):
                         # /config may return {"configs": [...]} or the config directly
                         cfg_list = master_cfg.get("configs") if "configs" in master_cfg else None
-                        first_cfg = (cfg_list[0] if isinstance(cfg_list, list) and cfg_list else master_cfg)
-                        primary_pool = first_cfg.get("PrimaryPool") or first_cfg.get("pool") or ""
-                        primary_addr = first_cfg.get("PrimaryAddress") or first_cfg.get("user") or ""
-                        for dev in result.get("devices", []):
-                            if primary_pool and not dev.get("PrimaryPool"):
-                                dev["PrimaryPool"] = primary_pool
-                            if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
-                                dev["PrimaryAddress"] = primary_addr
+                        if isinstance(cfg_list, list) and cfg_list:
+                            # Match each device's config by IP for accurate per-device enrichment
+                            cfg_by_ip_map = {c.get("ip"): c for c in cfg_list if c.get("ip")}
+                            for dev in result.get("devices", []):
+                                dev_cfg = cfg_by_ip_map.get(dev.get("ip", "")) or cfg_list[0]
+                                pool = dev_cfg.get("PrimaryPool") or dev_cfg.get("pool") or ""
+                                addr = dev_cfg.get("PrimaryAddress") or dev_cfg.get("user") or ""
+                                if pool and not dev.get("PrimaryPool"):
+                                    dev["PrimaryPool"] = pool
+                                if addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
+                                    dev["PrimaryAddress"] = addr
+                        else:
+                            primary_pool = master_cfg.get("PrimaryPool") or master_cfg.get("pool") or ""
+                            primary_addr = master_cfg.get("PrimaryAddress") or master_cfg.get("user") or ""
+                            for dev in result.get("devices", []):
+                                if primary_pool and not dev.get("PrimaryPool"):
+                                    dev["PrimaryPool"] = primary_pool
+                                if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
+                                    dev["PrimaryAddress"] = primary_addr
                 except Exception:
                     pass  # config fetch is best-effort; swarm data still usable
                 # Enrich with per-device config overrides by IP
@@ -1639,6 +1628,8 @@ async def _fetch_nmminer_safe(
                 except Exception:
                     pass
                 for dev in devs:
+                    if not dev.get("ip"):
+                        dev["ip"] = ip
                     dev["_temp_max"] = cfg_by_ip.get(ip, {}).get("temp_max")
                     if primary_pool and not dev.get("PrimaryPool"):
                         dev["PrimaryPool"] = primary_pool
