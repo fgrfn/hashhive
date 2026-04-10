@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/fgrfn/hashhive/compare/v1.1.0...v1.1.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* ckpool.org Pool-Link auf eusolostats.ckpool.org korrigiert ([a0a30a2](https://github.com/fgrfn/hashhive/commit/a0a30a2205f3b314b021caac69bf24df44cb99df))
+
 ## [1.1.0](https://github.com/fgrfn/hashhive/compare/v1.0.1...v1.1.0) (2026-04-09)
 
 
