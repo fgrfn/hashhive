@@ -6,10 +6,32 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Persistente Daten (Config, Alerts, Gerätestatus)
+      # Persistente Daten (Config, Alerts, Gerätestatus, SSL-Zertifikate)
       - hashhive-data:/app/backend/data
     environment:
       - HASHHIVE_DATA_DIR=/app/backend/data
+      # ── HTTPS-Konfiguration (optional) ───────────────────────────────────────
+      #
+      # Option 1: Selbst-signiertes Zertifikat automatisch erstellen
+      #   Einfachste Option für LAN-Zugriff. Browser zeigt Sicherheitswarnung –
+      #   das Zertifikat kann in Browser/OS importiert werden, um sie zu entfernen.
+      #   Das Zertifikat wird einmalig erzeugt und im Volume gespeichert.
+      #
+      # - SSL_SELFSIGNED=true
+      #
+      # Option 2: Eigenes Zertifikat verwenden (z.B. von Let's Encrypt)
+      #   Zertifikatsdateien per Volume ins Container mounten:
+      #
+      # - SSL_CERT_FILE=/certs/fullchain.pem
+      # - SSL_KEY_FILE=/certs/privkey.pem
+      #
+      # Dazu volumes-Sektion ergänzen:
+      # - /etc/letsencrypt/live/yourdomain.com:/certs:ro
+      #
+      # Port für HTTPS anpassen (optional, Standard 8000):
+      # - PORT=8443
+      # Und ports-Mapping entsprechend ändern:
+      # - "8443:8443"
 
 volumes:
   hashhive-data:
