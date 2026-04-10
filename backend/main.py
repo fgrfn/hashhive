@@ -1567,22 +1567,51 @@ async def _fetch_nmminer_safe(
                     cfg_resp.raise_for_status()
                     master_cfg = cfg_resp.json()
                     if isinstance(master_cfg, dict):
-                        # /config may return {"configs": [...]} or the config directly
+                        # /config may return {"configs": [...]} or the config directly.
+                        # Each list entry may also nest fields under a "config" sub-key:
+                        # {"ip": "x", "config": {"PrimaryPool": ..., "PrimaryAddress": ...}}
                         cfg_list = master_cfg.get("configs") if "configs" in master_cfg else None
                         if isinstance(cfg_list, list) and cfg_list:
-                            # Match each device's config by IP for accurate per-device enrichment
-                            cfg_by_ip_map = {c.get("ip"): c for c in cfg_list if c.get("ip")}
+                            # Build lookup maps by IP and hostname for flexible matching
+                            cfg_by_ip_map: dict = {}
+                            cfg_by_host_map: dict = {}
+                            for c in cfg_list:
+                                entry_ip = c.get("ip", "")
+                                # Actual config fields may be nested under "config" sub-key
+                                actual = c.get("config", c) if isinstance(c, dict) else c
+                                if entry_ip:
+                                    cfg_by_ip_map[entry_ip] = (entry_ip, actual)
+                                host = (actual.get("Hostname") or actual.get("hostname") or "")
+                                if host:
+                                    cfg_by_host_map[host] = (entry_ip, actual)
+
                             for dev in result.get("devices", []):
-                                dev_cfg = cfg_by_ip_map.get(dev.get("ip", "")) or cfg_list[0]
-                                pool = dev_cfg.get("PrimaryPool") or dev_cfg.get("pool") or ""
-                                addr = dev_cfg.get("PrimaryAddress") or dev_cfg.get("user") or ""
+                                dev_ip = dev.get("ip", "")
+                                dev_host = dev.get("hostname") or dev.get("name") or ""
+                                # Match by IP first, then by hostname
+                                if dev_ip and dev_ip in cfg_by_ip_map:
+                                    entry_ip, actual = cfg_by_ip_map[dev_ip]
+                                elif dev_host and dev_host in cfg_by_host_map:
+                                    entry_ip, actual = cfg_by_host_map[dev_host]
+                                    # Fill in missing IP from config
+                                    if not dev_ip and entry_ip:
+                                        dev["ip"] = entry_ip
+                                else:
+                                    # Fallback: apply first config entry
+                                    c0 = cfg_list[0]
+                                    entry_ip = c0.get("ip", "")
+                                    actual = c0.get("config", c0) if isinstance(c0, dict) else c0
+                                pool = actual.get("PrimaryPool") or actual.get("pool") or ""
+                                addr = actual.get("PrimaryAddress") or actual.get("user") or ""
                                 if pool and not dev.get("PrimaryPool"):
                                     dev["PrimaryPool"] = pool
                                 if addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
                                     dev["PrimaryAddress"] = addr
                         else:
-                            primary_pool = master_cfg.get("PrimaryPool") or master_cfg.get("pool") or ""
-                            primary_addr = master_cfg.get("PrimaryAddress") or master_cfg.get("user") or ""
+                            # Config fields may be at top level or under "config" sub-key
+                            actual_top = master_cfg.get("config", master_cfg)
+                            primary_pool = actual_top.get("PrimaryPool") or actual_top.get("pool") or ""
+                            primary_addr = actual_top.get("PrimaryAddress") or actual_top.get("user") or ""
                             for dev in result.get("devices", []):
                                 if primary_pool and not dev.get("PrimaryPool"):
                                     dev["PrimaryPool"] = primary_pool
@@ -1621,10 +1650,16 @@ async def _fetch_nmminer_safe(
                     cr.raise_for_status()
                     cfg = cr.json()
                     if isinstance(cfg, dict):
-                        cfg_list = cfg.get("configs")
-                        first = (cfg_list[0] if isinstance(cfg_list, list) and cfg_list else cfg)
-                        primary_pool = first.get("PrimaryPool") or first.get("pool") or ""
-                        primary_addr = first.get("PrimaryAddress") or first.get("user") or ""
+                        cfg_items = cfg.get("configs")
+                        if isinstance(cfg_items, list) and cfg_items:
+                            # Find the entry matching this device's IP; fall back to first
+                            match = next((c for c in cfg_items if c.get("ip") == ip), cfg_items[0])
+                        else:
+                            match = cfg
+                        # Actual fields may be nested under a "config" sub-key
+                        actual = match.get("config", match) if isinstance(match, dict) else match
+                        primary_pool = actual.get("PrimaryPool") or actual.get("pool") or ""
+                        primary_addr = actual.get("PrimaryAddress") or actual.get("user") or ""
                 except Exception:
                     pass
                 for dev in devs:
