@@ -472,6 +472,11 @@
           <div class="stat-value" id="stat-profit">–</div>
           <div class="stat-unit" id="stat-profit-unit">€</div>
         </div>
+        <div class="stat-card" id="stat-price-card" style="display:none">
+          <div class="stat-label" id="stat-price-label">Live Price</div>
+          <div class="stat-value" id="stat-price" style="font-size:20px">–</div>
+          <div class="stat-unit" id="stat-price-change"></div>
+        </div>
       </div>
 
       <div class="card card-nm">
@@ -4835,7 +4840,12 @@
 
   async function loadMarketPrice(force) {
     const cfg = currentConfig.market || {};
-    if (!cfg.enabled) { document.getElementById('price-ticker').style.display = 'none'; return; }
+    if (!cfg.enabled) {
+      document.getElementById('price-ticker').style.display = 'none';
+      const _pc = document.getElementById('stat-price-card');
+      if (_pc) _pc.style.display = 'none';
+      return;
+    }
     const coin = cfg.coin_id || 'bitcoin';
     const currency = (cfg.currency || 'eur').toLowerCase();
     const now = Date.now();
@@ -4854,16 +4864,35 @@
 
   function _applyPriceTicker(data, coin, currency) {
     const el = document.getElementById('price-ticker');
-    if (!el) return;
-    const price = data[coin]?.[currency];
+    const priceCard  = document.getElementById('stat-price-card');
+    const priceLabel = document.getElementById('stat-price-label');
+    const priceVal   = document.getElementById('stat-price');
+    const priceChg   = document.getElementById('stat-price-change');
+    const price  = data[coin]?.[currency];
     const change = data[coin]?.[currency + '_24h_change'];
-    if (price == null) { el.style.display = 'none'; return; }
+    if (price == null) {
+      if (el) el.style.display = 'none';
+      if (priceCard) priceCard.style.display = 'none';
+      return;
+    }
     const sym = currency === 'eur' ? '€' : currency === 'usd' ? '$' : currency.toUpperCase();
-    const chStr = change != null ? ` ${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%` : '';
+    const chStr   = change != null ? `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}% (24h)` : '';
     const chColor = change == null ? '' : change >= 0 ? 'color:var(--success)' : 'color:var(--danger)';
     const coinLabel = coin.charAt(0).toUpperCase() + coin.slice(1, 3).toUpperCase();
-    el.innerHTML = `${coinLabel} ${sym}${price.toLocaleString()}<span style="${chColor};font-size:11px">${chStr}</span>`;
-    el.style.display = '';
+    // Format price — small values (< 1) keep more decimals
+    const priceStr = price < 0.01 ? price.toFixed(6) : price < 1 ? price.toFixed(4) : price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    // Header ticker
+    if (el) {
+      el.innerHTML = `${coinLabel} ${sym}${price.toLocaleString()}<span style="${chColor};font-size:11px"> ${chStr}</span>`;
+      el.style.display = '';
+    }
+    // Dashboard stat card
+    if (priceCard) {
+      if (priceLabel) priceLabel.textContent = `${coinLabel} Price`;
+      if (priceVal)   priceVal.textContent = `${sym}${priceStr}`;
+      if (priceChg)   priceChg.innerHTML = chStr ? `<span style="${chColor}">${chStr}</span>` : '';
+      priceCard.style.display = '';
+    }
   }
 
   // ── Auth ───────────────────────────────────────────────────────────────────
