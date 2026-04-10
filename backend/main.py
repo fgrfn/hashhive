@@ -541,7 +541,7 @@ async def _dashboard_broadcast_loop():
                     for d in nmminer_data.get("devices", []):
                         total_gh += float(d.get("GHs5s") or d.get("GHs5") or d.get("GHs1m") or
                                           d.get("GHsav") or d.get("hashrate") or d.get("currentHashrate") or 0)
-                        total_shares += int(d.get("Accepted") or d.get("accepted") or d.get("sharesAccepted") or 0)
+                        total_shares += _parse_nm_shares(d)[0]
                     for d in axeos_results:
                         if d.get("_online"):
                             total_gh += float(d.get("hashRate") or d.get("hashrate") or 0)
@@ -636,13 +636,9 @@ async def _send_weekly_summary() -> None:
             axeos_results = list(results)
         for d in nmminer_devices:
             if isinstance(d, dict):
-                acc = d.get("Accepted") or d.get("accepted") or d.get("sharesAccepted") or 0
-                rej = d.get("Rejected") or d.get("rejected") or d.get("sharesRejected") or 0
-                try:
-                    shares_accepted += int(acc)
-                    shares_rejected += int(rej)
-                except (TypeError, ValueError):
-                    pass
+                _acc, _rej = _parse_nm_shares(d)
+                shares_accepted += _acc
+                shares_rejected += _rej
         for d in axeos_results:
             if isinstance(d, dict) and d.get("_online"):
                 try:
@@ -1531,6 +1527,30 @@ async def scan_axeos_devices():
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
+
+def _parse_nm_shares(d: dict) -> tuple[int, int]:
+    """Return (accepted, rejected) from an NMMiner device dict.
+
+    Prefers dedicated integer fields; falls back to parsing the combined
+    share string whose format is "rejected/accepted/acceptance_rate%"
+    (e.g. "266/11925/97.8%" → rejected=266, accepted=11925).
+    """
+    acc = d.get("Accepted") or d.get("accepted") or d.get("sharesAccepted")
+    rej = d.get("Rejected") or d.get("rejected") or d.get("sharesRejected")
+    if acc is not None or rej is not None:
+        try:
+            return int(acc or 0), int(rej or 0)
+        except (TypeError, ValueError):
+            pass
+    share_str = str(d.get("share") or d.get("shares") or "")
+    parts = share_str.split("/")
+    if len(parts) >= 2:
+        try:
+            return int(parts[1]), int(parts[0])  # accepted=parts[1], rejected=parts[0]
+        except (ValueError, IndexError):
+            pass
+    return 0, 0
+
 
 async def _fetch_nmminer_safe(
     client: httpx.AsyncClient,

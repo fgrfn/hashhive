@@ -596,7 +596,7 @@
         </div>
         <div class="table-wrap table-wrap-scroll">
           <table>
-            <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (A/T/R)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th data-picker="skip">Actions</th></tr></thead>
+            <thead><tr><th class="sortable" data-col="0">IP</th><th class="sortable" data-col="1">Hostname</th><th>Board</th><th>Status</th><th class="sortable" data-col="4">Hashrate</th><th class="sortable" data-col="5">Shares (R/A/Acc%)</th><th>Pool</th><th>NetDiff</th><th>PoolDiff</th><th>LastDiff</th><th class="sortable" data-col="10">BestDiff</th><th>Hits</th><th class="sortable" data-col="12">Temp</th><th>RSSI</th><th>Memory</th><th>Uptime</th><th>Version</th><th>Lastseen</th><th data-picker="skip">Actions</th></tr></thead>
             <tbody id="nm-rows"><tr><td colspan="19" class="empty text-muted">No data</td></tr></tbody>
           </table>
         </div>
@@ -3057,7 +3057,8 @@
       if (!d._online && d.online === false) continue;
       const pool = d.pool || d.stratumURL || d.stratum_url || d.poolURL || d.PrimaryPool || '–';
       const worker = d.worker || d.stratumUser || d.user || d.PrimaryAddress || '–';
-      // Try dedicated fields first; fall back to parsing the combined share string ("ok/total/pct%")
+      // Try dedicated fields first; fall back to parsing the combined share string.
+      // NMMiner format: "rejected/accepted/acceptance_rate%" (e.g. "266/11925/97.8%")
       const _nmShareStr = d.share || d.shares || '';
       let sharesOk = d.Accepted ?? d.accepted ?? d.sharesAccepted;
       let sharesErr = d.Rejected ?? d.rejected ?? d.sharesRejected;
@@ -3065,7 +3066,7 @@
         const _parts = String(_nmShareStr).split('/');
         if (_parts.length >= 2) {
           const _n0 = parseInt(_parts[0], 10), _n1 = parseInt(_parts[1], 10);
-          if (!isNaN(_n0) && !isNaN(_n1)) { sharesOk = _n0; sharesErr = Math.max(0, _n1 - _n0); }
+          if (!isNaN(_n0) && !isNaN(_n1)) { sharesErr = _n0; sharesOk = _n1; }  // n0=rejected, n1=accepted
         }
       }
       sharesOk = sharesOk ?? '–';
