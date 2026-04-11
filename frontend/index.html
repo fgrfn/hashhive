@@ -1927,7 +1927,11 @@
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg.type !== 'dashboard') return;
-    currentConfig = msg.config || {};
+    // Don't overwrite currentConfig while user is on the Settings page —
+    // they may have unsaved in-memory changes (added/removed devices).
+    if (currentPage !== 'settings') {
+      currentConfig = msg.config || {};
+    }
     _onFetchSuccess();
     const _s = renderDashboard(msg);
     appendLog('ok', `Refreshed — ${_s.onlineCnt}/${_s.total} online · ${_s.totalHr >= 1000 ? (_s.totalHr / 1000).toFixed(2) + ' TH/s' : _s.totalHr.toFixed(1) + ' GH/s'}`, 'system');
@@ -3444,11 +3448,12 @@
       </li>`).join('');
   }
 
-  function removeNmDevice(i) {
+  async function removeNmDevice(i) {
     const devs = currentConfig.nmminer_devices || [];
     devs.splice(i, 1);
     currentConfig.nmminer_devices = devs;
     renderNmDeviceList(devs);
+    await saveSettings();
   }
 
   async function discoverNmDevices() {
@@ -3573,7 +3578,7 @@
       </li>`).join('');
   }
 
-  function addAxeDevice() {
+  async function addAxeDevice() {
     const ip   = prompt('IP address:');     if (!ip) return;
     const name = prompt('Name:') || ip;
     const type = prompt('Type (bitaxe / nerdaxe):', 'bitaxe') || 'bitaxe';
@@ -3581,13 +3586,15 @@
     devs.push({ ip: ip.trim(), name: name.trim(), type: type.trim() });
     currentConfig.axeos_devices = devs;
     renderAxeDeviceList(devs);
+    await saveSettings();
   }
 
-  function removeAxeDevice(i) {
+  async function removeAxeDevice(i) {
     const devs = currentConfig.axeos_devices || [];
     devs.splice(i, 1);
     currentConfig.axeos_devices = devs;
     renderAxeDeviceList(devs);
+    await saveSettings();
   }
 
   // ── NerdMiner / SparkMiner Settings ─────────────────────────────────────────
@@ -3610,7 +3617,7 @@
       </li>`).join('');
   }
 
-  function addSoloMinerDevice(type) {
+  async function addSoloMinerDevice(type) {
     const ip   = prompt('IP address:');  if (!ip) return;
     const name = prompt('Name:') || ip;
     const key  = type === 'sparkminer' ? 'sparkminer_devices' : 'nerdminer_devices';
@@ -3618,14 +3625,16 @@
     devs.push({ ip: ip.trim(), name: name.trim(), type });
     currentConfig[key] = devs;
     renderSoloMinerDeviceList(type, devs);
+    await saveSettings();
   }
 
-  function removeSoloMinerDevice(type, i) {
+  async function removeSoloMinerDevice(type, i) {
     const key  = type === 'sparkminer' ? 'sparkminer_devices' : 'nerdminer_devices';
     const devs = currentConfig[key] || [];
     devs.splice(i, 1);
     currentConfig[key] = devs;
     renderSoloMinerDeviceList(type, devs);
+    await saveSettings();
   }
 
   async function scanSoloMiners() {
@@ -3668,7 +3677,7 @@
     btn.className = 'btn btn-primary btn-sm';
     btn.style.marginTop = '10px';
     btn.textContent = '⬇ Import Selected';
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const checked = [...out.querySelectorAll('input[type=checkbox]:checked')];
       const existing = currentConfig[key] || [];
       const seen = new Set(existing.map(d => d.ip));
@@ -3680,8 +3689,9 @@
       });
       currentConfig[key] = existing;
       renderSoloMinerDeviceList(type, existing);
-      out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${existing.length} device(s) imported. Click 💾 Save to persist.</p>`;
-      toast(`${checked.length} device(s) imported`, 'success');
+      out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${checked.length} device(s) imported — saving…</p>`;
+      await saveSettings();
+      out.innerHTML = `<p class="text-muted" style="font-size:12px">✓ ${existing.length} device(s) saved.</p>`;
     };
     out.appendChild(btn);
   }
