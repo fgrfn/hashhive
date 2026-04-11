@@ -891,6 +891,13 @@ async def get_settings() -> dict:
 
 @app.post("/api/settings")
 async def post_settings(data: dict) -> dict:
+    # Hash plaintext password if provided (crypto.subtle unavailable on plain HTTP,
+    # so the frontend sends plaintext and the backend performs SHA-256 hashing)
+    auth_data = data.get("auth")
+    if isinstance(auth_data, dict):
+        plaintext_pw = auth_data.pop("password", None)
+        if plaintext_pw:
+            auth_data["password_hash"] = _hash_pw(plaintext_pw)
     # Merge with DEFAULT_CONFIG so new keys added in updates are preserved
     merged = {**DEFAULT_CONFIG, **data}
     merged.setdefault("thresholds", {}).update({k: v for k, v in DEFAULT_CONFIG["thresholds"].items() if k not in data.get("thresholds", {})})
