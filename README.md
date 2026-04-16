@@ -174,6 +174,3 @@ Die App-Version steht in [`version.txt`](version.txt) und wird automatisch durch
 ## License
 
 [MIT](LICENSE)
-
-[MIT](LICENSE)
-
