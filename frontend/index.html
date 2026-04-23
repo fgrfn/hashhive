@@ -13,61 +13,89 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:           #0f0f13;
-      --surface:      #1a1a24;
-      --surface2:     #222230;
-      --border:       #2d2d3d;
-      --text:         #e2e2f0;
-      --text-muted:   #8888aa;
+      --bg:           #0f0b18;
+      --surface:      #181124;
+      --surface2:     #211733;
+      --surface3:     #2a1f42;
+      --border:       rgba(255,255,255,0.07);
+      --border-strong:rgba(255,255,255,0.14);
+      --text:         #ece7f5;
+      --text-muted:   #8b83a3;
+      --text-dim:     #5d576f;
       --accent:       #a855f7;
       --accent-dim:   #7c3aed;
-      --accent-glow:  rgba(168,85,247,.15);
-      --success:      #22c55e;
+      --accent-glow:  rgba(168,85,247,0.14);
+      --honey:        #fbbf24;
+      --honey-dim:    #d97706;
+      --success:      #34d399;
       --warning:      #f59e0b;
-      --danger:       #ef4444;
-      --info:         #3b82f6;
+      --danger:       #f43f5e;
+      --info:         #38bdf8;
+      --font-sans:    'Space Grotesk', 'Inter', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', ui-monospace, monospace;
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;display:flex;min-height:100vh}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;display:flex;min-height:100vh}
 
     /* ── Sidebar ── */
-    #sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
-    .sidebar-logo{padding:16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
-    .logo-icon{width:38px;height:38px;flex-shrink:0}
-    .logo-text{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1}
+    #sidebar{width:232px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+    .sidebar-logo{padding:20px 20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+    .logo-icon{width:30px;flex-shrink:0}
+    .logo-text{font-size:18px;font-weight:700;letter-spacing:-0.02em;line-height:1}
     .logo-text .logo-hash{color:var(--text)}
-    .logo-text .logo-hive{background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    nav{flex:1;padding:10px 0;overflow-y:auto}
-    nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--text-muted);text-decoration:none;transition:.15s;border-left:3px solid transparent;cursor:pointer;user-select:none}
+    .logo-text .logo-hive{background:linear-gradient(135deg,var(--honey),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    nav{flex:1;padding:12px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+    nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;color:var(--text-muted);text-decoration:none;transition:.15s;border-radius:8px;cursor:pointer;user-select:none;font-size:13px;font-weight:500}
     nav a:hover{color:var(--text);background:var(--surface2)}
-    nav a.active{color:var(--accent);background:var(--accent-glow);border-left-color:var(--accent)}
-    .nav-icon{font-size:16px;width:20px;text-align:center}
-    .nav-badge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px}
-    .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px}
+    nav a.active{color:var(--accent);background:var(--accent-glow)}
+    .nav-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0}
+    .nav-badge{margin-left:auto;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-family:var(--font-mono);font-weight:700}
+    .sidebar-groups{padding:0 2px;margin-top:16px}
+    .sidebar-groups-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;font-weight:600;font-family:var(--font-mono);padding:0 10px;margin-bottom:8px}
+    .sidebar-group-item{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:6px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:.15s}
+    .sidebar-group-item:hover{background:var(--surface2)}
+    .sidebar-group-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+    .sidebar-group-count{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-left:auto}
+    .sidebar-footer{padding:14px 20px;border-top:1px solid var(--border);color:var(--text-dim);font-size:11px;font-family:var(--font-mono)}
+    .sidebar-footer-live{display:flex;align-items:center;gap:4px;margin-top:4px}
+    .sidebar-footer-dot{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success)}
     .sidebar-footer a{color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11px}
     .sidebar-footer a:hover{color:var(--text)}
 
     /* ── Main ── */
-    #main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
-    .topbar{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50}
-    .topbar h1{font-size:17px;font-weight:600}
-    .topbar-right{display:flex;gap:8px;align-items:center}
-    .content{padding:22px;flex:1}
+    #main{margin-left:232px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+    .topbar{height:64px;padding:0 26px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50;gap:16px}
+    .topbar-title-wrap{min-width:0}
+    .topbar-breadcrumb{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;font-family:var(--font-mono)}
+    .topbar h1{font-size:20px;font-weight:600;letter-spacing:-0.02em;margin-top:2px}
+    .topbar-search{display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font-mono);color:var(--text-muted);min-width:220px;background:var(--surface)}
+    .topbar-search input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;font-family:var(--font-mono)}
+    .topbar-search input::placeholder{color:var(--text-muted)}
+    .topbar-search-kbd{padding:1px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:10px}
+    .topbar-right{display:flex;gap:8px;align-items:center;flex-shrink:0}
+    .content{padding:22px 26px;flex:1}
     .page{display:none}
     .page.active{display:block}
 
     /* ── Cards ── */
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
-    .card-title{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+    .card-title{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;font-family:var(--font-mono)}
 
     /* ── Stat grid ── */
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px}
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
-    .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-    .stat-value{font-size:24px;font-weight:700;color:var(--accent);line-height:1.1}
-    .stat-unit{font-size:12px;color:var(--text-muted);margin-top:2px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .15s}
+    .stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-family:var(--font-mono);font-weight:600}
+    .stat-value{font-size:26px;font-weight:700;color:var(--accent);line-height:1.1;font-family:var(--font-mono);letter-spacing:-0.02em}
+    .stat-unit{font-size:11px;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono)}
+    .stat-trend{font-size:11px;margin-top:4px;font-family:var(--font-mono)}
+    .stat-trend-up{color:var(--success)}
+    .stat-trend-down{color:var(--danger)}
+    /* ── Mono data class ── */
+    .mono{font-family:var(--font-mono)}
 
     /* ── Tables ── */
     .table-wrap{overflow-x:auto;border-radius:6px}
@@ -114,15 +142,23 @@
     .mm-tile.mm-nm{box-shadow:inset 0 0 0 1px rgba(168,85,247,.25)}
     .mm-tile .mm-badge{position:absolute;top:4px;right:5px;font-size:9px;opacity:.7}
     .mm-empty{color:var(--text-muted);font-size:13px;padding:8px 0}
-    tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
-    tbody tr:hover{background:var(--surface2)}
-    tbody tr:last-child td{border-bottom:none}
-
     /* ── Status dots ── */
     .dot-online{display:inline-flex;align-items:center;gap:5px;color:var(--success);font-weight:500}
     .dot-online::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--success)}
     .dot-offline{display:inline-flex;align-items:center;gap:5px;color:var(--danger);font-weight:500}
     .dot-offline::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--danger)}
+
+    /* ── Status pill ── */
+    .status-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:12px;font-weight:500;font-family:var(--font-mono);letter-spacing:0.02em;white-space:nowrap}
+    .status-pill-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+    .status-pill-online{background:rgba(52,211,153,0.15);color:var(--success)}
+    .status-pill-online .status-pill-dot{background:var(--success)}
+    .status-pill-warning{background:rgba(245,158,11,0.15);color:var(--warning)}
+    .status-pill-warning .status-pill-dot{background:var(--warning)}
+    .status-pill-offline{background:rgba(244,63,94,0.15);color:var(--danger)}
+    .status-pill-offline .status-pill-dot{background:var(--danger)}
+    .status-pill-paused{background:var(--surface2);color:var(--text-muted)}
+    .status-pill-paused .status-pill-dot{background:var(--text-muted)}
 
     /* ── Temp colors ── */
     .t-ok{color:var(--success)}
@@ -130,22 +166,22 @@
     .t-crit{color:var(--danger)}
 
     /* ── Buttons ── */
-    .btn{padding:7px 14px;border-radius:6px;border:1px solid transparent;cursor:pointer;font-size:13px;font-weight:500;transition:.15s;line-height:1.4}
+    .btn{padding:7px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;font-size:12px;font-weight:500;transition:.15s;line-height:1.4;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit}
     .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .btn-primary:hover{background:var(--accent-dim);border-color:var(--accent-dim)}
-    .btn-secondary{background:var(--surface2);color:var(--text);border-color:var(--border)}
+    .btn-secondary{background:transparent;color:var(--text);border-color:var(--border)}
     .btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
-    .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger)}
-    .btn-danger:hover{background:var(--danger);color:#fff}
-    .btn-sm{padding:4px 10px;font-size:12px}
+    .btn-danger{background:transparent;color:var(--danger);border-color:rgba(244,63,94,0.3)}
+    .btn-danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+    .btn-sm{padding:5px 10px;font-size:11px}
 
     /* ── Forms ── */
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
     .form-group{margin-bottom:14px}
-    .form-group label{display:block;margin-bottom:5px;color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-    .form-group input,.form-group select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;transition:.15s}
-    .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
-    .form-group input::placeholder{color:var(--text-muted)}
+    .form-group label{display:block;margin-bottom:6px;color:var(--text-muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-mono)}
+    .form-group input,.form-group select,.form-group textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;transition:.15s;font-family:var(--font-mono);outline:none}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+    .form-group input::placeholder,.form-group textarea::placeholder{color:var(--text-muted)}
 
     /* ── Toggle ── */
     .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
@@ -163,9 +199,6 @@
     .device-item-info{display:flex;flex-direction:column;gap:2px}
     .device-item-name{font-weight:500}
     .device-item-ip{font-size:12px;color:var(--text-muted)}
-
-    /* ── Section header ── */
-    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 
     /* ── Alert items ── */
     .alert-item{display:flex;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);align-items:flex-start}
@@ -185,18 +218,16 @@
 
     /* ── Toast ── */
     #toast-container{position:fixed;bottom:22px;right:22px;z-index:9999;display:flex;flex-direction:column;gap:8px}
-    .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;max-width:320px;animation:toastIn .2s ease}
+    .toast{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;max-width:320px;animation:toastIn .2s ease;box-shadow:0 8px 24px rgba(0,0,0,0.3)}
     .toast.success{border-color:var(--success);color:var(--success)}
     .toast.error{border-color:var(--danger);color:var(--danger)}
     .toast.info{border-color:var(--info);color:var(--info)}
     @keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 
-    /* ── Miner card accents ── */
-    .card-nm{border-top:3px solid var(--accent)}
-    .card-ax{border-top:3px solid #38bdf8}
+    /* ── Live log ── */
 
     /* ── Live log ── */
-    .log-panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;height:200px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px}
+    .log-panel{background:var(--bg);border:1px solid var(--border);border-radius:8px;height:200px;overflow-y:auto;font-family:var(--font-mono);font-size:12px;padding:8px 12px}
     .log-entry{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6;align-items:baseline}
     .log-entry:last-child{border-bottom:none}
     .log-entry.log-hidden{display:none}
@@ -210,22 +241,22 @@
     .log-warning{color:var(--warning)}
     .log-info{color:var(--info)}
     .log-ok{color:var(--success)}
-    .log-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:12px;margin-bottom:6px;box-sizing:border-box}
+    .log-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;font-family:var(--font-mono);margin-bottom:6px;box-sizing:border-box}
     .log-search:focus{outline:none;border-color:var(--accent)}
 
     /* ── Modal ── */
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)}
     .modal-overlay.open{display:flex}
-    .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(580px,100%);max-height:88vh;display:flex;flex-direction:column}
-    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
-    .modal-title{font-weight:600;font-size:15px}
-    .modal-title small{display:block;font-size:11px;font-weight:400;color:var(--text-muted);margin-top:1px}
-    .modal-close{background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
-    .modal-close:hover{color:var(--text)}
-    .modal-body{overflow-y:auto;padding:20px;flex:1}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(580px,100%);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.5)}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .modal-title{font-weight:600;font-size:15px;letter-spacing:-0.01em}
+    .modal-title small{display:block;font-size:11px;font-weight:400;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono)}
+    .modal-close{background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1;padding:4px 6px;border-radius:6px;transition:.15s}
+    .modal-close:hover{color:var(--text);background:var(--surface2)}
+    .modal-body{overflow-y:auto;padding:20px 22px;flex:1}
     .modal-section{margin-bottom:20px}
-    .modal-section-title{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-    .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+    .modal-section-title{font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}
+    .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
 
     /* ── Pool device checklist ── */
     .pool-devices{display:flex;flex-direction:column;gap:6px;margin:12px 0}
@@ -320,13 +351,14 @@
     #hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:0 6px;line-height:1;flex-shrink:0}
     #sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
     @media(max-width:768px){
-      #sidebar{transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);z-index:200}
+      #sidebar{transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);z-index:200;width:232px}
       #sidebar.open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.6)}
       #sidebar-overlay.show{display:block}
       #main{margin-left:0}
-      .topbar{padding:10px 12px}
+      .topbar{padding:0 12px;height:56px}
+      .topbar-search{display:none}
       #hamburger{display:inline-flex}
-      .content{padding:12px}
+      .content{padding:14px 12px}
       .stat-grid{grid-template-columns:repeat(2,1fr)}
       .form-grid{grid-template-columns:1fr}
       thead th,tbody td{padding:6px 8px;font-size:12px}
@@ -336,10 +368,40 @@
     .chart-wrap{position:relative;height:180px}
 
     /* ── Light mode ── */
-    html.light-mode{--bg:#f5f5fa;--surface:#ffffff;--surface2:#ebebf5;--border:#d0d0e0;--text:#1a1a2e;--text-muted:#6060aa;--accent-glow:rgba(168,85,247,.08)}
+    html.light-mode{
+      --bg:#faf8ff;--surface:#ffffff;--surface2:#f3eeff;--surface3:#e9e0ff;
+      --border:rgba(20,15,40,0.08);--border-strong:rgba(20,15,40,0.15);
+      --text:#191327;--text-muted:#6b6485;--text-dim:#a09bb3;
+      --accent:#7c3aed;--accent-dim:#6d28d9;--accent-glow:rgba(124,58,237,0.10);
+      --honey:#d97706;--honey-dim:#b45309;
+      --success:#059669;--warning:#d97706;--danger:#e11d48;--info:#0284c7;
+    }
 
     /* ── Offline banner ── */
-    #offline-banner{display:none;background:var(--danger);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:500;position:sticky;top:57px;z-index:49;letter-spacing:.01em}
+    #offline-banner{display:none;background:var(--danger);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:500;position:sticky;top:64px;z-index:49;letter-spacing:.01em}
+
+    /* ── Table improvements ── */
+    tbody td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+    tbody tr:hover{background:var(--surface2)}
+    tbody tr:last-child td{border-bottom:none}
+    thead th{text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:10;background:var(--surface2);font-family:var(--font-mono);font-weight:600}
+
+    /* ── Section header ── */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+
+    /* ── Miner card accents ── */
+    .card-nm{border-top:2px solid var(--accent)}
+    .card-ax{border-top:2px solid var(--info)}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.18);border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,0.32)}
+
+    /* ── Animations ── */
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
   </style>
 </head>
 <body>
@@ -352,65 +414,84 @@
   <div class="sidebar-logo">
     <svg class="logo-icon" viewBox="0 0 38 44" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="hxGrad" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id="hmGrad" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#fbbf24"/>
-          <stop offset="100%" stop-color="#d97706"/>
+          <stop offset="100%" stop-color="#a855f7"/>
         </linearGradient>
       </defs>
-      <!-- hexagon -->
-      <path d="M19 1 L37 11 L37 33 L19 43 L1 33 L1 11 Z" fill="url(#hxGrad)" stroke="#92400e" stroke-width="1"/>
-      <!-- bee body -->
-      <ellipse cx="19" cy="26" rx="5.5" ry="7.5" fill="#1a1a10" stroke="#92400e" stroke-width=".8"/>
-      <!-- stripes -->
-      <rect x="13.5" y="24" width="11" height="2" rx="1" fill="#fbbf24"/>
-      <rect x="13.5" y="27.5" width="11" height="2" rx="1" fill="#fbbf24"/>
-      <!-- head -->
-      <circle cx="19" cy="18" r="4" fill="#1a1a10"/>
-      <!-- antennae -->
-      <line x1="17" y1="14.5" x2="14" y2="11" stroke="#1a1a10" stroke-width="1.2" stroke-linecap="round"/>
-      <circle cx="13.5" cy="10.5" r="1" fill="#1a1a10"/>
-      <line x1="21" y1="14.5" x2="24" y2="11" stroke="#1a1a10" stroke-width="1.2" stroke-linecap="round"/>
-      <circle cx="24.5" cy="10.5" r="1" fill="#1a1a10"/>
-      <!-- wings -->
-      <ellipse cx="12" cy="22" rx="5.5" ry="3" fill="rgba(255,255,255,0.55)" transform="rotate(-20 12 22)"/>
-      <ellipse cx="26" cy="22" rx="5.5" ry="3" fill="rgba(255,255,255,0.55)" transform="rotate(20 26 22)"/>
-      <!-- hash # on body -->
-      <text x="19" y="30" text-anchor="middle" font-size="5.5" font-weight="900" fill="#fbbf24" font-family="monospace">#</text>
+      <path d="M19 1 L37 11 L37 33 L19 43 L1 33 L1 11 Z" fill="url(#hmGrad)"/>
+      <text x="19" y="27" text-anchor="middle" font-size="18" font-weight="800" fill="rgba(0,0,0,0.75)" font-family="'JetBrains Mono',monospace">#</text>
     </svg>
     <div class="logo-text"><span class="logo-hash">Hash</span><span class="logo-hive">Hive</span></div>
   </div>
   <nav>
-    <a id="nav-dashboard"      onclick="showPage('dashboard')">      <span class="nav-icon">📊</span> Dashboard</a>
-    <a id="nav-nmminer"        onclick="showPage('nmminer')">        <span class="nav-icon">⛏️</span> Solo Miners</a>
-    <a id="nav-axeos"          onclick="showPage('axeos')">          <span class="nav-icon">🔧</span> BitAxe / NerdAxe</a>
-    <a id="nav-pool"           onclick="showPage('pool')">           <span class="nav-icon">🌐</span> Pool</a>
-    <a id="nav-settings"       onclick="showPage('settings')">       <span class="nav-icon">⚙️</span> Settings</a>
-    <a id="nav-notifications"  onclick="showPage('notifications')">  <span class="nav-icon">🔔</span> Notifications
+    <a id="nav-dashboard"      onclick="showPage('dashboard')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+      Dashboard
+    </a>
+    <a id="nav-nmminer"        onclick="showPage('nmminer')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg></span>
+      Solo Miners
+    </a>
+    <a id="nav-axeos"          onclick="showPage('axeos')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+      BitAxe / NerdAxe
+    </a>
+    <a id="nav-pool"           onclick="showPage('pool')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg></span>
+      Pool
+    </a>
+    <a id="nav-notifications"  onclick="showPage('notifications')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg></span>
+      Alerts
       <span class="nav-badge" id="alert-badge" style="display:none">0</span>
+    </a>
+    <a id="nav-settings"       onclick="showPage('settings')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></span>
+      Settings
     </a>
   </nav>
   <div class="sidebar-footer">
-    <div id="sidebar-version">HashHive</div>
-    <a href="https://github.com/fgrfn/hashhive" target="_blank" rel="noopener">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
-      fgrfn/hashhive
-    </a>
+    <div id="sidebar-version">v– · – devices</div>
+    <div class="sidebar-footer-live">
+      <div class="sidebar-footer-dot"></div>
+      <span id="sidebar-ws-label">Connecting…</span>
+    </div>
   </div>
 </aside>
 
 <!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
 <div id="main">
   <div class="topbar">
-    <button id="hamburger" onclick="toggleSidebar()" title="Menu">☰</button>
-    <h1 id="page-title">Dashboard</h1>
+    <button id="hamburger" onclick="toggleSidebar()" title="Menu" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 6px;line-height:1;display:none">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="topbar-title-wrap">
+      <div class="topbar-breadcrumb">HashHive / <span id="page-breadcrumb">Dashboard</span></div>
+      <h1 id="page-title">Dashboard</h1>
+    </div>
+    <div class="topbar-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="global-search" placeholder="Search devices…" oninput="filterGlobal(this.value)">
+      <span class="topbar-search-kbd">⌘K</span>
+    </div>
     <div class="topbar-right">
-      <span id="last-update" class="text-muted" style="font-size:12px"></span>
-      <span id="refresh-countdown" class="text-muted" style="font-size:12px;display:none">↻ in <span id="refresh-secs">–</span>s</span>
-      <span id="price-ticker" style="font-size:12px;color:var(--text-muted);display:none;cursor:pointer" title="Live coin price (CoinGecko)" onclick="loadMarketPrice(true)"></span>
+      <span id="price-ticker" style="font-size:12px;color:var(--text-muted);display:none;cursor:pointer;font-family:var(--font-mono);padding:6px 10px;border:1px solid var(--border);border-radius:8px" title="Live coin price (CoinGecko)" onclick="loadMarketPrice(true)"></span>
       <span id="ws-status" title="WebSocket" style="font-size:12px;display:none"></span>
-      <button class="btn btn-secondary btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
-      <button class="btn btn-secondary btn-sm" id="btn-logout" style="display:none" onclick="authLogout()" title="Logout">⎋ Logout</button>
-      <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
+      <span id="last-update" class="text-muted" style="font-size:11px;font-family:var(--font-mono)"></span>
+      <span id="refresh-countdown" class="text-muted" style="font-size:11px;font-family:var(--font-mono);display:none">↻ <span id="refresh-secs">–</span>s</span>
+      <button class="btn btn-secondary btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" style="padding:7px 9px">
+        <svg id="theme-icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+        <svg id="theme-icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="refreshCurrent()" title="Refresh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+      </button>
+      <button class="btn btn-primary btn-sm" id="btn-add-device" onclick="showPage('settings')" title="Add device">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add device
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="display:none" onclick="authLogout()" title="Logout">Logout</button>
     </div>
   </div>
 
@@ -423,14 +504,17 @@
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-label">Total Hashrate</div>
-          <div class="stat-value" id="stat-hashrate">–</div>
-          <div class="stat-unit"><span id="stat-hashrate-unit">GH/s</span> <span id="stat-hashrate-trend" style="font-size:13px;font-weight:700"></span></div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" id="stat-hashrate">–</div>
+            <div class="stat-unit" id="stat-hashrate-unit">GH/s</div>
+          </div>
+          <div class="stat-trend stat-trend-up" id="stat-hashrate-trend"></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Devices Online</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="stat-value" id="stat-online">–</div>
-            <svg id="uptime-ring-svg" width="40" height="40" viewBox="0 0 40 40" style="transform:rotate(-90deg);flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <div class="stat-value" style="color:var(--success)" id="stat-online">–</div>
+            <svg id="uptime-ring-svg" width="36" height="36" viewBox="0 0 40 40" style="transform:rotate(-90deg);flex-shrink:0">
               <circle cx="20" cy="20" r="14" fill="none" stroke="var(--border)" stroke-width="3"/>
               <circle id="uptime-ring-fg" cx="20" cy="20" r="14" fill="none" stroke="var(--success)" stroke-width="3" stroke-dasharray="0 87.96" stroke-linecap="round" style="transition:stroke-dasharray .4s ease,stroke .4s ease"/>
             </svg>
@@ -439,49 +523,61 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Max. Temperature</div>
-          <div class="stat-value" id="stat-maxtemp">–</div>
-          <div class="stat-unit">°C</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" style="color:var(--warning)" id="stat-maxtemp">–</div>
+            <div class="stat-unit">°C</div>
+          </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="cursor:pointer" onclick="showPage('notifications')" onmouseenter="this.style.borderColor='var(--danger)'" onmouseleave="this.style.borderColor='var(--border)'">
           <div class="stat-label">Open Alerts</div>
-          <div class="stat-value" id="stat-alerts" style="color:var(--warning)">–</div>
-          <div class="stat-unit">unread</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" style="color:var(--danger)" id="stat-alerts">–</div>
+            <div class="stat-unit">unread</div>
+          </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Total Power</div>
-          <div class="stat-value" id="stat-power">–</div>
-          <div class="stat-unit">W</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" style="color:var(--honey)" id="stat-power">–</div>
+            <div class="stat-unit">W</div>
+          </div>
         </div>
         <div class="stat-card" id="stat-cost-card" style="display:none">
           <div class="stat-label">Est. Cost / Day</div>
-          <div class="stat-value" id="stat-cost">–</div>
-          <div class="stat-unit" id="stat-cost-unit">€</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" id="stat-cost">–</div>
+            <div class="stat-unit" id="stat-cost-unit">€</div>
+          </div>
         </div>
         <div class="stat-card" id="stat-prob-card" style="display:none">
           <div class="stat-label">Time to Block</div>
-          <div class="stat-value" id="stat-prob">–</div>
+          <div style="margin-top:8px"><div class="stat-value" id="stat-prob">–</div></div>
           <div class="stat-unit">estimated</div>
         </div>
         <div class="stat-card" id="stat-lucky-card" style="display:none">
           <div class="stat-label">Lucky Factor</div>
-          <div class="stat-value" id="stat-lucky">–</div>
-          <div class="stat-unit" id="stat-lucky-unit">% (30d)</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" style="color:var(--honey)" id="stat-lucky">–</div>
+            <div class="stat-unit" id="stat-lucky-unit">%</div>
+          </div>
         </div>
         <div class="stat-card" id="stat-profit-card" style="display:none">
           <div class="stat-label">Est. Reward / Day</div>
-          <div class="stat-value" id="stat-profit">–</div>
-          <div class="stat-unit" id="stat-profit-unit">€</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+            <div class="stat-value" style="color:var(--success)" id="stat-profit">–</div>
+            <div class="stat-unit" id="stat-profit-unit">€</div>
+          </div>
         </div>
         <div class="stat-card" id="stat-price-card" style="display:none">
           <div class="stat-label" id="stat-price-label">Live Price</div>
-          <div class="stat-value" id="stat-price" style="font-size:20px">–</div>
+          <div style="margin-top:8px"><div class="stat-value" style="font-size:20px" id="stat-price">–</div></div>
           <div class="stat-unit" id="stat-price-change"></div>
         </div>
       </div>
 
       <div class="card card-nm">
         <div class="section-header">
-          <div class="card-title mb-0">NMMiner</div>
+          <div class="card-title mb-0" style="font-size:13px;font-family:var(--font-sans);text-transform:none;font-weight:600;letter-spacing:0;color:var(--text)">NMMiner Swarm</div>
           <div class="view-toggle" id="nm-view-toggle">
             <button class="active" onclick="setDashView('nm','table',this)" title="Table view">☰</button>
             <button onclick="setDashView('nm','map',this)" title="Map view">⊞</button>
@@ -508,7 +604,7 @@
 
       <div class="card card-ax">
         <div class="section-header">
-          <div class="card-title mb-0">BitAxe / NerdAxe</div>
+          <div class="card-title mb-0" style="font-size:13px;font-family:var(--font-sans);text-transform:none;font-weight:600;letter-spacing:0;color:var(--text)">BitAxe / NerdAxe Fleet</div>
           <div class="view-toggle" id="ax-view-toggle">
             <button class="active" onclick="setDashView('ax','table',this)" title="Table view">☰</button>
             <button onclick="setDashView('ax','map',this)" title="Map view">⊞</button>
@@ -524,32 +620,34 @@
       </div>
 
       <div class="card">
-        <div class="section-header" style="margin-bottom:8px">
-          <div class="card-title mb-0">📈 Hashrate History</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="chart-days" onchange="loadHashrateChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:12px">
-              <option value="1" selected>Last 24 h</option>
-              <option value="3">Last 3 days</option>
-              <option value="7">Last 7 days</option>
+        <div class="section-header" style="margin-bottom:14px">
+          <div>
+            <div class="card-title mb-0">Hashrate History</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="chart-days" onchange="loadHashrateChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;font-family:var(--font-mono);outline:none;cursor:pointer">
+              <option value="1" selected>24 h</option>
+              <option value="3">3 days</option>
+              <option value="7">7 days</option>
             </select>
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">
-              <input type="checkbox" id="chart-eff-toggle" onchange="toggleChartEff()" style="accent-color:var(--warning)"> ⚡ Eff.
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;font-family:var(--font-mono)">
+              <input type="checkbox" id="chart-eff-toggle" onchange="toggleChartEff()" style="accent-color:var(--warning)"> Eff.
             </label>
-            <button class="btn btn-secondary btn-sm" onclick="exportChartCsv()" title="Download CSV">📥 CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportChartCsv()" title="Download CSV">CSV</button>
           </div>
         </div>
         <div class="chart-wrap"><canvas id="hashrate-chart"></canvas></div>
       </div>
 
       <div class="card" id="bestdiff-chart-card" style="display:none">
-        <div class="section-header" style="margin-bottom:8px">
-          <div class="card-title mb-0">🏆 Best Difficulty Verlauf</div>
+        <div class="section-header" style="margin-bottom:14px">
+          <div class="card-title mb-0">Best Difficulty</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="bestdiff-days" onchange="loadBestDiffChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:12px">
-              <option value="1">Last 24 h</option>
-              <option value="3">Last 3 days</option>
-              <option value="7" selected>Last 7 days</option>
-              <option value="30">Last 30 days</option>
+            <select id="bestdiff-days" onchange="loadBestDiffChart()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;font-family:var(--font-mono);outline:none;cursor:pointer">
+              <option value="1">24 h</option>
+              <option value="3">3 days</option>
+              <option value="7" selected>7 days</option>
+              <option value="30">30 days</option>
             </select>
           </div>
         </div>
@@ -557,11 +655,16 @@
       </div>
 
       <div class="card" style="margin-bottom:0">
-        <div class="section-header" style="margin-bottom:6px">
-          <div class="card-title mb-0">🖥 Live Log</div>
+        <div class="section-header" style="margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-title mb-0">Live Log</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--success);font-family:var(--font-mono)">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 5px var(--success);display:inline-block"></span> live
+            </div>
+          </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" onclick="loadYesterdayLog()" id="log-load-hist-btn" title="Load previous day entries">📅 Load more</button>
-            <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">✕ Clear</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadYesterdayLog()" id="log-load-hist-btn" title="Load previous day entries">Load more</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearLiveLog()">Clear</button>
           </div>
         </div>
         <div class="log-tabs">
@@ -1406,6 +1509,8 @@
     const navEl = document.getElementById('nav-' + name);
     if (navEl) navEl.classList.add('active');
     document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
+    const bc = document.getElementById('page-breadcrumb');
+    if (bc) bc.textContent = PAGE_TITLES[name] || name;
     currentPage = name;
     closeSidebar();  // close mobile sidebar on navigation
 
@@ -1458,8 +1563,10 @@
   function toggleTheme() {
     const isLight = document.documentElement.classList.toggle('light-mode');
     localStorage.setItem('hh_theme', isLight ? 'light' : 'dark');
-    const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+    const moon = document.getElementById('theme-icon-moon');
+    const sun  = document.getElementById('theme-icon-sun');
+    if (moon) moon.style.display = isLight ? 'none' : '';
+    if (sun)  sun.style.display  = isLight ? '' : 'none';
   }
 
   // ── Offline banner ─────────────────────────────────────────────────────────
@@ -1909,18 +2016,24 @@
 
   function _wsSetStatus(connected) {
     const el = document.getElementById('ws-status');
-    if (!el) return;
-    if (connected) {
-      el.textContent = '⬤ Live';
-      el.style.color = 'var(--success)';
-      el.title = 'WebSocket connected — live updates active';
-      el.style.display = '';
-    } else {
-      el.textContent = '⬤ Reconnecting…';
-      el.style.color = 'var(--warning)';
-      el.title = 'WebSocket disconnected — reconnecting';
-      el.style.display = '';
+    if (el) {
+      if (connected) {
+        el.textContent = '⬤ Live';
+        el.style.color = 'var(--success)';
+        el.title = 'WebSocket connected — live updates active';
+        el.style.display = '';
+      } else {
+        el.textContent = '⬤ Reconnecting…';
+        el.style.color = 'var(--warning)';
+        el.title = 'WebSocket disconnected — reconnecting';
+        el.style.display = '';
+      }
     }
+    const dot  = document.querySelector('.sidebar-footer-dot');
+    const lbl  = document.getElementById('sidebar-ws-label');
+    if (dot) dot.style.background = connected ? 'var(--success)' : 'var(--warning)';
+    if (dot) dot.style.boxShadow = connected ? '0 0 6px var(--success)' : '0 0 6px var(--warning)';
+    if (lbl) lbl.textContent = connected ? 'Connected · WS live' : 'Reconnecting…';
   }
 
   function _handleWsMessage(raw) {
@@ -2248,8 +2361,14 @@
 
   function fmtStatus(online) {
     return online
-      ? '<span class="dot-online">Online</span>'
-      : '<span class="dot-offline">Offline</span>';
+      ? '<span class="status-pill status-pill-online"><span class="status-pill-dot"></span>Online</span>'
+      : '<span class="status-pill status-pill-offline"><span class="status-pill-dot"></span>Offline</span>';
+  }
+
+  function fmtStatusEx(online, paused) {
+    if (!online) return '<span class="status-pill status-pill-offline"><span class="status-pill-dot"></span>Offline</span>';
+    if (paused)  return '<span class="status-pill status-pill-paused"><span class="status-pill-dot"></span>Paused</span>';
+    return '<span class="status-pill status-pill-online"><span class="status-pill-dot"></span>Online</span>';
   }
 
   function fmtUptime(s) {
@@ -2394,13 +2513,13 @@
         const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
         const nmUptime = online ? fmtUptime(d.uptime || d.uptimeSeconds) : (d._offline_since ? `<span class="text-muted" style="font-size:11px">offline ${fmtOfflineSince(d._offline_since)}</span>` : '–');
         return `<tr data-ip="${d.ip}" onclick="navigateToDevice('nmminer','${d.ip}')" style="cursor:pointer">
-          <td>${d.hostname || d.name || d.ip || '–'}<br><small class="text-muted">${d.ip || ''}</small></td>
+          <td><span style="font-weight:600">${d.hostname || d.name || d.ip || '–'}</span><br><small class="text-muted mono">${d.ip || ''}</small></td>
           <td>${fmtStatus(online)}</td>
-          <td>${fmtNmHr(hrKh)}</td>
-          <td>${fmtTemp(temp, d._temp_max ?? tMax)}</td>
-          <td><small style="${shareColor}">${shareStr || '–'}</small></td>
+          <td class="mono">${fmtNmHr(hrKh)}</td>
+          <td class="mono">${fmtTemp(temp, d._temp_max ?? tMax)}</td>
+          <td class="mono" style="${shareColor}">${shareStr || '–'}</td>
           <td class="max-w">${fmtPoolCell(d, 'nmminer')}</td>
-          <td>${nmUptime}</td>
+          <td class="mono text-muted">${nmUptime}</td>
         </tr>`;
       }).join('');
     }
@@ -2627,18 +2746,18 @@
       const poolLink = poolPageLink(stratumUrl, wallet);
       const devIp = d._ip || d.ip || '';
       return `<tr data-ip="${devIp}">
-        <td><span class="copy-ip" onclick="copyIP('${devIp}')" title="Copy IP">${devIp || '–'}</span></td>
-        <td><small>${d.hostname || d.minerName || d._name || '–'}</small></td>
+        <td><span class="copy-ip mono" onclick="copyIP('${devIp}')" title="Copy IP">${devIp || '–'}</span></td>
+        <td>${d.hostname || d.minerName || d._name || '–'}</td>
         <td>${fmtStatus(online)}</td>
-        <td>${fmtNmHr(hr)}</td>
-        <td>${fmtTemp(temp, d._temp_max ?? tMax)}</td>
-        <td class="max-w"><small>${poolDisplay}${poolLink}</small></td>
-        <td><small class="text-muted" style="font-size:10px;word-break:break-all">${wallet ? wallet.substring(0, 20) + (wallet.length > 20 ? '…' : '') : '–'}</small></td>
-        <td><small>${fmtDiff(best)}</small></td>
-        <td><small class="text-muted">${tmpl}</small></td>
-        <td><small>${fmtUptime(uptime)}</small></td>
-        <td><small class="text-muted">${d.version || '–'}</small></td>
-        <td><button class="btn btn-secondary btn-xs" onclick="openSoloEdit('${devIp}','${type}')" title="Push pool config">⚙</button></td>
+        <td class="mono">${fmtNmHr(hr)}</td>
+        <td class="mono">${fmtTemp(temp, d._temp_max ?? tMax)}</td>
+        <td class="max-w mono" style="font-size:12px">${poolDisplay}${poolLink}</td>
+        <td class="mono text-muted" style="font-size:10px;word-break:break-all">${wallet ? wallet.substring(0, 20) + (wallet.length > 20 ? '…' : '') : '–'}</td>
+        <td class="mono" style="color:var(--honey)">${fmtDiff(best)}</td>
+        <td class="mono text-muted">${tmpl}</td>
+        <td class="mono text-muted">${fmtUptime(uptime)}</td>
+        <td class="mono text-muted">${d.version || '–'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openSoloEdit('${devIp}','${type}')" title="Push pool config">Config</button></td>
       </tr>`;
     }).join('');
     if (summary) {
@@ -2671,25 +2790,25 @@
       const shareMin = (currentConfig && currentConfig.thresholds && currentConfig.thresholds.share_rate_min) || 80;
       const shareColor = sharePct === null ? '' : sharePct >= shareMin ? 'color:var(--success)' : sharePct >= shareMin * 0.9 ? 'color:var(--warning)' : 'color:var(--danger)';
       return `<tr data-ip="${d.ip||''}">
-        <td><span class="copy-ip" data-ip="${d.ip||''}" onclick="event.stopPropagation();var _ip=this.dataset.ip||this.closest('tr')?.dataset.ip||'';if(_ip)copyIP(_ip);" title="Copy IP">${d.ip || '–'}</span></td>
-        <td>${d.hostname || d.name || '–'}</td>
-        <td><small class="text-muted">${d.boardtype || d.boardType || d.board || '–'}</small></td>
+        <td class="mono"><span class="copy-ip" data-ip="${d.ip||''}" onclick="event.stopPropagation();var _ip=this.dataset.ip||this.closest('tr')?.dataset.ip||'';if(_ip)copyIP(_ip);" title="Copy IP">${d.ip || '–'}</span></td>
+        <td><span style="font-weight:600">${d.hostname || d.name || '–'}</span></td>
+        <td class="text-muted mono" style="font-size:11px">${d.boardtype || d.boardType || d.board || '–'}</td>
         <td>${fmtStatus(online)}</td>
-        <td>${fmtNmHr(hr)}</td>
-        <td><small style="${shareColor}">${shareStr || '–'}</small></td>
-        <td class="max-w"><small>${fmtPoolCell(d, 'nmminer')}</small></td>
-        <td><small class="text-muted">${d.netDiff || '–'}</small></td>
-        <td><small class="text-muted">${d.poolDiff || '–'}</small></td>
-        <td><small class="text-muted">${d.lastDiff || '–'}</small></td>
-        <td><small>${fmtDiff(d.bestDiff || d.best_share || d.bestShare)}</small></td>
-        <td>${d.valid ?? d.hits ?? '–'}</td>
-        <td>${fmtTemp(tempRaw, d._temp_max ?? tMax)}</td>
-        <td><small class="text-muted">${d.rssi || '–'}</small></td>
-        <td><small class="text-muted">${d.memory || '–'}</small></td>
-        <td><small>${fmtUptime(d.uptime || d.uptimeSeconds)}</small></td>
-        <td><small class="text-muted">${d.version || '–'}</small></td>
-        <td><small class="text-muted">${d.lastconn || d.lastseen || '–'}</small></td>
-        <td><button class="btn btn-secondary btn-sm" onclick="openNmEdit('${d.ip}')">✏ Edit</button></td>
+        <td class="mono">${fmtNmHr(hr)}</td>
+        <td class="mono" style="${shareColor}">${shareStr || '–'}</td>
+        <td class="max-w" style="font-size:12px">${fmtPoolCell(d, 'nmminer')}</td>
+        <td class="mono text-muted">${d.netDiff || '–'}</td>
+        <td class="mono text-muted">${d.poolDiff || '–'}</td>
+        <td class="mono text-muted">${d.lastDiff || '–'}</td>
+        <td class="mono" style="color:var(--honey)">${fmtDiff(d.bestDiff || d.best_share || d.bestShare)}</td>
+        <td class="mono">${d.valid ?? d.hits ?? '–'}</td>
+        <td class="mono">${fmtTemp(tempRaw, d._temp_max ?? tMax)}</td>
+        <td class="mono text-muted">${d.rssi || '–'}</td>
+        <td class="mono text-muted">${d.memory || '–'}</td>
+        <td class="mono text-muted">${fmtUptime(d.uptime || d.uptimeSeconds)}</td>
+        <td class="mono text-muted">${d.version || '–'}</td>
+        <td class="mono text-muted">${d.lastconn || d.lastseen || '–'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openNmEdit('${d.ip}')">Edit</button></td>
       </tr>`;
     }).join('');
     if (summary) {
@@ -2748,9 +2867,7 @@
       const freq = d.actualFrequency ?? d.frequency ?? d.freqMHz ?? '–';
       const fanRpm = d.fanrpm ?? '–';
       const paused = d.miningPaused;
-      const statusCell = online
-        ? (paused ? '<span class="dot-offline">Paused</span>' : '<span class="dot-online">Online</span>')
-        : '<span class="dot-offline">Offline</span>';
+      const statusCell = fmtStatusEx(online, paused);
       const actions = [
         `<button class="btn btn-secondary btn-sm" onclick="openAxEdit('${d._ip}','${(d._name||d._ip).replace(/'/g,'')}')">✏ Edit</button>`,
         `<button class="btn btn-secondary btn-sm" onclick="openDevChart('${d._ip}','${(d._name||d._ip).replace(/'/g,'')}')">📈</button>`,
@@ -2768,27 +2885,27 @@
         <td><small>${d.ASICModel || '–'}${d.boardVersion ? '<br><span class="text-muted">'+d.boardVersion+'</span>' : ''}</small></td>
         <td>${d._type || '–'}</td>
         <td>${statusCell}</td>
-        <td>${hr.toFixed(2)}</td>
+        <td class="mono">${hr.toFixed(2)}</td>
         <td>${_drawSparkline(_sparkData[d._ip] || [])}</td>
-        <td>${hr1m > 0 ? hr1m.toFixed(2) : '–'}</td>
-        <td>${expHr > 0 ? expHr.toFixed(2) : '–'}</td>
-        <td>${errPct}</td>
-        <td>${fmtTemp(temp, devTMax)}</td>
-        <td>${vrTemp}</td>
-        <td>${power}</td>
-        <td>${eff}</td>
-        <td>${d.voltage ?? '–'}</td>
-        <td>${freq}</td>
-        <td>${d.fanspeed ?? '–'}</td>
-        <td>${fanRpm}</td>
-        <td>${d.fan2rpm ?? '–'}</td>
-        <td>${d.sharesAccepted ?? '–'}</td>
-        <td>${d.sharesRejected ?? '–'}</td>
-        <td>${fmtShareAcc(d.sharesAccepted, d.sharesRejected)}</td>
-        <td><small>${fmtDiff(d.bestDiff)}</small></td>
-        <td><small class="text-muted">${fmtDiff(d.bestSessionDiff)}</small></td>
-        <td><small class="text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</small></td>
-        <td>${fmtRssi(d.wifiRSSI)}</td>
+        <td class="mono">${hr1m > 0 ? hr1m.toFixed(2) : '–'}</td>
+        <td class="mono">${expHr > 0 ? expHr.toFixed(2) : '–'}</td>
+        <td class="mono">${errPct}</td>
+        <td class="mono">${fmtTemp(temp, devTMax)}</td>
+        <td class="mono">${vrTemp}</td>
+        <td class="mono">${power}</td>
+        <td class="mono">${eff}</td>
+        <td class="mono">${d.voltage ?? '–'}</td>
+        <td class="mono">${freq}</td>
+        <td class="mono">${d.fanspeed ?? '–'}</td>
+        <td class="mono">${fanRpm}</td>
+        <td class="mono">${d.fan2rpm ?? '–'}</td>
+        <td class="mono">${d.sharesAccepted ?? '–'}</td>
+        <td class="mono">${d.sharesRejected ?? '–'}</td>
+        <td class="mono">${fmtShareAcc(d.sharesAccepted, d.sharesRejected)}</td>
+        <td class="mono" style="color:var(--honey)">${fmtDiff(d.bestDiff)}</td>
+        <td class="mono text-muted">${fmtDiff(d.bestSessionDiff)}</td>
+        <td class="mono text-muted">${d.uptimeSeconds != null ? fmtUptime(d.uptimeSeconds) : '–'}</td>
+        <td class="mono">${fmtRssi(d.wifiRSSI)}</td>
         <td class="max-w">${fmtPoolCell(d, 'axeos')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
@@ -4424,6 +4541,24 @@
 
   // ── Table filter ───────────────────────────────────────────────────────────
 
+  function filterGlobal(q) {
+    // Forward global search to the active page's filter input
+    const activeFilters = { nmminer: 'nm-filter', axeos: 'ax-filter' };
+    const filterId = activeFilters[currentPage];
+    if (filterId) {
+      const el = document.getElementById(filterId);
+      if (el) { el.value = q; el.dispatchEvent(new Event('input')); }
+    }
+  }
+
+  // ⌘K global search shortcut
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('global-search')?.focus();
+    }
+  });
+
   function filterTable(tbodyId, inputId, countId) {
     const q = (document.getElementById(inputId)?.value || '').trim().toLowerCase();
     const tbody = document.getElementById(tbodyId);
@@ -5029,8 +5164,10 @@
     // Restore theme
     if (localStorage.getItem('hh_theme') === 'light') {
       document.documentElement.classList.add('light-mode');
-      const btn = document.getElementById('theme-toggle');
-      if (btn) btn.textContent = '☀️';
+      const moon = document.getElementById('theme-icon-moon');
+      const sun  = document.getElementById('theme-icon-sun');
+      if (moon) moon.style.display = 'none';
+      if (sun)  sun.style.display  = '';
     }
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
@@ -5055,8 +5192,8 @@
     _checkAuth();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {
-      document.getElementById('sidebar-version').textContent = `HashHive v${d.version}`;
-    }).catch(() => { document.getElementById('sidebar-version').textContent = 'HashHive'; });
+      document.getElementById('sidebar-version').textContent = `v${d.version} · – devices`;
+    }).catch(() => { document.getElementById('sidebar-version').textContent = 'v– · – devices'; });
     // Start price ticker (refresh every 5 min)
     loadMarketPrice(false);
     setInterval(() => loadMarketPrice(false), 300000);
