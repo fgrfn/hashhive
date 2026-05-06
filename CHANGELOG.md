@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/fgrfn/hashhive/compare/v1.1.1...v1.2.0) (2026-05-06)
+
+
+### Features
+
+* implement design features from Hive OS prototype ([61af4d4](https://github.com/fgrfn/hashhive/commit/61af4d47c9b14332dc726a1defb0c9c56e7a3aa6))
+* implement Hive OS design — Groups, Schedules, Wallets, Earnings, Device Detail ([cce5776](https://github.com/fgrfn/hashhive/commit/cce5776733a9405843fb45b829c07135a1d0030d))
+
 ## [1.1.1](https://github.com/fgrfn/hashhive/compare/v1.1.0...v1.1.1) (2026-04-10)
 
 
