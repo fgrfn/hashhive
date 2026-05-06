@@ -402,6 +402,68 @@
     /* ── Animations ── */
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+    /* ── KPI small chip (new pages) ── */
+    .kpi-sm{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:110px}
+    .kpi-sm-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-mono);font-weight:600}
+    .kpi-sm-value{font-size:20px;font-weight:700;font-family:var(--font-mono);letter-spacing:-0.02em;line-height:1.15}
+    .kpi-sm-unit{font-size:10px;color:var(--text-muted);font-family:var(--font-mono)}
+
+    /* ── Group cards ── */
+    .group-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden}
+    .group-card:hover{border-color:var(--accent)}
+    .group-stat{background:var(--surface2);border-radius:8px;padding:8px 10px;flex:1}
+    .group-stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);font-weight:600}
+    .group-stat-value{font-size:15px;font-weight:700;font-family:var(--font-mono);margin-top:2px}
+
+    /* ── Color swatches (group modal) ── */
+    .color-swatch{width:24px;height:24px;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s;display:inline-block}
+    .color-swatch:hover,.color-swatch.selected{transform:scale(1.2);border-color:#fff}
+
+    /* ── Schedule rows ── */
+    .schedule-row{display:grid;grid-template-columns:40px 1.4fr 1.2fr 1fr 1fr 0.9fr 32px;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);align-items:center;font-size:13px;transition:background .1s}
+    .schedule-row:last-child{border-bottom:none}
+    .schedule-row:hover{background:var(--surface2)}
+    .schedule-row.disabled{opacity:.5}
+
+    /* ── Wallet cards ── */
+    .wallet-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .15s}
+    .wallet-card:hover{border-color:var(--accent)}
+    .wallet-addr{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:11px;word-break:break-all;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+
+    /* ── Earnings ── */
+    .earnings-stat-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+    .earnings-stat-row:last-child{border-bottom:none}
+    .earnings-stat-key{color:var(--text-muted);font-size:11px}
+    .earnings-stat-val{font-family:var(--font-mono);font-size:13px;font-weight:600}
+
+    /* ── Device detail tabs ── */
+    .detail-tabs{display:flex;border-bottom:1px solid var(--border);gap:2px;margin-bottom:14px}
+    .detail-tab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+    .detail-tab:hover{color:var(--text)}
+    .detail-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+    /* ── Sidebar footer position context ── */
+    #sidebar-footer{position:relative}
+
+    /* ── Pill badge redesign ── */
+    .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:12px;font-weight:500;font-family:var(--font-mono);letter-spacing:.02em;white-space:nowrap}
+    .pill-success{background:rgba(52,211,153,.15);color:var(--success)}
+    .pill-warning{background:rgba(245,158,11,.15);color:var(--warning)}
+    .pill-danger{background:rgba(244,63,94,.15);color:var(--danger)}
+    .pill-accent{background:var(--accent-glow);color:var(--accent)}
+    .pill-muted{background:var(--surface2);color:var(--text-muted)}
+    .pill-honey{background:rgba(251,191,36,.15);color:var(--honey)}
+
+    /* ── Dashboard variant B extras ── */
+    .heatmap-grid{display:grid;gap:2px}
+    .heatmap-cell{border-radius:2px;cursor:default;transition:opacity .1s}
+    .heatmap-cell:hover{opacity:.8}
+
+    /* ── Timeline ── */
+    .timeline-row{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-bottom:6px}
+    .timeline-bar{position:relative;height:22px;background:var(--surface2);border-radius:5px;border:1px solid var(--border)}
+    .timeline-band{position:absolute;top:0;bottom:0;border-radius:4px;display:flex;align-items:center;padding-left:6px;font-size:9px;font-family:var(--font-mono);font-weight:600;text-transform:uppercase;letter-spacing:.05em;overflow:hidden}
   </style>
 </head>
 <body>
@@ -437,6 +499,22 @@
       <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
       BitAxe / NerdAxe
     </a>
+    <a id="nav-groups"          onclick="showPage('groups')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+      Groups
+    </a>
+    <a id="nav-schedules"       onclick="showPage('schedules')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></span>
+      Schedules
+    </a>
+    <a id="nav-wallets"         onclick="showPage('wallets')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H4a2 2 0 010-4h16v4"/><path d="M4 6a2 2 0 00-2 2v10a2 2 0 002 2h16v-4"/><circle cx="16" cy="14" r="1.5"/></svg></span>
+      Wallets
+    </a>
+    <a id="nav-earnings"        onclick="showPage('earnings')">
+      <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+      Earnings
+    </a>
     <a id="nav-pool"           onclick="showPage('pool')">
       <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg></span>
       Pool
@@ -451,11 +529,40 @@
       Settings
     </a>
   </nav>
-  <div class="sidebar-footer">
-    <div id="sidebar-version">v– · – devices</div>
-    <div class="sidebar-footer-live">
-      <div class="sidebar-footer-dot"></div>
+  <div class="sidebar-footer" id="sidebar-footer">
+    <div id="sidebar-update-row" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 0" onclick="toggleUpdatePopover()" title="Check for updates">
+      <span id="sidebar-update-dot" style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);flex-shrink:0"></span>
+      <div style="flex:1;min-width:0">
+        <div id="sidebar-update-label" style="font-size:11px;color:var(--success);font-weight:500">Up to date</div>
+        <div id="sidebar-update-sub" style="font-size:10px;color:var(--text-dim)"></div>
+      </div>
+      <span id="sidebar-update-badge" style="display:none;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700;letter-spacing:0.06em;background:rgba(245,158,11,0.2);color:var(--warning)">NEW</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px">
+      <span id="sidebar-version">v–</span>
+      <span id="sidebar-device-count">– devices</span>
+    </div>
+    <div class="sidebar-footer-live" style="margin-top:4px">
+      <div class="sidebar-footer-dot" id="sidebar-ws-dot"></div>
       <span id="sidebar-ws-label">Connecting…</span>
+    </div>
+    <!-- Update popover -->
+    <div id="sidebar-update-popover" style="display:none;position:absolute;bottom:calc(100% - 8px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.35);padding:14px;z-index:300;font-family:var(--font-mono)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;color:var(--warning);font-weight:700;letter-spacing:0.06em">UPDATE AVAILABLE</div>
+          <div id="popover-version" style="font-size:14px;font-weight:600;margin-top:3px;font-family:var(--font-sans)">HashHive –</div>
+          <div id="popover-sub" style="font-size:10px;color:var(--text-muted);margin-top:2px">–</div>
+        </div>
+        <button onclick="toggleUpdatePopover()" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;padding:2px;font-size:16px;line-height:1">×</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:500">What's new</div>
+      <ul id="popover-notes" style="margin:0;padding:0 0 0 14px;font-size:11px;color:var(--text);line-height:1.55;font-family:var(--font-sans)"></ul>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <a id="popover-link" href="#" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:7px 10px;font-size:12px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-family:var(--font-sans)">View release →</a>
+        <button onclick="toggleUpdatePopover()" style="padding:7px 10px;font-size:12px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:var(--font-sans)">Later</button>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:8px;text-align:center">Devices keep mining during update</div>
     </div>
   </div>
 </aside>
@@ -1162,8 +1269,214 @@
       </div>
     </div>
 
+    <!-- ── GROUPS ── -->
+    <div class="page" id="page-groups">
+      <div class="section-header">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div class="kpi-sm" id="groups-kpi-count"></div>
+          <div class="kpi-sm" id="groups-kpi-devices"></div>
+          <div class="kpi-sm" id="groups-kpi-hashrate"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openGroupModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New group
+        </button>
+      </div>
+      <div id="groups-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:14px"></div>
+    </div>
+
+    <!-- ── GROUP DETAIL ── -->
+    <div class="page" id="page-group-detail">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <button class="btn btn-secondary btn-sm" onclick="showPage('groups')" style="padding:7px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div id="group-detail-breadcrumb" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">Groups / –</div>
+      </div>
+      <div id="group-detail-content"></div>
+    </div>
+
+    <!-- ── SCHEDULES ── -->
+    <div class="page" id="page-schedules">
+      <div class="section-header">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div class="kpi-sm" id="schedules-kpi-total"></div>
+          <div class="kpi-sm" id="schedules-kpi-active"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New schedule
+        </button>
+      </div>
+      <!-- Timeline preview -->
+      <div class="card" style="margin-top:14px;margin-bottom:14px">
+        <div class="section-header" style="margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">24h Timeline Preview</div>
+          <span style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted)">local time · today</span>
+        </div>
+        <div id="schedules-timeline"></div>
+      </div>
+      <!-- Schedules table -->
+      <div class="card" style="padding:0">
+        <div style="display:grid;grid-template-columns:40px 1.4fr 1.2fr 1fr 1fr 0.9fr 32px;gap:12px;padding:12px 18px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-family:var(--font-mono);font-weight:600;border-radius:12px 12px 0 0">
+          <span>On</span><span>Name</span><span>Target</span><span>Window</span><span>Action</span><span>Next run</span><span></span>
+        </div>
+        <div id="schedules-list"></div>
+        <div id="schedules-empty" style="padding:32px;text-align:center;color:var(--text-muted);font-size:13px;display:none">No schedules yet. Create your first schedule →</div>
+      </div>
+    </div>
+
+    <!-- ── WALLETS ── -->
+    <div class="page" id="page-wallets">
+      <div class="section-header">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div class="kpi-sm" id="wallets-kpi-count"></div>
+          <div class="kpi-sm" id="wallets-kpi-total"></div>
+          <div class="kpi-sm" id="wallets-kpi-last"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openWalletModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add wallet
+        </button>
+      </div>
+      <div id="wallets-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;margin-top:14px"></div>
+    </div>
+
+    <!-- ── EARNINGS ── -->
+    <div class="page" id="page-earnings">
+      <div class="section-header">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div class="kpi-sm" id="earnings-kpi-reward"></div>
+          <div class="kpi-sm" id="earnings-kpi-cost"></div>
+          <div class="kpi-sm" id="earnings-kpi-net"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="view-toggle" id="earnings-range-toggle">
+            <button class="active" onclick="setEarningsRange('7d',this)">7d</button>
+            <button onclick="setEarningsRange('30d',this)">30d</button>
+            <button onclick="setEarningsRange('60d',this)">60d</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="exportEarningsCSV()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+      <!-- Charts row -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-top:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="section-header" style="margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:0">Reward vs Cost</div>
+            <div style="display:flex;gap:14px;font-size:11px;font-family:var(--font-mono)">
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:2px;background:var(--success)"></span> Reward</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:2px;background:var(--danger)"></span> Cost</span>
+            </div>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="earnings-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Profitability</div>
+          <div id="earnings-stats" style="display:flex;flex-direction:column;gap:10px;font-size:13px"></div>
+        </div>
+      </div>
+      <!-- Bar chart -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Daily Power Consumption</div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:100px" id="earnings-bars"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;font-family:var(--font-mono);color:var(--text-dim)">
+          <span id="earnings-bars-left">–d ago</span><span>now</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DEVICE DETAIL ── -->
+    <div class="page" id="page-device-detail">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <button class="btn btn-secondary btn-sm" id="device-detail-back" onclick="deviceDetailBack()" style="padding:7px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div id="device-detail-breadcrumb" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">– / –</div>
+      </div>
+      <div id="device-detail-content"></div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ── GROUP MODAL ── -->
+<div id="group-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:460px;max-width:95vw">
+    <div style="font-size:16px;font-weight:700;margin-bottom:18px" id="group-modal-title">New Group</div>
+    <input type="hidden" id="group-modal-id">
+    <div class="form-group"><label>Name</label><input type="text" id="group-modal-name" placeholder="e.g. BitAxe Fleet" maxlength="64"></div>
+    <div class="form-group"><label>Description</label><input type="text" id="group-modal-desc" placeholder="Optional description" maxlength="128"></div>
+    <div class="form-group">
+      <label>Color</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="group-color-picker">
+        <span class="color-swatch" data-color="#a855f7" style="background:#a855f7" onclick="selectGroupColor('#a855f7',this)"></span>
+        <span class="color-swatch" data-color="#38bdf8" style="background:#38bdf8" onclick="selectGroupColor('#38bdf8',this)"></span>
+        <span class="color-swatch" data-color="#fbbf24" style="background:#fbbf24" onclick="selectGroupColor('#fbbf24',this)"></span>
+        <span class="color-swatch" data-color="#34d399" style="background:#34d399" onclick="selectGroupColor('#34d399',this)"></span>
+        <span class="color-swatch" data-color="#f43f5e" style="background:#f43f5e" onclick="selectGroupColor('#f43f5e',this)"></span>
+        <span class="color-swatch" data-color="#fb923c" style="background:#fb923c" onclick="selectGroupColor('#fb923c',this)"></span>
+      </div>
+      <input type="hidden" id="group-modal-color" value="#a855f7">
+    </div>
+    <div class="form-group"><label>Wallet address (optional)</label><input type="text" id="group-modal-wallet" placeholder="bc1q… or leave blank" maxlength="128" style="font-family:var(--font-mono)"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGroup()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCHEDULE MODAL ── -->
+<div id="schedule-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:500px;max-width:95vw">
+    <div style="font-size:16px;font-weight:700;margin-bottom:18px" id="schedule-modal-title">New Schedule</div>
+    <input type="hidden" id="schedule-modal-id">
+    <div class="form-group"><label>Name</label><input type="text" id="schedule-modal-name" placeholder="e.g. Off-peak boost" maxlength="64"></div>
+    <div class="form-group"><label>Description</label><input type="text" id="schedule-modal-desc" placeholder="What does this schedule do?" maxlength="128"></div>
+    <div class="form-group"><label>Target devices</label><input type="text" id="schedule-modal-target" placeholder="All devices / BitAxe Fleet / NMMiner Swarm" maxlength="64"></div>
+    <div class="form-group"><label>Time window</label><input type="text" id="schedule-modal-window" placeholder="00:00 → 06:00 daily / Sun 04:00 weekly" maxlength="64" style="font-family:var(--font-mono)"></div>
+    <div class="form-group"><label>Action</label><input type="text" id="schedule-modal-action" placeholder="e.g. Set freq 525 MHz · core 1.20 V" maxlength="128"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-secondary" onclick="closeScheduleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSchedule()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WALLET MODAL ── -->
+<div id="wallet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:480px;max-width:95vw">
+    <div style="font-size:16px;font-weight:700;margin-bottom:18px" id="wallet-modal-title">Add Wallet</div>
+    <input type="hidden" id="wallet-modal-id">
+    <div class="form-group"><label>Label</label><input type="text" id="wallet-modal-label" placeholder="e.g. Primary BTC" maxlength="64"></div>
+    <div class="form-group">
+      <label>Coin</label>
+      <select id="wallet-modal-coin" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none">
+        <option value="BTC">BTC – Bitcoin</option>
+        <option value="LN">LN – Lightning</option>
+        <option value="LNURL">LNURL</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Address</label><input type="text" id="wallet-modal-address" placeholder="bc1q… / lnurl1…" maxlength="256" style="font-family:var(--font-mono)"></div>
+    <div class="form-group">
+      <label>Derivation</label>
+      <select id="wallet-modal-derivation" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none">
+        <option value="native segwit">Native SegWit (bc1q…)</option>
+        <option value="taproot">Taproot (bc1p…)</option>
+        <option value="legacy">Legacy (1…)</option>
+        <option value="lnurl">LNURL</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-secondary" onclick="closeWalletModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWallet()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ════════════ DEVICE CHART PANEL ════════════ -->
 <div id="dev-chart-panel">
@@ -1497,6 +1810,9 @@
   const PAGE_TITLES = {
     dashboard: 'Dashboard', nmminer: 'NMMiner', axeos: 'BitAxe / NerdAxe',
     pool: 'Pool Settings', settings: 'Settings', notifications: 'Notifications',
+    groups: 'Groups', 'group-detail': 'Group Detail',
+    schedules: 'Schedules', wallets: 'Wallets', earnings: 'Earnings',
+    'device-detail': 'Device Detail',
   };
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -1523,6 +1839,10 @@
       case 'settings':     loadSettingsForm(); break;
       case 'pool':          loadPoolPage().then(() => { updateWorkerPreview(); renderPoolStatus(); renderPoolPresets(); }); break;
       case 'notifications': loadNotifForm(); loadAlerts(); break;
+      case 'groups':       loadGroups(); break;
+      case 'schedules':    loadSchedules(); break;
+      case 'wallets':      loadWallets(); break;
+      case 'earnings':     loadEarnings(); break;
     }
   }
 
@@ -2593,6 +2913,8 @@
     }
 
     const total = nmDevs.length + soloDevs.length + axDevs.length;
+    const dcEl = document.getElementById('sidebar-device-count');
+    if (dcEl) dcEl.textContent = `${total} device${total !== 1 ? 's' : ''}`;
     document.getElementById('stat-hashrate').textContent = totalHr >= 1000
       ? (totalHr / 1000).toFixed(3) + ' TH'
       : totalHr.toFixed(2);
@@ -5192,12 +5514,796 @@
     _checkAuth();
     showPage('dashboard');
     fetch('/api/health').then(r => r.json()).then(d => {
-      document.getElementById('sidebar-version').textContent = `v${d.version} · – devices`;
-    }).catch(() => { document.getElementById('sidebar-version').textContent = 'v– · – devices'; });
+      document.getElementById('sidebar-version').textContent = `v${d.version}`;
+      checkForUpdates(d.version);
+    }).catch(() => { document.getElementById('sidebar-version').textContent = 'v–'; });
     // Start price ticker (refresh every 5 min)
     loadMarketPrice(false);
     setInterval(() => loadMarketPrice(false), 300000);
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── GROUPS ──────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _groupsData = [];
+
+  async function loadGroups() {
+    try {
+      _groupsData = await apiFetch('/api/groups');
+    } catch (e) {
+      _groupsData = [];
+    }
+    renderGroups();
+  }
+
+  function renderGroups() {
+    const grid = document.getElementById('groups-grid');
+    if (!grid) return;
+
+    // KPI chips
+    const totalHr = _groupsData.reduce((a, g) => a + (g.hr || 0), 0);
+    const totalDev = _groupsData.reduce((a, g) => a + (g.total || 0), 0);
+    const onlineDev = _groupsData.reduce((a, g) => a + (g.online || 0), 0);
+    _setKpiSm('groups-kpi-count', 'Groups', _groupsData.length, '');
+    _setKpiSm('groups-kpi-devices', 'Devices', `${onlineDev}/${totalDev}`, '');
+    _setKpiSm('groups-kpi-hashrate', 'Total Hashrate', totalHr > 0 ? totalHr.toFixed(0) : '–', 'GH/s');
+
+    if (_groupsData.length === 0) {
+      grid.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:24px 0;grid-column:1/-1">No groups yet. Create a group to organize your devices.</div>`;
+      return;
+    }
+
+    grid.innerHTML = _groupsData.map(g => {
+      const onlinePct = g.total ? Math.round((g.online || 0) / g.total * 100) : 0;
+      const color = g.color || 'var(--accent)';
+      const deviceChips = (g.devices || []).slice(0, 4).map(d =>
+        `<span style="padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${d}</span>`
+      ).join('');
+      const extraChip = (g.devices || []).length > 4
+        ? `<span style="padding:3px 8px;font-size:10px;font-family:var(--font-mono);color:var(--text-dim)">+${g.devices.length - 4}</span>` : '';
+
+      return `<div class="group-card" style="border-color:var(--border);" onmouseenter="this.style.borderColor='${color}'" onmouseleave="this.style.borderColor='var(--border)'" onclick="openGroupDetail('${g.id}')">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${color};border-radius:12px 12px 0 0" ></div>
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          <div style="width:38px;height:38px;border-radius:8px;background:${color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid ${color}55">
+            <span style="width:12px;height:12px;border-radius:3px;background:${color};display:inline-block"></span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:16px;letter-spacing:-0.01em">${g.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${g.desc || ''}</div>
+          </div>
+          <button onclick="event.stopPropagation();openGroupModal('${g.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;color:var(--text-muted);font-size:11px" title="Edit">✎</button>
+          <button onclick="event.stopPropagation();deleteGroup('${g.id}')" style="background:none;border:1px solid rgba(244,63,94,.25);border-radius:6px;padding:4px 7px;cursor:pointer;color:var(--danger);font-size:11px" title="Delete">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div class="group-stat">
+            <div class="group-stat-label">Hashrate</div>
+            <div class="group-stat-value" style="color:${color}">${g.hr != null ? parseFloat(g.hr).toFixed(0) : '–'} <span style="font-size:10px;color:var(--text-muted);font-weight:400">GH/s</span></div>
+          </div>
+          <div class="group-stat">
+            <div class="group-stat-label">Online</div>
+            <div class="group-stat-value" style="color:${(g.online||0)===(g.total||0)&&(g.total||0)>0?'var(--success)':'var(--warning)'}">${g.online||0}/${g.total||0}</div>
+          </div>
+          <div class="group-stat">
+            <div class="group-stat-label">Power</div>
+            <div class="group-stat-value" style="color:var(--text)">${g.power != null ? parseFloat(g.power).toFixed(0) : '–'} <span style="font-size:10px;color:var(--text-muted);font-weight:400">W</span></div>
+          </div>
+        </div>
+        <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:10px">
+          <div style="width:${onlinePct}%;height:100%;background:${color};transition:width .3s"></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${deviceChips}${extraChip}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function openGroupDetail(groupId) {
+    const g = _groupsData.find(x => x.id === groupId);
+    if (!g) return;
+    const bc = document.getElementById('group-detail-breadcrumb');
+    if (bc) bc.textContent = `Groups / ${g.name}`;
+    const color = g.color || 'var(--accent)';
+    document.getElementById('group-detail-content').innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+        <div style="width:52px;height:52px;border-radius:12px;background:${color}22;border:1px solid ${color}55;display:flex;align-items:center;justify-content:center">
+          <span style="width:18px;height:18px;border-radius:4px;background:${color};display:inline-block"></span>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:24px;font-weight:700;letter-spacing:-0.02em">${g.name}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${g.desc || '–'}</div>
+        </div>
+        <button onclick="openGroupModal('${g.id}')" class="btn btn-secondary btn-sm">✎ Edit</button>
+        <button onclick="deleteGroup('${g.id}')" class="btn btn-danger btn-sm">✕ Delete</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Configuration</div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted);font-size:11px">Wallet</span><span style="font-family:var(--font-mono);font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${g.wallet || '—'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted);font-size:11px">Devices</span><span style="font-family:var(--font-mono)">${(g.devices||[]).join(', ') || '—'}</span></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm">⏸ Pause all</button>
+          <button class="btn btn-secondary btn-sm">↺ Restart all</button>
+          <button class="btn btn-secondary btn-sm">⌁ Push pool</button>
+        </div>
+      </div>`;
+    // update page title manually
+    document.getElementById('page-title').textContent = g.name;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-group-detail').classList.add('active');
+    currentPage = 'group-detail';
+  }
+
+  function _setKpiSm(elId, label, value, unit) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.className = 'kpi-sm';
+    el.innerHTML = `<div class="kpi-sm-label">${label}</div><div style="display:flex;align-items:baseline;gap:4px"><div class="kpi-sm-value">${value}</div>${unit ? `<div class="kpi-sm-unit">${unit}</div>` : ''}</div>`;
+  }
+
+  // ── Group modal CRUD ────
+  let _selectedGroupColor = '#a855f7';
+
+  function openGroupModal(groupId) {
+    const modal = document.getElementById('group-modal');
+    const g = groupId ? _groupsData.find(x => x.id === groupId) : null;
+    document.getElementById('group-modal-title').textContent = g ? 'Edit Group' : 'New Group';
+    document.getElementById('group-modal-id').value = g ? g.id : '';
+    document.getElementById('group-modal-name').value = g ? g.name : '';
+    document.getElementById('group-modal-desc').value = g ? (g.desc || '') : '';
+    document.getElementById('group-modal-wallet').value = g ? (g.wallet || '') : '';
+    _selectedGroupColor = g ? (g.color || '#a855f7') : '#a855f7';
+    document.getElementById('group-modal-color').value = _selectedGroupColor;
+    document.querySelectorAll('.color-swatch').forEach(s => {
+      s.classList.toggle('selected', s.dataset.color === _selectedGroupColor);
+    });
+    modal.style.display = 'flex';
+  }
+
+  function closeGroupModal() {
+    document.getElementById('group-modal').style.display = 'none';
+  }
+
+  function selectGroupColor(color, el) {
+    _selectedGroupColor = color;
+    document.getElementById('group-modal-color').value = color;
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  async function saveGroup() {
+    const id = document.getElementById('group-modal-id').value;
+    const payload = {
+      name: document.getElementById('group-modal-name').value.trim(),
+      desc: document.getElementById('group-modal-desc').value.trim(),
+      color: _selectedGroupColor,
+      wallet: document.getElementById('group-modal-wallet').value.trim(),
+      devices: [],
+    };
+    if (!payload.name) return;
+    try {
+      if (id) {
+        await apiFetch(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      } else {
+        await apiFetch('/api/groups', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      closeGroupModal();
+      loadGroups();
+    } catch (e) {
+      toast('Failed to save group: ' + e.message, 'error');
+    }
+  }
+
+  async function deleteGroup(id) {
+    if (!confirm('Delete this group?')) return;
+    try {
+      await apiFetch(`/api/groups/${id}`, { method: 'DELETE' });
+      if (currentPage === 'group-detail') showPage('groups');
+      else loadGroups();
+    } catch (e) {
+      toast('Failed to delete: ' + e.message, 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── SCHEDULES ────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _schedulesData = [];
+
+  async function loadSchedules() {
+    try {
+      _schedulesData = await apiFetch('/api/schedules');
+    } catch (e) {
+      _schedulesData = [];
+    }
+    renderSchedules();
+  }
+
+  function renderSchedules() {
+    const list = document.getElementById('schedules-list');
+    const empty = document.getElementById('schedules-empty');
+    if (!list) return;
+
+    const active = _schedulesData.filter(s => s.enabled);
+    _setKpiSm('schedules-kpi-total', 'Schedules', _schedulesData.length, '');
+    _setKpiSm('schedules-kpi-active', 'Active', active.length, '');
+
+    renderScheduleTimeline(active);
+
+    if (_schedulesData.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    list.innerHTML = _schedulesData.map((s, i) => {
+      const nextColor = s.nextRun === 'paused' ? 'var(--text-dim)' : s.nextRun === 'monitoring' ? 'var(--info)' : 'var(--success)';
+      return `<div class="schedule-row ${s.enabled ? '' : 'disabled'}">
+        <label class="toggle" style="width:32px;height:18px;flex-shrink:0" title="${s.enabled ? 'Disable' : 'Enable'}">
+          <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule('${s.id}', this.checked)">
+          <span class="toggle-slider" style="border-radius:18px"></span>
+        </label>
+        <div>
+          <div style="font-weight:600">${s.name}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${s.desc || ''}</div>
+        </div>
+        <div style="font-size:12px;font-family:var(--font-mono)">${s.target || '—'}</div>
+        <div style="font-size:11px;font-family:var(--font-mono);color:var(--honey)">${s.window || '—'}</div>
+        <div style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted)">${s.action || '—'}</div>
+        <div style="font-size:11px;font-family:var(--font-mono);color:${nextColor}">${s.nextRun || '—'}</div>
+        <div style="display:flex;gap:4px">
+          <button onclick="openScheduleModal('${s.id}')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 6px;cursor:pointer;color:var(--text-muted);font-size:11px" title="Edit">✎</button>
+          <button onclick="deleteSchedule('${s.id}')" style="background:none;border:1px solid rgba(244,63,94,.25);border-radius:5px;padding:3px 6px;cursor:pointer;color:var(--danger);font-size:11px" title="Delete">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderScheduleTimeline(items) {
+    const el = document.getElementById('schedules-timeline');
+    if (!el) return;
+    if (items.length === 0) {
+      el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No active schedules</div>';
+      return;
+    }
+    const colors = ['var(--accent)', 'var(--honey)', 'var(--info)', 'var(--success)', 'var(--danger)'];
+    const hourLabels = '<div style="display:grid;grid-template-columns:130px 1fr;gap:10px;margin-bottom:4px"><div></div><div style="position:relative;height:14px;font-family:var(--font-mono);font-size:9px;color:var(--text-dim)">' +
+      [0,3,6,9,12,15,18,21,24].map(h => `<span style="position:absolute;left:${h/24*100}%;transform:translateX(-50%)">${String(h).padStart(2,'0')}</span>`).join('') +
+      '</div></div>';
+    const rows = items.map((s, i) => {
+      const color = colors[i % colors.length];
+      const m = (s.window || '').match(/(\d{1,2}):(\d{2})\s*[→\-to]+\s*(\d{1,2}):(\d{2})/i);
+      let band = '';
+      if (m) {
+        const from = +m[1] + +m[2]/60, to = +m[3] + +m[4]/60;
+        const action = (s.action || '').split('·')[0].trim();
+        if (from < to) {
+          band = `<div class="timeline-band" style="left:${from/24*100}%;width:${(to-from)/24*100}%;background:${color}33;border-left:2px solid ${color};border-right:2px solid ${color};color:${color}">${action}</div>`;
+        } else {
+          band = `<div class="timeline-band" style="left:${from/24*100}%;right:0;background:${color}33;border-left:2px solid ${color};border-radius:4px"></div>
+                  <div class="timeline-band" style="left:0;width:${to/24*100}%;background:${color}33;border-right:2px solid ${color};border-radius:4px;color:${color}">${action}</div>`;
+        }
+      } else {
+        const action = (s.action || '').split('·')[0].trim();
+        band = `<div class="timeline-band" style="inset:2px 4px;background:${color}22;border:1px dashed ${color}88;color:${color}">continuous · ${s.window||''}</div>`;
+      }
+      return `<div class="timeline-row">
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 0">${s.name}</div>
+        <div class="timeline-bar">${band}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = hourLabels + rows;
+  }
+
+  function openScheduleModal(scheduleId) {
+    const modal = document.getElementById('schedule-modal');
+    const s = scheduleId ? _schedulesData.find(x => x.id === scheduleId) : null;
+    document.getElementById('schedule-modal-title').textContent = s ? 'Edit Schedule' : 'New Schedule';
+    document.getElementById('schedule-modal-id').value = s ? s.id : '';
+    document.getElementById('schedule-modal-name').value = s ? s.name : '';
+    document.getElementById('schedule-modal-desc').value = s ? (s.desc || '') : '';
+    document.getElementById('schedule-modal-target').value = s ? (s.target || '') : '';
+    document.getElementById('schedule-modal-window').value = s ? (s.window || '') : '';
+    document.getElementById('schedule-modal-action').value = s ? (s.action || '') : '';
+    modal.style.display = 'flex';
+  }
+
+  function closeScheduleModal() {
+    document.getElementById('schedule-modal').style.display = 'none';
+  }
+
+  async function saveSchedule() {
+    const id = document.getElementById('schedule-modal-id').value;
+    const payload = {
+      name: document.getElementById('schedule-modal-name').value.trim(),
+      desc: document.getElementById('schedule-modal-desc').value.trim(),
+      target: document.getElementById('schedule-modal-target').value.trim(),
+      window: document.getElementById('schedule-modal-window').value.trim(),
+      action: document.getElementById('schedule-modal-action').value.trim(),
+      enabled: true,
+      nextRun: 'monitoring',
+      lastRun: 'never',
+    };
+    if (!payload.name) return;
+    try {
+      if (id) {
+        await apiFetch(`/api/schedules/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      } else {
+        await apiFetch('/api/schedules', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      closeScheduleModal();
+      loadSchedules();
+    } catch (e) {
+      toast('Failed to save schedule: ' + e.message, 'error');
+    }
+  }
+
+  async function toggleSchedule(id, enabled) {
+    try {
+      await apiFetch(`/api/schedules/${id}`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+      const s = _schedulesData.find(x => x.id === id);
+      if (s) s.enabled = enabled;
+      renderSchedules();
+    } catch (e) {
+      toast('Failed to update schedule', 'error');
+    }
+  }
+
+  async function deleteSchedule(id) {
+    if (!confirm('Delete this schedule?')) return;
+    try {
+      await apiFetch(`/api/schedules/${id}`, { method: 'DELETE' });
+      loadSchedules();
+    } catch (e) {
+      toast('Failed to delete schedule: ' + e.message, 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── WALLETS ──────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _walletsData = [];
+
+  async function loadWallets() {
+    try {
+      _walletsData = await apiFetch('/api/wallets');
+    } catch (e) {
+      _walletsData = [];
+    }
+    renderWallets();
+  }
+
+  function renderWallets() {
+    const grid = document.getElementById('wallets-grid');
+    if (!grid) return;
+
+    const totalPayout = _walletsData.reduce((a, w) => a + (w.payoutTotal || 0), 0);
+    _setKpiSm('wallets-kpi-count', 'Wallets', _walletsData.length, '');
+    _setKpiSm('wallets-kpi-total', 'Lifetime payout', totalPayout > 0 ? totalPayout.toFixed(5) : '—', totalPayout > 0 ? 'BTC' : '');
+    _setKpiSm('wallets-kpi-last', 'Last payout', _walletsData.length ? (_walletsData.find(w => w.lastPayout && w.lastPayout !== '—')?.lastPayout || '—') : '—', '');
+
+    if (_walletsData.length === 0) {
+      grid.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:24px 0;grid-column:1/-1">No wallets yet. Add a Bitcoin address to track payouts.</div>`;
+      return;
+    }
+
+    grid.innerHTML = _walletsData.map(w => {
+      const coinColor = w.coin === 'BTC' ? 'var(--honey)' : w.coin === 'LN' ? 'var(--accent)' : 'var(--info)';
+      const assigned = w.assigned || 0;
+      return `<div class="wallet-card">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          <div style="width:36px;height:36px;border-radius:8px;background:${coinColor}22;border:1px solid ${coinColor}55;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--font-mono);font-size:10px;color:${coinColor};flex-shrink:0">${w.coin}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span style="font-weight:700;font-size:15px;letter-spacing:-0.01em">${w.label}</span>
+              ${assigned > 0 ? `<span class="pill pill-accent">${assigned} assigned</span>` : '<span class="pill pill-muted">unused</span>'}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:2px">${w.derivation || '—'} · added ${w.addedOn || '—'}</div>
+          </div>
+          <button onclick="openWalletModal('${w.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;color:var(--text-muted);font-size:11px" title="Edit">✎</button>
+          ${assigned === 0 ? `<button onclick="deleteWallet('${w.id}')" style="background:none;border:1px solid rgba(244,63,94,.25);border-radius:6px;padding:4px 7px;cursor:pointer;color:var(--danger);font-size:11px" title="Delete">✕</button>` : ''}
+        </div>
+        <div class="wallet-addr">
+          <span style="flex:1">${w.address || '—'}</span>
+          <button onclick="navigator.clipboard.writeText('${(w.address||'').replace(/'/g,"\\'")}').then(()=>toast('Copied!','success'))" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 7px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">copy</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="group-stat">
+            <div class="group-stat-label">Lifetime</div>
+            <div class="group-stat-value" style="color:${coinColor}">${w.payoutTotal > 0 ? parseFloat(w.payoutTotal).toFixed(5) : '—'} <span style="font-size:10px;color:var(--text-muted);font-weight:400">${w.payoutTotal > 0 ? w.coin : ''}</span></div>
+          </div>
+          <div class="group-stat">
+            <div class="group-stat-label">Last payout</div>
+            <div class="group-stat-value" style="color:var(--text);font-size:13px">${w.lastPayout || '—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="openWalletModal('${w.id}')">✎ Rename</button>
+          ${assigned === 0 ? `<button class="btn btn-danger btn-sm" style="font-size:11px" onclick="deleteWallet('${w.id}')">✕ Remove</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function openWalletModal(walletId) {
+    const modal = document.getElementById('wallet-modal');
+    const w = walletId ? _walletsData.find(x => x.id === walletId) : null;
+    document.getElementById('wallet-modal-title').textContent = w ? 'Edit Wallet' : 'Add Wallet';
+    document.getElementById('wallet-modal-id').value = w ? w.id : '';
+    document.getElementById('wallet-modal-label').value = w ? w.label : '';
+    document.getElementById('wallet-modal-coin').value = w ? (w.coin || 'BTC') : 'BTC';
+    document.getElementById('wallet-modal-address').value = w ? (w.address || '') : '';
+    document.getElementById('wallet-modal-derivation').value = w ? (w.derivation || 'native segwit') : 'native segwit';
+    modal.style.display = 'flex';
+  }
+
+  function closeWalletModal() {
+    document.getElementById('wallet-modal').style.display = 'none';
+  }
+
+  async function saveWallet() {
+    const id = document.getElementById('wallet-modal-id').value;
+    const payload = {
+      label: document.getElementById('wallet-modal-label').value.trim(),
+      coin: document.getElementById('wallet-modal-coin').value,
+      address: document.getElementById('wallet-modal-address').value.trim(),
+      derivation: document.getElementById('wallet-modal-derivation').value,
+    };
+    if (!payload.label || !payload.address) { toast('Label and address are required', 'error'); return; }
+    try {
+      if (id) {
+        await apiFetch(`/api/wallets/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      } else {
+        await apiFetch('/api/wallets', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      closeWalletModal();
+      loadWallets();
+    } catch (e) {
+      toast('Failed to save wallet: ' + e.message, 'error');
+    }
+  }
+
+  async function deleteWallet(id) {
+    if (!confirm('Remove this wallet?')) return;
+    try {
+      await apiFetch(`/api/wallets/${id}`, { method: 'DELETE' });
+      loadWallets();
+    } catch (e) {
+      toast('Failed to delete wallet: ' + e.message, 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── EARNINGS ─────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _earningsData = [];
+  let _earningsRange = '30d';
+  let _earningsChart = null;
+
+  async function loadEarnings() {
+    const days = _earningsRange === '7d' ? 7 : _earningsRange === '60d' ? 60 : 30;
+    try {
+      _earningsData = await apiFetch(`/api/earnings?days=${days}`);
+    } catch (e) {
+      _earningsData = [];
+    }
+    renderEarnings();
+  }
+
+  function setEarningsRange(range, btn) {
+    _earningsRange = range;
+    document.querySelectorAll('#earnings-range-toggle button').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadEarnings();
+  }
+
+  function renderEarnings() {
+    const data = _earningsData;
+    const totalReward = data.reduce((a, d) => a + (d.usd_reward || 0), 0);
+    const totalCost = data.reduce((a, d) => a + (d.usd_cost || 0), 0);
+    const net = totalReward - totalCost;
+
+    _setKpiSm('earnings-kpi-reward', 'Reward', totalReward > 0 ? `$${totalReward.toFixed(2)}` : '—', '');
+    _setKpiSm('earnings-kpi-cost', 'Electricity', totalCost > 0 ? `$${totalCost.toFixed(2)}` : '—', '');
+    _setKpiSm('earnings-kpi-net', 'Net', net !== 0 ? `${net >= 0 ? '+' : ''}$${net.toFixed(2)}` : '—', '');
+
+    // Profitability stats
+    const statsEl = document.getElementById('earnings-stats');
+    if (statsEl) {
+      const days = data.length || 1;
+      const avgReward = totalReward / days;
+      const avgCost = totalCost / days;
+      const margin = totalReward > 0 ? (net / totalReward * 100).toFixed(1) : '—';
+      statsEl.innerHTML = [
+        ['Reward / day (avg)', avgReward > 0 ? `$${avgReward.toFixed(2)}` : '—', 'var(--success)'],
+        ['Cost / day (avg)', avgCost > 0 ? `$${avgCost.toFixed(2)}` : '—', 'var(--danger)'],
+        ['Margin', margin !== '—' ? `${margin}%` : '—', net >= 0 ? 'var(--success)' : 'var(--danger)'],
+        ['Data points', data.length, 'var(--text)'],
+      ].map(([k, v, c]) => `<div class="earnings-stat-row">
+        <span class="earnings-stat-key">${k}</span>
+        <span class="earnings-stat-val" style="color:${c}">${v}</span>
+      </div>`).join('');
+    }
+
+    // Chart
+    const ctx = document.getElementById('earnings-chart');
+    if (ctx) {
+      if (_earningsChart) { _earningsChart.destroy(); _earningsChart = null; }
+      const isDark = !document.documentElement.classList.contains('light-mode');
+      const labels = data.map(d => d.date.slice(5));
+      _earningsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Reward $', data: data.map(d => d.usd_reward || 0), borderColor: getComputedStyle(document.documentElement).getPropertyValue('--success').trim(), tension: 0.4, pointRadius: 0, fill: false, borderWidth: 2 },
+            { label: 'Cost $', data: data.map(d => d.usd_cost || 0), borderColor: getComputedStyle(document.documentElement).getPropertyValue('--danger').trim(), tension: 0.4, pointRadius: 0, fill: false, borderWidth: 2 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8b83a3', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,.05)' } },
+            y: { ticks: { color: '#8b83a3', font: { size: 10 }, callback: v => `$${v.toFixed(2)}` }, grid: { color: 'rgba(255,255,255,.05)' } },
+          },
+        },
+      });
+    }
+
+    // Power bar chart
+    const barsEl = document.getElementById('earnings-bars');
+    const barsLeft = document.getElementById('earnings-bars-left');
+    if (barsEl) {
+      const maxPow = Math.max(...data.map(d => d.avg_power_w || 0), 1);
+      barsEl.innerHTML = data.map(d => {
+        const h = Math.max(((d.avg_power_w || 0) / maxPow) * 100, 2);
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default" title="${d.date}: ${(d.avg_power_w||0).toFixed(1)}W avg">
+          <div style="width:100%;height:${h}%;background:var(--accent);opacity:.8;border-radius:2px 2px 0 0"></div>
+        </div>`;
+      }).join('');
+      if (barsLeft) barsLeft.textContent = `${data.length}d ago`;
+    }
+  }
+
+  function exportEarningsCSV() {
+    if (!_earningsData.length) { toast('No earnings data to export', 'error'); return; }
+    const header = 'Date,Avg Hashrate (GH/s),Avg Power (W),BTC Reward,USD Reward,USD Cost';
+    const rows = _earningsData.map(d =>
+      `${d.date},${d.avg_hr_ghs},${d.avg_power_w},${d.btc_reward},${d.usd_reward},${d.usd_cost}`
+    );
+    const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `hashhive-earnings-${_earningsRange}.csv`;
+    a.click();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── DEVICE DETAIL ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _detailDevice = null;
+  let _detailFromPage = 'dashboard';
+
+  function openDeviceDetail(device, fromPage) {
+    _detailDevice = device;
+    _detailFromPage = fromPage || currentPage;
+    const isAx = !!(device.asic || device.model);
+    document.getElementById('device-detail-breadcrumb').textContent =
+      `${isAx ? 'BitAxe / NerdAxe' : 'NMMiner'} / ${device.name || device.ip}`;
+    document.getElementById('device-detail-back').title = `Back to ${PAGE_TITLES[_detailFromPage] || _detailFromPage}`;
+    renderDeviceDetail(device, 'overview');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-device-detail').classList.add('active');
+    document.getElementById('page-title').textContent = device.name || device.ip;
+    currentPage = 'device-detail';
+  }
+
+  function deviceDetailBack() {
+    showPage(_detailFromPage || 'dashboard');
+  }
+
+  function renderDeviceDetail(device, tab) {
+    const isAx = !!(device.asic || device.model);
+    const iconColor = isAx ? 'var(--info)' : 'var(--accent)';
+    const statusClass = device.online === false || device.status === 'offline' ? 'offline'
+      : device.status === 'warning' ? 'warning' : 'online';
+    const statusLabel = { online: 'Online', offline: 'Offline', warning: 'Warning', paused: 'Paused' }[statusClass] || 'Online';
+
+    // KPI values
+    const hr = device.hashRate || device.hr || device.currentHashrate || 0;
+    const temp = device.temp || device.chipTemp || device.temperature || null;
+    const power = device.power || device.wattage || null;
+    const bestDiff = device.bestDiff || device.bestSessionDiff || device.bestDifficulty || '—';
+    const acc = device.acc || device.efficiency || null;
+    const uptime = device.uptime || '—';
+    const pool = device.pool || device.stratum_url || device.stratumURL || '—';
+    const version = device.version || device.swVersion || '—';
+    const rssi = device.rssi || device.wifiRSSI || null;
+
+    document.getElementById('device-detail-content').innerHTML = `
+      <!-- Hero header -->
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+        <div style="width:54px;height:54px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="1.5" stroke-linecap="round">
+            ${isAx ? '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' : '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>'}
+          </svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:24px;font-weight:700;letter-spacing:-0.02em">${device.name || device.hostname || device.ip}</div>
+          <div style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);margin-top:2px">
+            ${device.ip} · ${device.asic || device.model || version}${device.type ? ' · ' + device.type : ''}
+          </div>
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="status-pill status-pill-${statusClass}"><span class="status-pill-dot"></span>${statusLabel}</span>
+            ${rssi != null ? `<span class="pill pill-muted">WiFi ${rssi} dBm</span>` : ''}
+            <span class="pill pill-accent">uptime ${uptime}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="toast('Pause sent','info')">⏸ Pause</button>
+          <button class="btn btn-secondary btn-sm" onclick="toast('Restart sent','info')">↺ Restart</button>
+          <button class="btn btn-primary btn-sm" onclick="window.open('http://${device.ip}','_blank')">↗ Open Web UI</button>
+        </div>
+      </div>
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px">
+        ${[
+          ['Hashrate', hr > 0 ? `${hr >= 1000 ? (hr/1000).toFixed(2) : hr.toFixed(1)}` : '—', hr >= 1000 ? 'TH/s' : 'GH/s', 'var(--accent)'],
+          ['Temp', temp != null ? temp.toFixed(1) : '—', '°C', temp == null ? 'var(--accent)' : temp > 75 ? 'var(--danger)' : temp > 65 ? 'var(--warning)' : 'var(--success)'],
+          ['Power', power != null ? power.toFixed(1) : '—', 'W', 'var(--honey)'],
+          ['Best Diff', bestDiff, '', 'var(--honey)'],
+          ['Accept %', acc != null ? acc.toFixed(1) : '—', acc != null ? '%' : '', 'var(--success)'],
+        ].map(([l, v, u, c]) => `<div class="card" style="padding:12px 14px;margin:0">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-mono);font-weight:600;margin-bottom:4px">${l}</div>
+          <div style="font-size:22px;font-weight:700;color:${c};font-family:var(--font-mono)">${v} <span style="font-size:11px;color:var(--text-muted);font-weight:400">${u}</span></div>
+        </div>`).join('')}
+      </div>
+      <!-- Tabs -->
+      <div class="detail-tabs">
+        ${['overview','config'].map(t => `<div class="detail-tab ${t === tab ? 'active' : ''}" onclick="switchDetailTab(this,'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join('')}
+      </div>
+      <!-- Tab content -->
+      <div id="detail-tab-content">
+        ${_renderDetailTab(device, tab)}
+      </div>`;
+  }
+
+  function switchDetailTab(el, tab) {
+    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('detail-tab-content').innerHTML = _renderDetailTab(_detailDevice, tab);
+  }
+
+  function _renderDetailTab(device, tab) {
+    if (tab === 'config') {
+      const rows = Object.entries(device).filter(([k]) =>
+        ['ip','name','hostname','pool','stratum_url','stratumURL','version','swVersion','asic','model','type','frequency','coreVoltage','fanSpeed','fanrpm'].includes(k)
+      );
+      return `<div class="card"><div class="card-title">Device Properties</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+          ${rows.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);padding:6px 0">
+            <span style="color:var(--text-muted)">${k}</span>
+            <span style="font-family:var(--font-mono);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v}</span>
+          </div>`).join('')}
+        </div></div>`;
+    }
+    // overview tab
+    const hr = device.hashRate || device.hr || device.currentHashrate || 0;
+    const temp = device.temp || device.chipTemp || device.temperature || 0;
+    const shares = device.shares || device.sharesAccepted || '—';
+    const rejected = device.rejected || device.sharesRejected || 0;
+    const pool = device.pool || device.stratum_url || device.stratumURL || '—';
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-title">Pool & Shares</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
+            <span style="color:var(--text-muted)">Pool</span>
+            <span style="font-family:var(--font-mono);font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis">${pool}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
+            <span style="color:var(--text-muted)">Shares accepted</span>
+            <span style="font-family:var(--font-mono);color:var(--success)">${shares}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0">
+            <span style="color:var(--text-muted)">Shares rejected</span>
+            <span style="font-family:var(--font-mono);color:${rejected > 0 ? 'var(--warning)' : 'var(--text-muted)'}">${rejected}</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Hardware</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
+            <span style="color:var(--text-muted)">ASIC / Model</span>
+            <span style="font-family:var(--font-mono)">${device.asic || device.model || '—'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
+            <span style="color:var(--text-muted)">Frequency</span>
+            <span style="font-family:var(--font-mono)">${device.frequency != null ? device.frequency + ' MHz' : '—'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0">
+            <span style="color:var(--text-muted)">Voltage</span>
+            <span style="font-family:var(--font-mono)">${device.coreVoltage != null ? device.coreVoltage + ' mV' : '—'}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── UPDATE CHECKER ──────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  let _updateState = 'up-to-date';
+  let _latestRelease = null;
+
+  async function checkForUpdates(currentVersion) {
+    try {
+      const resp = await fetch('https://api.github.com/repos/fgrfn/hashhive/releases/latest', {
+        headers: { 'Accept': 'application/vnd.github+json' }
+      });
+      if (!resp.ok) return;
+      const release = await resp.json();
+      _latestRelease = release;
+      const latest = (release.tag_name || '').replace(/^v/, '');
+      const current = (currentVersion || '').replace(/^v/, '');
+      if (latest && current && latest !== current && _versionGt(latest, current)) {
+        _updateState = 'available';
+        const dot = document.getElementById('sidebar-update-dot');
+        const label = document.getElementById('sidebar-update-label');
+        const sub = document.getElementById('sidebar-update-sub');
+        const badge = document.getElementById('sidebar-update-badge');
+        if (dot) { dot.style.background = 'var(--warning)'; dot.style.boxShadow = '0 0 8px var(--warning)'; }
+        if (label) { label.textContent = 'Update available'; label.style.color = 'var(--warning)'; }
+        if (sub) sub.textContent = `v${current} → v${latest}`;
+        if (badge) badge.style.display = '';
+        // Populate popover
+        const notesEl = document.getElementById('popover-notes');
+        if (notesEl) {
+          const notes = (release.body || '').split('\n').filter(l => l.trim().startsWith('*') || l.trim().startsWith('-')).slice(0, 5);
+          notesEl.innerHTML = notes.map(n => `<li>${n.replace(/^[\*\-]\s*/, '')}</li>`).join('') || '<li>See release notes for details</li>';
+        }
+        const verEl = document.getElementById('popover-version');
+        if (verEl) verEl.textContent = `HashHive v${latest}`;
+        const subEl = document.getElementById('popover-sub');
+        if (subEl) {
+          const published = release.published_at ? new Date(release.published_at).toLocaleDateString() : '';
+          subEl.textContent = published ? `released ${published}` : '';
+        }
+        const link = document.getElementById('popover-link');
+        if (link && release.html_url) link.href = release.html_url;
+      } else {
+        _updateState = 'up-to-date';
+      }
+    } catch (e) {
+      // Silently fail — no update info available
+    }
+  }
+
+  function _versionGt(a, b) {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const va = pa[i] || 0, vb = pb[i] || 0;
+      if (va > vb) return true;
+      if (va < vb) return false;
+    }
+    return false;
+  }
+
+  function toggleUpdatePopover() {
+    if (_updateState !== 'available') return;
+    const p = document.getElementById('sidebar-update-popover');
+    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  }
 </script>
 </body>
 </html>

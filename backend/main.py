@@ -306,6 +306,9 @@ DEFAULT_CONFIG: dict = {
         "time": "08:00",
     },
     "pool_presets": [],
+    "groups": [],
+    "schedules": [],
+    "wallets": [],
     "electricity_kwh_price": 0.0,
     "auto_restart": {
         "enabled": False,
@@ -2065,3 +2068,226 @@ async def test_weekly_summary():
     """Immediately send a weekly summary via all configured notification channels."""
     asyncio.create_task(_send_weekly_summary())
     return {"status": "queued"}
+
+
+# ── Groups ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/groups")
+async def get_groups():
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    return config.get("groups", [])
+
+
+@app.post("/api/groups")
+async def create_group(request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    groups = config.get("groups", [])
+    group = {
+        "id": secrets.token_hex(8),
+        "name": str(data.get("name", "New Group"))[:64],
+        "desc": str(data.get("desc", ""))[:128],
+        "color": str(data.get("color", "#a855f7"))[:16],
+        "devices": [str(d) for d in data.get("devices", [])],
+        "poolId": str(data.get("poolId", ""))[:64],
+        "wallet": str(data.get("wallet", ""))[:128],
+    }
+    groups.append(group)
+    config["groups"] = groups
+    save_json(CONFIG_FILE, config)
+    return group
+
+
+@app.put("/api/groups/{group_id}")
+async def update_group(group_id: str, request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    groups = config.get("groups", [])
+    for i, g in enumerate(groups):
+        if g.get("id") == group_id:
+            groups[i] = {**g, **{
+                k: v for k, v in data.items()
+                if k in ("name", "desc", "color", "devices", "poolId", "wallet")
+            }}
+            config["groups"] = groups
+            save_json(CONFIG_FILE, config)
+            return groups[i]
+    raise HTTPException(status_code=404, detail="Group not found")
+
+
+@app.delete("/api/groups/{group_id}")
+async def delete_group(group_id: str):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    groups = config.get("groups", [])
+    config["groups"] = [g for g in groups if g.get("id") != group_id]
+    save_json(CONFIG_FILE, config)
+    return {"ok": True}
+
+
+# ── Schedules ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/schedules")
+async def get_schedules():
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    return config.get("schedules", [])
+
+
+@app.post("/api/schedules")
+async def create_schedule(request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    schedules = config.get("schedules", [])
+    schedule = {
+        "id": secrets.token_hex(8),
+        "name": str(data.get("name", "New Schedule"))[:64],
+        "desc": str(data.get("desc", ""))[:128],
+        "enabled": bool(data.get("enabled", True)),
+        "target": str(data.get("target", "All devices"))[:64],
+        "window": str(data.get("window", ""))[:64],
+        "action": str(data.get("action", ""))[:128],
+        "nextRun": str(data.get("nextRun", ""))[:32],
+        "lastRun": str(data.get("lastRun", "never"))[:32],
+    }
+    schedules.append(schedule)
+    config["schedules"] = schedules
+    save_json(CONFIG_FILE, config)
+    return schedule
+
+
+@app.put("/api/schedules/{schedule_id}")
+async def update_schedule(schedule_id: str, request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    schedules = config.get("schedules", [])
+    for i, s in enumerate(schedules):
+        if s.get("id") == schedule_id:
+            schedules[i] = {**s, **{
+                k: v for k, v in data.items()
+                if k in ("name", "desc", "enabled", "target", "window", "action", "nextRun", "lastRun")
+            }}
+            config["schedules"] = schedules
+            save_json(CONFIG_FILE, config)
+            return schedules[i]
+    raise HTTPException(status_code=404, detail="Schedule not found")
+
+
+@app.delete("/api/schedules/{schedule_id}")
+async def delete_schedule(schedule_id: str):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    schedules = config.get("schedules", [])
+    config["schedules"] = [s for s in schedules if s.get("id") != schedule_id]
+    save_json(CONFIG_FILE, config)
+    return {"ok": True}
+
+
+# ── Wallets ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/wallets")
+async def get_wallets():
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    return config.get("wallets", [])
+
+
+@app.post("/api/wallets")
+async def create_wallet(request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    wallets = config.get("wallets", [])
+    wallet = {
+        "id": secrets.token_hex(8),
+        "label": str(data.get("label", "My Wallet"))[:64],
+        "coin": str(data.get("coin", "BTC"))[:8],
+        "address": str(data.get("address", ""))[:256],
+        "derivation": str(data.get("derivation", "native segwit"))[:32],
+        "addedOn": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "lastPayout": "—",
+        "payoutTotal": 0.0,
+    }
+    wallets.append(wallet)
+    config["wallets"] = wallets
+    save_json(CONFIG_FILE, config)
+    return wallet
+
+
+@app.put("/api/wallets/{wallet_id}")
+async def update_wallet(wallet_id: str, request: Request):
+    data = await request.json()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    wallets = config.get("wallets", [])
+    for i, w in enumerate(wallets):
+        if w.get("id") == wallet_id:
+            wallets[i] = {**w, **{
+                k: v for k, v in data.items()
+                if k in ("label", "coin", "address", "derivation", "lastPayout", "payoutTotal")
+            }}
+            config["wallets"] = wallets
+            save_json(CONFIG_FILE, config)
+            return wallets[i]
+    raise HTTPException(status_code=404, detail="Wallet not found")
+
+
+@app.delete("/api/wallets/{wallet_id}")
+async def delete_wallet(wallet_id: str):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    wallets = config.get("wallets", [])
+    config["wallets"] = [w for w in wallets if w.get("id") != wallet_id]
+    save_json(CONFIG_FILE, config)
+    return {"ok": True}
+
+
+# ── Earnings ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/earnings")
+async def get_earnings(days: int = Query(30, ge=1, le=365)):
+    """Return daily earnings summary computed from existing hashrate stats."""
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    kwh_price = float(config.get("electricity_kwh_price", 0.0))
+    market_cfg = config.get("market", {})
+    currency = market_cfg.get("currency", "eur")
+
+    # Try to get current BTC price from cached market data
+    btc_price_eur = 0.0
+    try:
+        prices_file = DATA_DIR / "market_cache.json"
+        if prices_file.exists():
+            cached = json.loads(prices_file.read_text(encoding="utf-8"))
+            btc_price_eur = float(cached.get("bitcoin", {}).get(currency, 0))
+    except Exception:
+        pass
+
+    result = []
+    for i in range(days - 1, -1, -1):
+        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        stats_file = STATS_DIR / f"{date_str}.json"
+        samples = load_json(stats_file, [])
+
+        if samples:
+            avg_hr_ghs = sum(s.get("total_hr", 0) for s in samples) / len(samples)
+            avg_power_w = sum(s.get("total_power", 0) for s in samples) / len(samples)
+        else:
+            avg_hr_ghs = 0.0
+            avg_power_w = 0.0
+
+        # Estimated daily BTC reward (very rough: avg hashrate / network difficulty)
+        # This is a simple estimation formula
+        btc_reward = 0.0
+        usd_reward = 0.0
+        if avg_hr_ghs > 0 and btc_price_eur > 0:
+            # Simplified estimate: network_difficulty * 2^32 / (avg_hr * 1e9) / 600 seconds
+            # We just store 0 if we have no price data — frontend shows "—"
+            pass
+
+        # Electricity cost
+        usd_cost = (avg_power_w / 1000) * 24 * kwh_price if kwh_price > 0 else 0.0
+
+        result.append({
+            "date": date_str,
+            "avg_hr_ghs": round(avg_hr_ghs, 2),
+            "avg_power_w": round(avg_power_w, 2),
+            "btc_reward": round(btc_reward, 8),
+            "usd_reward": round(usd_reward, 2),
+            "usd_cost": round(usd_cost, 2),
+            "samples": len(samples),
+        })
+
+    return result
