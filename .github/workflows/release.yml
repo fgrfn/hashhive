@@ -7,17 +7,52 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version override (leave empty to use version.txt)"
+        description: "Version override (leave empty to use tag / version.txt)"
         required: false
         default: ""
 
 jobs:
-  release:
-    name: Build Docker image, push to GHCR & create GitHub Release
+  # ── Pre-release checks ───────────────────────────────────────────────────────
+  precheck:
+    name: Pre-release checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ruff
+          pip install -r backend/requirements.txt
+
+      - name: Lint (ruff)
+        run: ruff check backend/
+
+      - name: Compile check
+        run: python -m py_compile backend/main.py backend/alerts.py backend/gen_cert.py
+
+      - name: Import check
+        run: python -c "import sys; sys.path.insert(0, 'backend'); import main; print('OK')"
+        env:
+          HASHHIVE_DATA_DIR: /tmp/hashhive-ci
+
+  # ── Docker build & push to GHCR ─────────────────────────────────────────────
+  docker:
+    name: Build & push Docker image
+    needs: precheck
     runs-on: ubuntu-latest
     permissions:
-      contents: write    # create GitHub Release
-      packages: write    # push to ghcr.io
+      contents: write
+      packages: write
+
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      tag:     ${{ steps.ver.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +68,8 @@ jobs:
             VERSION="$(cat version.txt | tr -d '[:space:]')"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}"    >> $GITHUB_OUTPUT
+          echo "Resolved version: ${VERSION}"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -59,29 +95,54 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags:        ${{ steps.meta.outputs.tags }}
+          labels:      ${{ steps.meta.outputs.labels }}
+          cache-from:  type=gha
+          cache-to:    type=gha,mode=max
+
+  # ── GitHub Release ───────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
+          tag_name:               ${{ needs.docker.outputs.tag }}
           generate_release_notes: true
           body: |
             ## Docker
 
-            ```bash
-            # Pull & run (no build needed)
-            docker run -d -p 8000:8000 ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
-            ```
-
-            Or with persistent data:
+            **Quick start:**
             ```bash
             docker run -d -p 8000:8000 \
               -v hashhive-data:/app/backend/data \
-              ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
+              ghcr.io/${{ github.repository }}:${{ needs.docker.outputs.version }}
+            ```
+
+            **Docker Compose:**
+            ```yaml
+            services:
+              hashhive:
+                image: ghcr.io/${{ github.repository }}:${{ needs.docker.outputs.version }}
+                ports: ["8000:8000"]
+                volumes: [hashhive-data:/app/backend/data]
+                restart: unless-stopped
+            volumes:
+              hashhive-data:
+            ```
+
+            **Update / downgrade:**
+            ```bash
+            docker compose pull && docker compose up -d
+            # or for a specific version:
+            docker pull ghcr.io/${{ github.repository }}:${{ needs.docker.outputs.version }}
             ```
 
             Dashboard: **http://localhost:8000**
