@@ -82,12 +82,7 @@ function DeviceDetailPage({ t, device, onBack }) {
           <Card t={t}>
             <Label t={t} style={{marginBottom:10}}>Recent activity</Label>
             <div style={{display:'flex', flexDirection:'column', gap:4}}>
-              {SAMPLE.logLines.slice(0,6).map((l, i) => (
-                <div key={i} style={{display:'flex', gap:10, fontSize:11, fontFamily:PROTO_MONO, padding:'4px 0', borderBottom: i===5 ? 'none' : `1px solid ${t.border}`}}>
-                  <span style={{color:t.textDim, flexShrink:0}}>{l.ts}</span>
-                  <span style={{color: l.level==='critical'?t.danger : l.level==='warning'?t.warning : l.level==='ok'?t.success : t.text, flex:1, lineHeight:1.4}}>{l.msg}</span>
-                </div>
-              ))}
+              <div style={{fontSize:11, fontFamily:PROTO_MONO, color:t.textMuted, padding:'8px 0'}}>No recent activity</div>
             </div>
           </Card>
           <Card t={t} style={{gridColumn:'1 / -1'}}>
@@ -124,13 +119,7 @@ function DeviceDetailPage({ t, device, onBack }) {
             <button style={{...protoBtn(t), fontSize:11}}><Icons.copy size={11}/> Copy</button>
           </div>
           <div style={{padding:'10px 14px', fontFamily:PROTO_MONO, fontSize:11, maxHeight:520, overflow:'auto'}}>
-            {SAMPLE.logLines.concat(SAMPLE.logLines).concat(SAMPLE.logLines).concat(SAMPLE.logLines).map((l, i) => (
-              <div key={i} style={{display:'flex', gap:12, padding:'3px 0', lineHeight:1.7}}>
-                <span style={{color:t.textDim, flexShrink:0, width:60}}>{l.ts}</span>
-                <span style={{color:t.textMuted, flexShrink:0, width:54, textTransform:'uppercase', fontSize:10}}>{l.src}</span>
-                <span style={{color: l.level==='critical'?t.danger : l.level==='warning'?t.warning : l.level==='ok'?t.success : t.text, flex:1}}>{l.msg}</span>
-              </div>
-            ))}
+            <div style={{color:t.textMuted, padding:'8px 0'}}>No logs available</div>
           </div>
         </Card>
       )}
@@ -182,7 +171,7 @@ function DeviceDetailPage({ t, device, onBack }) {
             <FormField t={t} label="Display name" value={device.name} onChange={()=>{}}/>
             <FormField t={t} label="Static IP" value={device.ip} onChange={()=>{}} mono/>
             <FormField t={t} label="Group" value="BitAxe Fleet" onChange={()=>{}}/>
-            <FormField t={t} label="Pool" value={SAMPLE.pools[0].name} onChange={()=>{}}/>
+            <FormField t={t} label="Pool" value="solo.ckpool.org" onChange={()=>{}}/>
             <FormField t={t} label="Worker" value={`bc1q...vj.${device.name.toLowerCase()}`} onChange={()=>{}} mono/>
             <FormField t={t} label="Firmware channel" value="stable" onChange={()=>{}}/>
           </div>

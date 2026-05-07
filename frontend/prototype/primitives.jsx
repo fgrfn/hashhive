@@ -217,15 +217,6 @@ function Input({ t, value, onChange, placeholder, type = 'text', mono = true, st
   );
 }
 
-// Variant switcher shown at top-right of every page
-function VariantBar({ t, variant, onChange }) {
-  return (
-    <div style={{display:'flex', alignItems:'center', gap:8}}>
-      <Label t={t}>Variant</Label>
-      <Segmented t={t} options={[{value:'v1', label:'A'}, {value:'v2', label:'B'}]} value={variant} onChange={onChange}/>
-    </div>
-  );
-}
 
 window.protoTheme = protoTheme;
 window.PROTO_PALETTES = PROTO_PALETTES;
@@ -281,4 +272,3 @@ function FormField({ t, label, value, onChange, mono = false, placeholder, error
 
 window.Select = Select;
 window.FormField = FormField;
-window.VariantBar = VariantBar;
