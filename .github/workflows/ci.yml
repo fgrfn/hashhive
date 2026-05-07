@@ -7,25 +7,8 @@ on:
     branches: ["**"]
 
 jobs:
-  lint:
-    name: Lint (ruff)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install ruff
-        run: pip install ruff
-
-      - name: Run ruff
-        run: ruff check backend/
-
-  syntax:
-    name: Syntax & import check
+  check:
+    name: Lint & syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +20,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip ruff
           pip install -r backend/requirements.txt
+
+      - name: Lint (ruff)
+        run: ruff check backend/
 
       - name: Compile check
         run: python -m py_compile backend/main.py backend/alerts.py backend/gen_cert.py
