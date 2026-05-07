@@ -1,16 +1,23 @@
 // Device lists (NMMiner + AxeOS) — with sort, filter, bulk actions.
+// Production version: uses HiveContext for real device data.
 
 function DeviceListPage({ t, kind, onDevice }) {
+  const { nmminer, axeos, nerdminer, sparkminer } = useHive();
   const isAx = kind === 'axeos';
-  const rowsOrig = isAx ? SAMPLE.axeos : SAMPLE.nmminer;
   const accent = isAx ? t.info : t.accent;
+
+  // Build normalized rows from context
+  const rowsOrig = React.useMemo(() => {
+    if (kind === 'nmminer') return (nmminer.devices || []).map(normalizeNM);
+    if (kind === 'axeos')   return (axeos.devices || []).map(normalizeAxe);
+    return [];
+  }, [kind, nmminer, axeos]);
 
   const [sortKey, setSortKey] = React.useState('name');
   const [sortDir, setSortDir] = React.useState('asc');
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [query, setQuery] = React.useState('');
   const [selected, setSelected] = React.useState(new Set());
-  const [bulkOpen, setBulkOpen] = React.useState(false);
 
   const rows = React.useMemo(() => {
     let r = rowsOrig.filter(x => {
@@ -51,7 +58,12 @@ function DeviceListPage({ t, kind, onDevice }) {
     ? '28px 1.3fr 1fr 1fr 1.1fr 0.7fr 0.7fr 0.8fr 0.9fr 36px'
     : '28px 1.3fr 1fr 1fr 1.3fr 0.7fr 0.8fr 0.9fr 36px';
 
-  const totalHr = rows.reduce((a, r) => a + r.hr, 0);
+  const totalHr = rows.reduce((a, r) => a + (r.hr || 0), 0);
+
+  // Bulk action stubs
+  const bulkAction = (action) => {
+    console.log(`Bulk action: ${action}`, Array.from(selected));
+  };
 
   return (
     <div>
@@ -60,7 +72,6 @@ function DeviceListPage({ t, kind, onDevice }) {
         <div style={{display:'flex', gap:12}}>
           <KpiSm t={t} label="Hashrate" value={totalHr.toFixed(1)} unit="GH/s" color={accent}/>
           <KpiSm t={t} label="Online" value={`${rows.filter(r => r.status === 'online').length}/${rows.length}`} color={t.success}/>
-          {isAx && <KpiSm t={t} label="Efficiency" value="32.4" unit="J/TH" color={t.honey}/>}
           {isAx && <KpiSm t={t} label="Power" value={rowsOrig.reduce((a,r)=>a+(r.power||0),0).toFixed(1)} unit="W" color={t.text}/>}
         </div>
         <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
@@ -81,11 +92,11 @@ function DeviceListPage({ t, kind, onDevice }) {
             {selected.size} selected
           </div>
           <div style={{flex:1}}/>
-          <button style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.pause size={13}/> Pause</button>
-          <button style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.play size={13}/> Resume</button>
-          <button style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.restart size={13}/> Restart</button>
-          <button style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.globe size={13}/> Push pool</button>
-          <button style={{...protoBtn(t, 'danger'), fontFamily:PROTO_MONO, fontSize:12}}><Icons.trash size={13}/> Remove</button>
+          <button onClick={() => bulkAction('pause')} style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.pause size={13}/> Pause</button>
+          <button onClick={() => bulkAction('resume')} style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.play size={13}/> Resume</button>
+          <button onClick={() => bulkAction('restart')} style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.restart size={13}/> Restart</button>
+          <button onClick={() => bulkAction('push-pool')} style={{...protoBtn(t), fontFamily:PROTO_MONO, fontSize:12}}><Icons.globe size={13}/> Push pool</button>
+          <button onClick={() => bulkAction('remove')} style={{...protoBtn(t, 'danger'), fontFamily:PROTO_MONO, fontSize:12}}><Icons.trash size={13}/> Remove</button>
           <button onClick={() => setSelected(new Set())} style={{...protoBtn(t), padding:6}}><Icons.x size={12}/></button>
         </div>
       )}
@@ -100,17 +111,29 @@ function DeviceListPage({ t, kind, onDevice }) {
           {sortHead('temp', 'Temp')}
           {isAx && sortHead('power', 'Power')}
           {!isAx && <span>Shares</span>}
-          {isAx && sortHead('eff', 'J/TH')}
+          {isAx && <span>Efficiency</span>}
           <span>Best / Uptime</span>
           <span></span>
         </div>
-        {rows.length === 0 && (
+
+        {rowsOrig.length === 0 && (
+          <div style={{padding:48, textAlign:'center', color:t.textMuted, fontSize:13}}>
+            <div style={{fontSize:28, marginBottom:12}}>⛏</div>
+            <div style={{fontWeight:600, marginBottom:6}}>No {isAx ? 'BitAxe / NerdAxe' : 'NMMiner'} devices configured yet</div>
+            <div style={{fontSize:12, color:t.textDim}}>Devices will appear here once they are discovered and connected.</div>
+          </div>
+        )}
+
+        {rowsOrig.length > 0 && rows.length === 0 && (
           <div style={{padding:40, textAlign:'center', color:t.textMuted, fontSize:13}}>No devices match your filter.</div>
         )}
+
         {rows.map((r, i) => {
           const hrPct = r.hrExpected ? Math.min(120, (r.hr / r.hrExpected) * 100) : 0;
+          const sharesStr = r.shares ? `${r.shares.acc}` : '—';
+          const accPct = r.shares && r.shares.acc > 0 ? Math.round(r.shares.acc / (r.shares.acc + r.shares.rej) * 100) : null;
           return (
-            <div key={r.ip} onClick={() => onDevice(r)}
+            <div key={r.ip || i} onClick={() => onDevice(r)}
               style={{display:'grid', gridTemplateColumns: cols, gap:10, padding:'12px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems:'center', fontSize:13, cursor:'pointer', transition:'background .1s'}}
               onMouseEnter={e => e.currentTarget.style.background = t.surface2}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -123,8 +146,7 @@ function DeviceListPage({ t, kind, onDevice }) {
               </div>
               {isAx && (
                 <div>
-                  <div style={{fontSize:12, fontFamily:PROTO_MONO}}>{r.asic}</div>
-                  <div style={{fontSize:10, color:t.textMuted}}>{r.type}</div>
+                  <div style={{fontSize:12, fontFamily:PROTO_MONO}}>{r.asic || '—'}</div>
                 </div>
               )}
               <StatusPill t={t} status={r.status}/>
@@ -133,7 +155,7 @@ function DeviceListPage({ t, kind, onDevice }) {
                   {r.hr > 0 ? r.hr.toFixed(1) : <span style={{color:t.textMuted}}>—</span>}
                   {r.hr > 0 && <span style={{fontSize:10, color:t.textMuted, fontWeight:400, marginLeft:4}}>GH/s</span>}
                 </div>
-                {isAx && r.hr > 0 && (
+                {isAx && r.hr > 0 && hrPct > 0 && (
                   <div style={{display:'flex', alignItems:'center', gap:4, marginTop:3}}>
                     <div style={{height:3, flex:1, background:t.border, borderRadius:2, overflow:'hidden'}}>
                       <div style={{height:'100%', width:`${Math.min(100,hrPct)}%`, background: hrPct>=95 ? t.success : hrPct>=85 ? t.warning : t.danger}}/>
@@ -142,15 +164,19 @@ function DeviceListPage({ t, kind, onDevice }) {
                   </div>
                 )}
               </div>
-              <div style={{fontFamily:PROTO_MONO, color: r.temp==null ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success}}>
-                {r.temp != null ? `${r.temp}°` : '—'}
+              <div style={{fontFamily:PROTO_MONO, color: r.temp==null||r.temp===0 ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success}}>
+                {r.temp > 0 ? `${r.temp}°` : '—'}
               </div>
               {isAx && <div style={{fontFamily:PROTO_MONO, color:t.text}}>{r.power > 0 ? `${r.power.toFixed(1)}W` : <span style={{color:t.textMuted}}>—</span>}</div>}
-              {!isAx && <div style={{fontFamily:PROTO_MONO, fontSize:12, color: r.acc==null ? t.textMuted : r.acc > 99 ? t.success : t.warning}}>{r.shares}{r.acc != null ? ` · ${r.acc}%` : ''}</div>}
-              {isAx && <div style={{fontFamily:PROTO_MONO, color:t.text}}>{r.eff > 0 ? r.eff.toFixed(1) : <span style={{color:t.textMuted}}>—</span>}</div>}
+              {!isAx && (
+                <div style={{fontFamily:PROTO_MONO, fontSize:12, color: accPct == null ? t.textMuted : accPct > 99 ? t.success : t.warning}}>
+                  {sharesStr}{accPct != null ? ` · ${accPct}%` : ''}
+                </div>
+              )}
+              {isAx && <div style={{fontFamily:PROTO_MONO, color:t.text}}>—</div>}
               <div>
-                <div style={{fontFamily:PROTO_MONO, color:t.honey, fontWeight:600, fontSize:12}}>{r.bestDiff}</div>
-                <div style={{fontFamily:PROTO_MONO, color:t.textMuted, fontSize:10, marginTop:2}}>{r.uptime}</div>
+                <div style={{fontFamily:PROTO_MONO, color:t.honey, fontWeight:600, fontSize:12}}>{r.bestDiff || '—'}</div>
+                <div style={{fontFamily:PROTO_MONO, color:t.textMuted, fontSize:10, marginTop:2}}>{r.uptime || '—'}</div>
               </div>
               <div style={{color:t.textMuted, display:'flex', justifyContent:'flex-end'}}><Icons.more size={16}/></div>
             </div>
