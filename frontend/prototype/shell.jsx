@@ -225,46 +225,80 @@ window.Shell = Shell;
 // Shows current version + whether a HashHive software update is available.
 // Three states: up-to-date, update-available, checking.
 // Click "Update available" to open a small popover with release notes + install button.
-const CURRENT_VERSION = 'v1.4.2';
-const LATEST_VERSION  = 'v1.5.0';
-const RELEASE_NOTES = [
-  'Power-curve auto-tuning per ASIC',
-  'BitAxe Gamma support (BM1370)',
-  'Telegram bot inline commands',
-  'Fixed: stratum reconnect storm on flaky links',
-];
+// Uses backend-proxied /api/updates/* endpoints (avoids client CORS + GitHub rate limits).
 
 function LiveFooter({ t }) {
-  // 'checking' | 'up-to-date' | 'available'
-  const [state, setState] = React.useState('available');
+  const [state, setState]           = React.useState('checking');
   const [showPopover, setShowPopover] = React.useState(false);
-  const [installing, setInstalling] = React.useState(false);
+  const [currentVer, setCurrentVer] = React.useState('');
+  const [latestRelease, setLatestRelease] = React.useState(null);
+  const [allReleases, setAllReleases]     = React.useState([]);
+  const [selectedVer, setSelectedVer]     = React.useState('');
+  const [copying, setCopying]             = React.useState(false);
 
-  const checkNow = () => {
-    setState('checking');
-    setShowPopover(false);
-    setTimeout(() => setState('available'), 1200); // demo: always finds the same update
+  React.useEffect(() => {
+    fetch('/api/updates/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) { setState('up-to-date'); return; }
+        setCurrentVer(data.current || '');
+        if (data.update_available && data.latest) {
+          setLatestRelease(data.latest);
+          setSelectedVer(data.latest.version);
+          setState('available');
+        } else {
+          setState('up-to-date');
+        }
+      })
+      .catch(() => setState('up-to-date'));
+  }, []);
+
+  const openPopover = async () => {
+    setShowPopover(true);
+    if (allReleases.length === 0) {
+      try {
+        const data = await fetch('/api/updates/releases').then(r => r.json());
+        setAllReleases(data.releases || []);
+      } catch (_) {}
+    }
   };
 
-  const doInstall = () => {
-    setInstalling(true);
-    setTimeout(() => {
-      setInstalling(false);
-      setState('up-to-date');
-      setShowPopover(false);
-    }, 2400);
+  const selectRelease = (ver) => {
+    setSelectedVer(ver);
+    const rel = allReleases.find(r => r.version === ver);
+    if (rel) setLatestRelease(rel);
   };
+
+  const copyCmd = () => {
+    if (!latestRelease) return;
+    const cmd = `docker pull ${latestRelease.docker_image} && docker compose up -d`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopying(true);
+      setTimeout(() => setCopying(false), 1500);
+    }).catch(() => {});
+  };
+
+  const displayedRelease = allReleases.find(r => r.version === selectedVer) || latestRelease;
+  const releaseNotes = displayedRelease
+    ? (displayedRelease.body || '').split('\n')
+        .filter(l => l.trim().startsWith('*') || l.trim().startsWith('-'))
+        .slice(0, 5)
+        .map(n => n.replace(/^[\*\-]\s*/, ''))
+    : [];
+
+  const currentDisplay = currentVer ? `v${currentVer}` : '…';
+  const latestDisplay  = latestRelease ? `v${latestRelease.version}` : '';
 
   const cfg = {
-    'checking':    { color: t.textMuted, dot: t.textMuted, label: 'Checking for updates…',  sub: '' },
-    'up-to-date':  { color: t.success,   dot: t.success,   label: 'Up to date',              sub: `${CURRENT_VERSION} · latest` },
-    'available':   { color: t.warning,   dot: t.warning,   label: 'Update available',        sub: `${CURRENT_VERSION} → ${LATEST_VERSION}` },
+    'checking':   { color: t.textMuted, dot: t.textMuted, label: 'Checking for updates…', sub: '' },
+    'up-to-date': { color: t.success,   dot: t.success,   label: 'Up to date',             sub: `${currentDisplay} · latest` },
+    'available':  { color: t.warning,   dot: t.warning,   label: 'Update available',        sub: `${currentDisplay} → ${latestDisplay}` },
   }[state];
 
   return (
     <div style={{padding:'12px 16px', borderTop:`1px solid ${t.border}`, fontFamily:PROTO_MONO, background:t.surface, position:'relative'}}>
       <div
-        onClick={() => state === 'available' && setShowPopover(v => !v)}
+        onClick={() => state === 'available' && (showPopover ? setShowPopover(false) : openPopover())}
         style={{
           display:'flex', alignItems:'center', gap:8,
           cursor: state === 'available' ? 'pointer' : 'default',
@@ -301,7 +335,7 @@ function LiveFooter({ t }) {
 
       {/* Row 2: version + device count */}
       <div style={{fontSize:10, color:t.textDim, display:'flex', justifyContent:'space-between', marginTop:6}}>
-        <span>{CURRENT_VERSION}</span>
+        <span>{currentDisplay}</span>
         <span>{SAMPLE.devicesTotal} devices</span>
       </div>
 
@@ -314,28 +348,72 @@ function LiveFooter({ t }) {
             background:t.surface, border:`1px solid ${t.border}`, borderRadius:12,
             boxShadow:'0 8px 32px rgba(0,0,0,0.25)',
             padding:14, zIndex:40,
-            fontFamily:'inherit',
           }}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10}}>
               <div>
                 <div style={{fontSize:11, color:t.warning, fontWeight:700, fontFamily:PROTO_MONO, letterSpacing:'0.06em'}}>UPDATE AVAILABLE</div>
-                <div style={{fontSize:14, fontWeight:600, marginTop:3}}>HashHive {LATEST_VERSION}</div>
-                <div style={{fontSize:10, color:t.textMuted, fontFamily:PROTO_MONO, marginTop:2}}>released 2 days ago · 8.4 MB</div>
+                <div style={{fontSize:14, fontWeight:600, marginTop:3}}>
+                  HashHive {displayedRelease ? `v${displayedRelease.version}` : latestDisplay}
+                </div>
+                {displayedRelease?.published_at && (
+                  <div style={{fontSize:10, color:t.textMuted, fontFamily:PROTO_MONO, marginTop:2}}>
+                    released {new Date(displayedRelease.published_at).toLocaleDateString()}
+                  </div>
+                )}
               </div>
               <button onClick={() => setShowPopover(false)} style={{background:'transparent', border:'none', color:t.textMuted, cursor:'pointer', padding:2}}>
                 <Icons.x size={14}/>
               </button>
             </div>
+
+            {/* Release notes */}
             <div style={{fontSize:11, color:t.textMuted, marginBottom:6, fontWeight:500}}>What's new</div>
             <ul style={{margin:0, padding:'0 0 0 14px', fontSize:11, color:t.text, lineHeight:1.55}}>
-              {RELEASE_NOTES.map((n, i) => <li key={i} style={{marginBottom:2}}>{n}</li>)}
+              {(releaseNotes.length ? releaseNotes : ['See release notes for details']).map((n, i) =>
+                <li key={i} style={{marginBottom:2}}>{n}</li>
+              )}
             </ul>
+
+            {/* Docker command */}
+            {displayedRelease?.docker_image && (
+              <div style={{marginTop:10}}>
+                <div style={{fontSize:10, color:t.textMuted, marginBottom:4, fontWeight:500, textTransform:'uppercase', letterSpacing:'.08em', fontFamily:PROTO_MONO}}>Docker update command</div>
+                <div style={{background:t.surface2, border:`1px solid ${t.border}`, borderRadius:6, padding:'8px 10px', display:'flex', alignItems:'center', gap:8}}>
+                  <code style={{fontFamily:PROTO_MONO, fontSize:10, color:t.text, flex:1, wordBreak:'break-all'}}>
+                    {`docker pull ${displayedRelease.docker_image} && docker compose up -d`}
+                  </code>
+                  <button onClick={copyCmd} style={{...protoBtn(t), padding:'3px 7px', fontSize:10, flexShrink:0}}>
+                    {copying ? '✓' : 'copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Version selector for downgrade */}
+            {allReleases.length > 1 && (
+              <div style={{marginTop:10}}>
+                <div style={{fontSize:10, color:t.textMuted, marginBottom:4, fontWeight:500, textTransform:'uppercase', letterSpacing:'.08em', fontFamily:PROTO_MONO}}>Switch version</div>
+                <select
+                  value={selectedVer}
+                  onChange={e => selectRelease(e.target.value)}
+                  style={{width:'100%', background:t.surface2, border:`1px solid ${t.border}`, borderRadius:6, padding:'6px 8px', color:t.text, fontSize:12, fontFamily:PROTO_MONO, outline:'none'}}>
+                  {allReleases.map(r => (
+                    <option key={r.version} value={r.version}>
+                      {`v${r.version}${r.version === currentVer ? ' (current)' : ''}${r.prerelease ? ' [pre]' : ''}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div style={{display:'flex', gap:6, marginTop:12}}>
-              <button onClick={doInstall} disabled={installing}
-                style={{...protoBtn(t, 'primary'), flex:1, padding:'7px 10px', fontSize:12, justifyContent:'center', opacity: installing ? 0.7 : 1}}>
-                {installing ? <><Spinner t={t} size={11}/> Installing…</> : <><Icons.download size={12}/> Install & restart</>}
-              </button>
-              <button style={{...protoBtn(t), padding:'7px 10px', fontSize:12}}>Later</button>
+              {displayedRelease?.html_url && (
+                <a href={displayedRelease.html_url} target="_blank" rel="noopener"
+                  style={{flex:1, textAlign:'center', padding:'7px 10px', fontSize:12, background:t.accent, color:'#fff', borderRadius:8, textDecoration:'none'}}>
+                  View release →
+                </a>
+              )}
+              <button onClick={() => setShowPopover(false)} style={{...protoBtn(t), padding:'7px 10px', fontSize:12}}>Later</button>
             </div>
             <div style={{fontSize:9, color:t.textDim, marginTop:8, fontFamily:PROTO_MONO, textAlign:'center'}}>
               Devices keep mining during update · ~30 s downtime for WebUI
