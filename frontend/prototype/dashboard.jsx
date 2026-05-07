@@ -1,38 +1,72 @@
-// Dashboard — two variants.
-// V1 (A): KPI grid + big chart + dual device lists + live log (sharpened refresh of current UI)
-// V2 (B): Analytics-focused — hero chart with brush, health radial, heatmap, pool latency, dual earnings chart
+// Dashboard — production version using real device data from HiveContext.
 
-function Dashboard({ t, variant, onDevice, onNav }) {
-  return variant === 'v1' ? <DashA t={t} onDevice={onDevice} onNav={onNav}/> : <DashB t={t} onDevice={onDevice} onNav={onNav}/>;
+function Dashboard({ t, onDevice, onNav }) {
+  return <DashA t={t} onDevice={onDevice} onNav={onNav}/>;
 }
 
-// ─────── VARIANT A ───────
+// ─────── VARIANT A (only variant kept) ───────
 function DashA({ t, onDevice, onNav }) {
-  const S = SAMPLE;
+  const { nmminer, axeos, openAlerts } = useHive();
   const P = PROTO;
   const [range, setRange] = React.useState('24h');
   const [brushed, setBrushed] = React.useState(null);
 
   const chartData = range === '7d' ? P.hr7d : P.hr24h;
 
+  // Build normalized device list from real data
+  const allDevices = React.useMemo(() => [
+    ...(nmminer.devices || []).map(normalizeNM),
+    ...(axeos.devices || []).map(normalizeAxe),
+  ], [nmminer, axeos]);
+
+  const nmDevices = (nmminer.devices || []).map(normalizeNM);
+  const axDevices = (axeos.devices || []).map(normalizeAxe);
+
+  const devicesOnline = allDevices.filter(d => d.status === 'online').length;
+  const devicesTotal  = allDevices.length;
+  const totalHashrate = allDevices.reduce((a, d) => a + (d.hr || 0), 0);
+  const maxTemp       = allDevices.reduce((a, d) => Math.max(a, d.temp || 0), 0);
+  const totalPower    = allDevices.reduce((a, d) => a + (d.power || 0), 0);
+
+  const hotDevice = allDevices.reduce((best, d) => (d.temp || 0) > (best?.temp || 0) ? d : best, null);
+
   return (
     <div>
       {/* KPI strip */}
       <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:12, marginBottom:16}}>
-        <KpiCard t={t} label="Total Hashrate" value={S.totalHashrate.toLocaleString()} unit={S.totalHashrateUnit} accent={t.accent} trend={{pos:true, label:'+2.1% · 1h'}} spark={P.hr1h(1, 30, S.totalHashrate)}/>
-        <KpiCard t={t} label="Devices Online" value={`${S.devicesOnline}/${S.devicesTotal}`} accent={t.success} trend={{pos:true, label:'87.5% uptime'}}/>
-        <KpiCard t={t} label="Max Temp" value={S.maxTemp} unit="°C" accent={t.warning} trend={{pos:false, label:'Axe-04 hot'}}/>
-        <KpiCard t={t} label="Total Power" value={S.totalPower} unit="W" accent={t.honey} spark={P.hr1h(4, 8, S.totalPower)}/>
-        <KpiCard t={t} label="Open Alerts" value={S.openAlerts} unit="unread" accent={t.danger} onClick={() => onNav('notifications')}/>
+        <KpiCard t={t} label="Total Hashrate"
+          value={totalHashrate > 0 ? totalHashrate.toFixed(1) : '—'}
+          unit="GH/s" accent={t.accent}
+          trend={totalHashrate > 0 ? {pos:true, label:'live'} : null}
+          spark={P.hr1h(1, 30, totalHashrate || 2800)}/>
+        <KpiCard t={t} label="Devices Online"
+          value={devicesTotal > 0 ? `${devicesOnline}/${devicesTotal}` : '—'}
+          accent={t.success}
+          trend={devicesTotal > 0 ? {pos: devicesOnline === devicesTotal, label: devicesOnline === devicesTotal ? 'all online' : `${devicesTotal - devicesOnline} offline`} : null}/>
+        <KpiCard t={t} label="Max Temp"
+          value={maxTemp > 0 ? maxTemp : '—'}
+          unit={maxTemp > 0 ? '°C' : ''}
+          accent={maxTemp > 75 ? t.danger : maxTemp > 65 ? t.warning : t.success}
+          trend={hotDevice && maxTemp > 65 ? {pos: false, label: hotDevice.name + ' hot'} : null}/>
+        <KpiCard t={t} label="Total Power"
+          value={totalPower > 0 ? totalPower.toFixed(0) : '—'}
+          unit={totalPower > 0 ? 'W' : ''}
+          accent={t.honey}
+          spark={totalPower > 0 ? P.hr1h(4, 8, totalPower) : null}/>
+        <KpiCard t={t} label="Open Alerts"
+          value={openAlerts != null ? openAlerts : '—'}
+          unit={openAlerts > 0 ? 'unread' : ''}
+          accent={t.danger}
+          onClick={() => onNav('notifications')}/>
       </div>
 
-      {/* Hero chart with zoom */}
+      {/* Hero chart */}
       <Card t={t} style={{marginBottom:16}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14}}>
           <div>
             <Label t={t}>Hashrate · {range}</Label>
             <div style={{fontSize:18, fontWeight:600, letterSpacing:'-0.01em', marginTop:4}}>
-              {chartData.reduce((a,b)=>a+b,0) / chartData.length | 0} <span style={{color:t.textMuted, fontSize:13, fontWeight:400}}>GH/s avg</span>
+              {chartData.reduce((a,b)=>a+b,0) / chartData.length | 0} <span style={{color:t.textMuted, fontSize:13, fontWeight:400}}>GH/s avg (historical)</span>
               {brushed && brushed.from !== brushed.to && (
                 <span style={{marginLeft:12, fontSize:12, color:t.accent, fontFamily:PROTO_MONO}}>
                   · selection: {chartData.slice(brushed.from, brushed.to+1).reduce((a,b)=>a+b,0) / (brushed.to - brushed.from + 1) | 0} avg
@@ -55,35 +89,63 @@ function DashA({ t, onDevice, onNav }) {
         </div>
       </Card>
 
+      {/* Offline / Warning devices warning strip */}
+      {allDevices.filter(d => d.status !== 'online').length > 0 && (
+        <div style={{
+          padding:'10px 16px', background: t.danger + '18', border:`1px solid ${t.danger}44`,
+          borderRadius:10, marginBottom:16, display:'flex', alignItems:'center', gap:10, fontSize:13,
+        }}>
+          <Icons.alert size={16} color={t.danger}/>
+          <span style={{color:t.danger, fontWeight:600}}>
+            {allDevices.filter(d => d.status !== 'online').length} device(s) offline or in warning state:
+          </span>
+          <span style={{color:t.textMuted, fontFamily:PROTO_MONO, fontSize:12}}>
+            {allDevices.filter(d => d.status !== 'online').map(d => d.name).join(', ')}
+          </span>
+        </div>
+      )}
+
       {/* Two device groups */}
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16}}>
-        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={S.nmminer} onDevice={onDevice} onViewAll={() => onNav('nmminer')}/>
-        <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={S.axeos.slice(0, 5)} onDevice={onDevice} onViewAll={() => onNav('axeos')}/>
+        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent}
+          rows={nmDevices} onDevice={onDevice} onViewAll={() => onNav('nmminer')}
+          emptyMsg="No NMMiner devices configured yet"/>
+        <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info}
+          rows={axDevices.slice(0, 5)} onDevice={onDevice} onViewAll={() => onNav('axeos')}
+          emptyMsg="No BitAxe devices configured yet"/>
       </div>
 
       {/* Live log */}
       <Card t={t}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12}}>
-          <Label t={t}>Live Log</Label>
+          <Label t={t}>Activity</Label>
           <div style={{display:'flex', gap:8, alignItems:'center'}}>
             <div style={{display:'flex', alignItems:'center', gap:6, fontSize:11, color:t.success, fontFamily:PROTO_MONO}}>
               <span style={{width:6, height:6, borderRadius:'50%', background:t.success, boxShadow:`0 0 6px ${t.success}`}}/> live
             </div>
-            <Segmented t={t} options={['All','NMMiner','BitAxe','System']} value="All" onChange={() => {}}/>
           </div>
         </div>
-        <div style={{background:t.bg, border:`1px solid ${t.border}`, borderRadius:8, padding:'8px 12px', fontFamily:PROTO_MONO, fontSize:12, maxHeight:220, overflow:'auto'}}>
-          {S.logLines.map((l,i) => (
-            <div key={i} style={{display:'flex', gap:10, padding:'4px 0', lineHeight:1.6, alignItems:'center'}}>
-              <span style={{color:t.textDim, fontSize:11}}>{l.ts}</span>
-              <span style={{fontSize:10, padding:'0 6px', borderRadius:3, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em',
-                background: l.src==='nmminer'?t.accentGlow:l.src==='axeos'?t.info + '22':t.success + '22',
-                color: l.src==='nmminer'?t.accent:l.src==='axeos'?t.info:t.success,
-              }}>{l.src}</span>
-              <span style={{color: l.level==='critical'?t.danger : l.level==='warning'?t.warning : l.level==='ok'?t.success : t.text, flex:1}}>{l.msg}</span>
-            </div>
-          ))}
-        </div>
+        {allDevices.length === 0 ? (
+          <div style={{padding:'32px 0', textAlign:'center', color:t.textMuted, fontSize:13}}>
+            <div style={{fontSize:24, marginBottom:8}}>⛏</div>
+            No devices configured yet. <button onClick={() => onNav('settings')} style={{...protoBtn(t, 'primary'), marginLeft:8}}>Get started</button>
+          </div>
+        ) : (
+          <div style={{background:t.bg, border:`1px solid ${t.border}`, borderRadius:8, padding:'8px 12px', fontFamily:PROTO_MONO, fontSize:12, maxHeight:220, overflow:'auto'}}>
+            {allDevices.map((d, i) => (
+              <div key={i} style={{display:'flex', gap:10, padding:'5px 0', lineHeight:1.6, alignItems:'center', borderBottom: i < allDevices.length-1 ? `1px solid ${t.border}22` : 'none'}}>
+                <span style={{fontSize:10, padding:'0 6px', borderRadius:3, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em',
+                  background: d._type==='nmminer' ? t.accentGlow : t.info + '22',
+                  color: d._type==='nmminer' ? t.accent : t.info,
+                }}>{d._type}</span>
+                <span style={{fontWeight:600, color:t.text, minWidth:100}}>{d.name}</span>
+                <span style={{color:t.textMuted, fontSize:11}}>{d.ip}</span>
+                <span style={{marginLeft:'auto', color: d.status==='online' ? t.success : t.danger, fontWeight:600}}>{d.status}</span>
+                {d.hr > 0 && <span style={{color:t.accent, fontFamily:PROTO_MONO}}>{d.hr.toFixed(1)} GH/s</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -105,7 +167,7 @@ function KpiCard({ t, label, value, unit, accent, trend, spark, onClick }) {
   );
 }
 
-function DeviceMini({ t, title, accent, rows, onDevice, onViewAll }) {
+function DeviceMini({ t, title, accent, rows, onDevice, onViewAll, emptyMsg }) {
   return (
     <Card t={t} noPad style={{position:'relative', overflow:'hidden'}}>
       <div style={{position:'absolute', top:0, left:0, right:0, height:2, background:accent}}/>
@@ -116,189 +178,36 @@ function DeviceMini({ t, title, accent, rows, onDevice, onViewAll }) {
           <button onClick={onViewAll} style={{...protoBtn(t), padding:'3px 8px', fontSize:11}}>View all <Icons.arrowRight size={11}/></button>
         </div>
       </div>
-      <div>
-        <div style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 70px 90px', gap:8, padding:'6px 18px', borderBottom:`1px solid ${t.border}`, borderTop:`1px solid ${t.border}`, background:t.surface2}}>
-          <Label t={t}>Name</Label><Label t={t}>Hashrate</Label><Label t={t}>Temp</Label><Label t={t}>Status</Label>
+      {rows.length === 0 ? (
+        <div style={{padding:'24px 18px', textAlign:'center', color:t.textMuted, fontSize:12}}>
+          {emptyMsg || 'No devices yet'}
         </div>
-        {rows.map((r, i) => (
-          <div key={i} onClick={() => onDevice && onDevice(r)}
-            style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 70px 90px', gap:8, padding:'10px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems:'center', fontSize:13, cursor:'pointer', transition:'background .1s'}}
-            onMouseEnter={e => e.currentTarget.style.background = t.surface2}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            <div>
-              <div style={{fontWeight:500}}>{r.name}</div>
-              <div style={{fontSize:11, color:t.textMuted, fontFamily:PROTO_MONO}}>{r.ip}</div>
-            </div>
-            <div style={{fontFamily:PROTO_MONO, fontWeight:600}}>
-              {r.hr > 0 ? <><span>{r.hr.toFixed(1)}</span> <span style={{color:t.textMuted, fontWeight:400, fontSize:11}}>GH/s</span></> : <span style={{color:t.textMuted}}>—</span>}
-            </div>
-            <div style={{fontFamily:PROTO_MONO, color: r.temp==null ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success}}>
-              {r.temp != null ? `${r.temp}°` : '—'}
-            </div>
-            <StatusPill t={t} status={r.status}/>
+      ) : (
+        <div>
+          <div style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 70px 90px', gap:8, padding:'6px 18px', borderBottom:`1px solid ${t.border}`, borderTop:`1px solid ${t.border}`, background:t.surface2}}>
+            <Label t={t}>Name</Label><Label t={t}>Hashrate</Label><Label t={t}>Temp</Label><Label t={t}>Status</Label>
           </div>
-        ))}
-      </div>
+          {rows.map((r, i) => (
+            <div key={r.ip || i} onClick={() => onDevice && onDevice(r)}
+              style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 70px 90px', gap:8, padding:'10px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems:'center', fontSize:13, cursor:'pointer', transition:'background .1s'}}
+              onMouseEnter={e => e.currentTarget.style.background = t.surface2}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div>
+                <div style={{fontWeight:500}}>{r.name}</div>
+                <div style={{fontSize:11, color:t.textMuted, fontFamily:PROTO_MONO}}>{r.ip}</div>
+              </div>
+              <div style={{fontFamily:PROTO_MONO, fontWeight:600}}>
+                {r.hr > 0 ? <><span>{r.hr.toFixed(1)}</span> <span style={{color:t.textMuted, fontWeight:400, fontSize:11}}>GH/s</span></> : <span style={{color:t.textMuted}}>—</span>}
+              </div>
+              <div style={{fontFamily:PROTO_MONO, color: r.temp==null||r.temp===0 ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success}}>
+                {r.temp > 0 ? `${r.temp}°` : '—'}
+              </div>
+              <StatusPill t={t} status={r.status}/>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
-  );
-}
-
-// ─────── VARIANT B — analytics heavy ───────
-function DashB({ t, onDevice, onNav }) {
-  const S = SAMPLE;
-  const P = PROTO;
-  const [range, setRange] = React.useState('7d');
-  const [brushed, setBrushed] = React.useState(null);
-
-  const chartData = range === '24h' ? P.hr24h : P.hr7d;
-
-  // Health radial: 14 of 16 online = 87.5%
-  const healthPct = Math.round((S.devicesOnline / S.devicesTotal) * 100);
-
-  return (
-    <div>
-      {/* Hero row: big hashrate + health radial + top stats */}
-      <div style={{display:'grid', gridTemplateColumns:'2.2fr 1fr', gap:16, marginBottom:16}}>
-        <Card t={t}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16}}>
-            <div>
-              <Label t={t}>Hashrate · {range} · drag to zoom</Label>
-              <div style={{display:'flex', alignItems:'baseline', gap:10, marginTop:6}}>
-                <div style={{fontSize:32, fontWeight:700, color:t.accent, fontFamily:PROTO_MONO, letterSpacing:'-0.02em'}}>
-                  {S.totalHashrate.toLocaleString()}
-                </div>
-                <div style={{fontSize:14, color:t.textMuted, fontFamily:PROTO_MONO}}>GH/s now</div>
-                <div style={{fontSize:12, color:t.success, fontFamily:PROTO_MONO}}>▲ 2.1% vs 1h</div>
-              </div>
-            </div>
-            <Segmented t={t} options={['24h','7d','30d']} value={range} onChange={setRange}/>
-          </div>
-          <AreaChart t={t} data={chartData} accent={t.accent} h={180} brushed={brushed} onBrush={setBrushed}/>
-        </Card>
-
-        <Card t={t}>
-          <Label t={t}>Fleet Health</Label>
-          <div style={{display:'flex', alignItems:'center', gap:18, marginTop:12}}>
-            <Donut t={t} size={120} thickness={14}
-              label={`${healthPct}%`} sublabel="online"
-              segments={[
-                {value: S.devicesOnline, color: t.success},
-                {value: S.devicesTotal - S.devicesOnline, color: t.danger + '44'},
-              ]}/>
-            <div style={{flex:1, display:'flex', flexDirection:'column', gap:8}}>
-              {[
-                ['Online', S.devicesOnline, t.success],
-                ['Warning', SAMPLE.axeos.concat(SAMPLE.nmminer).filter(r => r.status==='warning').length, t.warning],
-                ['Offline', SAMPLE.axeos.concat(SAMPLE.nmminer).filter(r => r.status==='offline').length, t.danger],
-                ['Paused', SAMPLE.axeos.concat(SAMPLE.nmminer).filter(r => r.status==='paused').length, t.textMuted],
-              ].map(([l,v,c]) => (
-                <div key={l} style={{display:'flex', alignItems:'center', gap:8}}>
-                  <span style={{width:8, height:8, borderRadius:2, background:c}}/>
-                  <span style={{fontSize:12, flex:1}}>{l}</span>
-                  <span style={{fontFamily:PROTO_MONO, fontSize:14, fontWeight:600, color:c}}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Row 2: Earnings | Pool Latency | Lucky */}
-      <div style={{display:'grid', gridTemplateColumns:'1.6fr 1fr 1fr', gap:16, marginBottom:16}}>
-        <Card t={t}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
-            <div>
-              <Label t={t}>Earnings vs Cost · 30d</Label>
-              <div style={{display:'flex', gap:14, marginTop:6, fontFamily:PROTO_MONO}}>
-                <div>
-                  <span style={{fontSize:10, color:t.textMuted}}>Reward 30d</span>
-                  <div style={{fontSize:18, fontWeight:600, color:t.success}}>€{P.earnings30d.reduce((a,d)=>a+d.reward,0).toFixed(2)}</div>
-                </div>
-                <div>
-                  <span style={{fontSize:10, color:t.textMuted}}>Power 30d</span>
-                  <div style={{fontSize:18, fontWeight:600, color:t.warning}}>€{P.earnings30d.reduce((a,d)=>a+d.cost,0).toFixed(2)}</div>
-                </div>
-                <div>
-                  <span style={{fontSize:10, color:t.textMuted}}>Net</span>
-                  <div style={{fontSize:18, fontWeight:600, color: P.earnings30d.reduce((a,d)=>a+d.reward-d.cost,0) >= 0 ? t.success : t.danger}}>
-                    €{P.earnings30d.reduce((a,d)=>a+d.reward-d.cost,0).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style={{marginTop:10}}>
-            <DualLineChart t={t}
-              series={[P.earnings30d.map(d => d.reward), P.earnings30d.map(d => d.cost)]}
-              colors={[t.success, t.warning]}
-              labels={['Reward €', 'Power €']}
-              h={160}/>
-          </div>
-        </Card>
-
-        <Card t={t}>
-          <Label t={t}>Pool Health</Label>
-          <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:12}}>
-            {[['primary', P.poolLatency.primary, t.accent], ['fallback', P.poolLatency.fallback, t.info]].map(([id, p, c]) => (
-              <div key={id}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                  <div style={{display:'flex', alignItems:'center', gap:6}}>
-                    <span style={{width:6, height:6, borderRadius:'50%', background:c}}/>
-                    <span style={{fontSize:11, color:t.textMuted, fontFamily:PROTO_MONO, textTransform:'uppercase'}}>{id}</span>
-                  </div>
-                  <span style={{fontSize:10, color:t.success, fontFamily:PROTO_MONO}}>● stratum up</span>
-                </div>
-                <div style={{fontSize:12, fontFamily:PROTO_MONO, marginTop:3, color:t.text}}>{p.name}</div>
-                <div style={{display:'flex', alignItems:'baseline', gap:10, marginTop:4}}>
-                  <div style={{fontSize:22, fontWeight:700, color:c, fontFamily:PROTO_MONO}}>{p.current}</div>
-                  <div style={{fontSize:10, color:t.textMuted, fontFamily:PROTO_MONO}}>ms · p50 {p.p50} · p95 {p.p95}</div>
-                </div>
-                <div style={{marginTop:4}}>
-                  <MiniChart t={t} data={p.series} color={c} h={28}/>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card t={t}>
-          <Label t={t}>Lucky Factor · 30d</Label>
-          <div style={{display:'flex', alignItems:'baseline', gap:8, marginTop:6}}>
-            <div style={{fontSize:28, fontWeight:700, color:t.honey, fontFamily:PROTO_MONO, letterSpacing:'-0.02em'}}>{S.luckyFactor}%</div>
-            <div style={{fontSize:11, color:t.success, fontFamily:PROTO_MONO}}>▲ running above expected</div>
-          </div>
-          <div style={{marginTop:14}}>
-            <BarChart t={t} bars={P.luckyBuckets} accent={t.honey} h={90} highlight={5}/>
-          </div>
-        </Card>
-      </div>
-
-      {/* Row 3: Temp heatmap full-width */}
-      <Card t={t} style={{marginBottom:16}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:12}}>
-          <div>
-            <Label t={t}>Temperature Heatmap · 24h</Label>
-            <div style={{fontSize:13, color:t.textMuted, marginTop:4, fontFamily:PROTO_MONO}}>
-              chip temperature per device, 30-minute buckets
-            </div>
-          </div>
-          <div style={{display:'flex', gap:10, alignItems:'center', fontSize:10, color:t.textMuted, fontFamily:PROTO_MONO}}>
-            <span>cool</span>
-            <div style={{display:'flex', gap:1}}>
-              {[50, 58, 65, 70, 75, 80].map(v => (
-                <div key={v} style={{width:16, height:10, background: heatColor(v, t)}}/>
-              ))}
-            </div>
-            <span>hot</span>
-          </div>
-        </div>
-        <Heatmap t={t}
-          rows={PROTO.tempHeatmap}
-          getColor={v => heatColor(v, t)}
-          cellSize={14} gap={2}
-          labels={['-24h','','','','-18h','','','','-12h','','','','-6h','','','','now'].filter((_,i) => i % 3 === 0)}/>
-      </Card>
-    </div>
   );
 }
 
