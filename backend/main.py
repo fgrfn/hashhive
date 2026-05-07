@@ -4,6 +4,7 @@ import hashlib
 import ipaddress
 import os
 import secrets
+import subprocess
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -27,11 +28,25 @@ LOGS_DIR = DATA_DIR / "logs"
 STATS_DIR = DATA_DIR / "stats"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
-# App-Version aus version.txt (Single Source of Truth; liegt im Projekt-Root)
-try:
-    APP_VERSION = (BASE_DIR.parent / "version.txt").read_text().strip()
-except Exception:
-    APP_VERSION = "dev"
+def _resolve_version() -> str:
+    # 1. git describe (works for native installs with git history)
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, cwd=BASE_DIR.parent, timeout=3,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().lstrip("v")
+    except Exception:
+        pass
+    # 2. version.txt (written by CI before Docker build)
+    try:
+        return (BASE_DIR.parent / "version.txt").read_text().strip()
+    except Exception:
+        pass
+    return "dev"
+
+APP_VERSION = _resolve_version()
 
 MAX_ENTRIES_PER_DAY = 1000
 KEEP_DAYS = 30

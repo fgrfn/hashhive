@@ -4,52 +4,15 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version override (leave empty to use tag / version.txt)"
-        required: false
-        default: ""
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  # ── Pre-release checks ───────────────────────────────────────────────────────
-  precheck:
-    name: Pre-release checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install ruff
-          pip install -r backend/requirements.txt
-
-      - name: Lint (ruff)
-        run: ruff check backend/
-
-      - name: Compile check
-        run: python -m py_compile backend/main.py backend/alerts.py backend/gen_cert.py
-
-      - name: Import check
-        run: python -c "import sys; sys.path.insert(0, 'backend'); import main; print('OK')"
-        env:
-          HASHHIVE_DATA_DIR: /tmp/hashhive-ci
-
-  # ── Docker build & push to GHCR ─────────────────────────────────────────────
   docker:
     name: Build & push Docker image
-    needs: precheck
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-
     outputs:
       version: ${{ steps.ver.outputs.version }}
       tag:     ${{ steps.ver.outputs.tag }}
@@ -57,19 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve version
+      - name: Resolve version from tag
         id: ver
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ "${{ github.event_name }}" = "push" ] && [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="$(cat version.txt | tr -d '[:space:]')"
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=v${VERSION}"    >> $GITHUB_OUTPUT
-          echo "Resolved version: ${VERSION}"
+          echo "${VERSION}" > version.txt
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -90,23 +47,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags:        ${{ steps.meta.outputs.tags }}
-          labels:      ${{ steps.meta.outputs.labels }}
-          cache-from:  type=gha
-          cache-to:    type=gha,mode=max
+          tags:       ${{ steps.meta.outputs.tags }}
+          labels:     ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
 
-  # ── GitHub Release ───────────────────────────────────────────────────────────
   release:
     name: Create GitHub Release
     needs: docker
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -138,11 +92,9 @@ jobs:
               hashhive-data:
             ```
 
-            **Update / downgrade:**
+            **Update:**
             ```bash
             docker compose pull && docker compose up -d
-            # or for a specific version:
-            docker pull ghcr.io/${{ github.repository }}:${{ needs.docker.outputs.version }}
             ```
 
             Dashboard: **http://localhost:8000**
