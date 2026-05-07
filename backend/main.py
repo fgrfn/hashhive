@@ -14,6 +14,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from alerts import check_alerts
 
@@ -797,6 +798,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve frontend subdirectories (shared/, prototype/, assets/)
+for _subdir in ("shared", "prototype", "assets"):
+    _path = FRONTEND_DIR / _subdir
+    if _path.exists():
+        app.mount(f"/{_subdir}", StaticFiles(directory=str(_path)), name=_subdir)
 
 
 @app.get("/manifest.json", include_in_schema=False)
