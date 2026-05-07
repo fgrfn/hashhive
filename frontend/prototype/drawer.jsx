@@ -78,12 +78,7 @@ function DeviceDrawerPro({ t, device, onClose }) {
 
               <Label t={t} style={{marginBottom:8}}>Recent Events</Label>
               <div style={{display:'flex', flexDirection:'column', gap:4}}>
-                {SAMPLE.logLines.slice(0,5).map((l,i) => (
-                  <div key={i} style={{display:'flex', gap:10, fontSize:12, fontFamily:PROTO_MONO, padding:'5px 0', borderBottom: i===4 ? 'none' : `1px solid ${t.border}`}}>
-                    <span style={{color:t.textDim, flexShrink:0}}>{l.ts}</span>
-                    <span style={{color: l.level==='critical'?t.danger : l.level==='warning'?t.warning : l.level==='ok'?t.success : t.text, flex:1}}>{l.msg}</span>
-                  </div>
-                ))}
+                <div style={{fontSize:12, fontFamily:PROTO_MONO, color:t.textMuted, padding:'8px 0'}}>No recent events</div>
               </div>
             </>
           )}
@@ -111,12 +106,7 @@ function DeviceDrawerPro({ t, device, onClose }) {
 
           {tab === 'logs' && (
             <div style={{background:t.bg, border:`1px solid ${t.border}`, borderRadius:10, padding:'10px 12px', fontFamily:PROTO_MONO, fontSize:11, maxHeight:440, overflow:'auto'}}>
-              {SAMPLE.logLines.concat(SAMPLE.logLines).concat(SAMPLE.logLines).map((l,i) => (
-                <div key={i} style={{display:'flex', gap:10, padding:'3px 0', lineHeight:1.6}}>
-                  <span style={{color:t.textDim, flexShrink:0}}>{l.ts}</span>
-                  <span style={{color: l.level==='critical'?t.danger : l.level==='warning'?t.warning : l.level==='ok'?t.success : t.text}}>{l.msg}</span>
-                </div>
-              ))}
+              <div style={{color:t.textMuted, padding:'8px 0'}}>No logs available</div>
             </div>
           )}
 
