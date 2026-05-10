@@ -1,7 +1,9 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { PageErrorBoundary } from './components/ErrorBoundary';
 import { useDeviceStream } from './hooks/useDeviceStream';
+import { useThemeStore } from './store/theme';
 import { Dashboard } from './pages/Dashboard';
 import { NMMiner } from './pages/NMMiner';
 import { AxeOS } from './pages/AxeOS';
@@ -17,8 +19,11 @@ import { DeviceDetail } from './pages/DeviceDetail';
 
 function AppInner() {
   useDeviceStream();
+  const { theme: t } = useThemeStore();
+  const location = useLocation();
   return (
     <AppShell>
+      <PageErrorBoundary key={location.key} theme={t}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -37,6 +42,7 @@ function AppInner() {
         <Route path="/settings/:section" element={<Settings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      </PageErrorBoundary>
     </AppShell>
   );
 }
