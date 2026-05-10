@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
   Activity, Wallet, TrendingUp, Bell, Settings,
   Sun, Moon, Plus, Search, Menu, X,
-  Download, type LucideIcon,
+  Download, LogOut, type LucideIcon,
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme';
 import { type Theme, FONT_MONO, bodyFont } from '../../tokens';
@@ -60,7 +60,7 @@ function activeId(pathname: string): string {
   return seg || 'dashboard';
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, onLogout }: { children: React.ReactNode; onLogout?: () => void }) {
   const { theme, dark, toggleDark, personality } = useThemeStore();
   const { unreadAlerts, btcPrice, btcChange, globalSearch, setGlobalSearch, wsStatus } = useAppStore();
   const t = theme;
@@ -128,6 +128,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {badge && unreadAlerts > 0 && <span style={{ marginLeft: 'auto', background: t.danger, color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, fontFamily: FONT_MONO }}>{unreadAlerts}</span>}
                 </div>
               ))}
+              {onLogout && (
+                <div onClick={onLogout} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', color: t.textMuted, fontSize: 14, marginTop: 8, borderTop: `1px solid ${t.border}` }}>
+                  <LogOut size={16} /><span>Sign out</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -168,6 +173,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <LiveFooter t={t} collapsed={!sidebarExpanded} />
+        {onLogout && (
+          <button onClick={onLogout} title="Sign out" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: sidebarExpanded ? '10px 16px' : '10px 0', justifyContent: sidebarExpanded ? 'flex-start' : 'center', background: 'transparent', border: 'none', borderTop: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer', fontSize: 12, width: '100%' }}>
+            <LogOut size={14} style={{ flexShrink: 0 }} />
+            {sidebarExpanded && 'Sign out'}
+          </button>
+        )}
       </aside>
 
       {/* Main area */}

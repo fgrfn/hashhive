@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Toggle, Input, Select, FormField, Segmented, Spinner, btnStyle, HiveMark } from '../components/primitives';
@@ -14,6 +14,7 @@ const SECTIONS = [
   { id: 'display',       label: 'Display',             Icon: Eye },
   { id: 'notifications', label: 'Notifications',       Icon: Bell },
   { id: 'thresholds',    label: 'Thresholds',          Icon: Thermometer },
+  { id: 'security',      label: 'Security',            Icon: Lock },
   { id: 'backup',        label: 'Backup & Data',       Icon: Download },
   { id: 'about',         label: 'About',               Icon: HelpCircle },
 ];
@@ -153,6 +154,10 @@ export function Settings() {
           </div>
         )}
 
+        {section === 'security' && (
+          <SecuritySection t={t} localSettings={localSettings} upd={upd} save={save} />
+        )}
+
         {section === 'backup' && (
           <div>
             <SectionHeader t={t} title="Backup & Data" desc="Export configuration and historical data." />
@@ -236,6 +241,66 @@ function SettingRow({ t, label, desc, children, last }: { t: Theme; label: strin
         {desc && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 3 }}>{desc}</div>}
       </div>
       <div>{children}</div>
+    </div>
+  );
+}
+
+function SecuritySection({ t, localSettings, upd, save }: {
+  t: Theme;
+  localSettings: AppSettings;
+  upd: (patch: Partial<AppSettings>) => void;
+  save: () => Promise<void>;
+}) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const authEnabled = localSettings.auth?.enabled ?? false;
+
+  const savePassword = async () => {
+    if (!password || password !== confirm) { setPwMsg({ ok: false, text: 'Passwords do not match.' }); return; }
+    if (password.length < 8) { setPwMsg({ ok: false, text: 'Minimum 8 characters.' }); return; }
+    setPwSaving(true); setPwMsg(null);
+    try {
+      await api.settings.save({ ...localSettings, auth: { ...localSettings.auth, enabled: authEnabled, password } });
+      setPassword(''); setConfirm('');
+      setPwMsg({ ok: true, text: 'Password updated.' });
+    } catch {
+      setPwMsg({ ok: false, text: 'Save failed.' });
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <SectionHeader t={t} title="Security" desc="Password-protect the dashboard when exposed to the internet. Requires HTTPS for full protection." />
+      <Card t={t}>
+        <SettingRow t={t} label="Enable authentication" desc="Require a password to access the dashboard.">
+          <Toggle t={t} on={authEnabled} onChange={v => { upd({ auth: { ...localSettings.auth, enabled: v } }); save(); }} />
+        </SettingRow>
+        {authEnabled && (
+          <div style={{ paddingTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Change password</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
+              <Input t={t} type="password" value={password} onChange={setPassword} placeholder="New password (min 8 chars)" mono={false} />
+              <Input t={t} type="password" value={confirm} onChange={setConfirm} placeholder="Confirm new password" mono={false} />
+              {pwMsg && (
+                <div style={{ fontSize: 12, color: pwMsg.ok ? t.success : t.danger, padding: '6px 10px', background: (pwMsg.ok ? t.success : t.danger) + '18', borderRadius: 6 }}>
+                  {pwMsg.text}
+                </div>
+              )}
+              <button onClick={savePassword} disabled={!password || !confirm || pwSaving} style={{ ...btnStyle(t, 'primary'), opacity: password && confirm && !pwSaving ? 1 : 0.5, alignSelf: 'flex-start' }}>
+                {pwSaving ? 'Saving…' : 'Set password'}
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: t.textMuted, marginTop: 16 }}>
+              Bootstrap tip: set <code style={{ fontFamily: FONT_MONO, background: t.surface2, padding: '1px 4px', borderRadius: 3 }}>HASHHIVE_PASSWORD=...</code> env var on first start to enable auth automatically.
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
