@@ -7,6 +7,7 @@ import { Card, Label, Toggle, Input, Select, FormField, Segmented, Spinner, btnS
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { AppSettings } from '../api';
+import { toast } from '../store/toast';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
@@ -44,7 +45,10 @@ export function Settings() {
     try {
       const updated = await api.settings.save(latestSettings.current);
       setSettings(updated);
-    } catch { /* save failed — keep local state */ }
+      toast('Settings saved');
+    } catch {
+      toast('Failed to save settings', 'error');
+    }
     setSaving(false);
   }, [setSettings]);
 
@@ -146,6 +150,7 @@ export function Settings() {
                 { key: 'telegram', label: 'Telegram', color: t.info, fields: [['telegram_token', 'Bot token'], ['telegram_chat_id', 'Chat ID']] },
                 { key: 'discord', label: 'Discord Webhook', color: t.accent, fields: [['discord_webhook', 'Webhook URL']] },
                 { key: 'gotify', label: 'Gotify', color: t.success, fields: [['gotify_url', 'Gotify URL'], ['gotify_token', 'App token']] },
+                { key: 'ntfy', label: 'Ntfy', color: t.honey, fields: [['ntfy_url', 'Server URL'], ['ntfy_topic', 'Topic'], ['ntfy_token', 'Access token (optional)']] },
               ].map(({ key, label, color, fields }) => {
                 const notifs = localSettings.notifications || {};
                 const enabled = notifs[`${key}_enabled` as keyof typeof notifs] as boolean;
@@ -282,8 +287,10 @@ function SecuritySection({ t, localSettings, updToggle }: {
       await api.settings.save({ ...localSettings, auth: { ...localSettings.auth, enabled: authEnabled, password } });
       setPassword(''); setConfirm('');
       setPwMsg({ ok: true, text: 'Password updated.' });
+      toast('Password updated');
     } catch {
       setPwMsg({ ok: false, text: 'Save failed.' });
+      toast('Failed to update password', 'error');
     } finally {
       setPwSaving(false);
     }

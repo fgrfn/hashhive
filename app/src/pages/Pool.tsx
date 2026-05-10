@@ -6,6 +6,7 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { PoolPreset } from '../api';
 import { Database, Plus, Edit, Trash2, Send, Check } from 'lucide-react';
+import { toast } from '../store/toast';
 
 export function Pool() {
   const { theme: t } = useThemeStore();
@@ -38,17 +39,20 @@ function PoolLibrary() {
   }, []);
 
   const deletePool = async (id: string) => {
-    await api.pools.delete(id).catch(() => {});
-    setPools(pools.filter(p => p.id !== id));
+    const ok = await api.pools.delete(id).then(() => true).catch(() => false);
+    if (ok) { setPools(pools.filter(p => p.id !== id)); toast('Pool deleted'); }
+    else toast('Failed to delete pool', 'error');
   };
 
   const savePool = async (data: Partial<PoolPreset>) => {
     if (editing) {
       const updated = await api.pools.update(editing.id, data).catch(() => null);
-      if (updated) setPools(pools.map(p => p.id === editing.id ? updated : p));
+      if (updated) { setPools(pools.map(p => p.id === editing.id ? updated : p)); toast('Pool updated'); }
+      else toast('Failed to update pool', 'error');
     } else {
       const created = await api.pools.create(data).catch(() => null);
-      if (created) setPools(prev => [...prev, created]);
+      if (created) { setPools(prev => [...prev, created]); toast('Pool created'); }
+      else toast('Failed to create pool', 'error');
     }
     setShowAdd(false);
     setEditing(null);

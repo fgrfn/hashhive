@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle, Banner } from '../components/primitives';
+import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
+import { toast } from '../store/toast';
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
@@ -16,7 +17,6 @@ export function AxeOS() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [bulkFreqOpen, setBulkFreqOpen] = useState(false);
-  const [actionResult, setActionResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const filtered = axeDevices.filter(d => {
     const ip = d._ip || '';
@@ -39,16 +39,19 @@ export function AxeOS() {
   const doAction = async (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => {
     try {
       await api.axeos.action(ip, action);
-      setActionResult({ ok: true, msg: `${action} sent to ${ip}` });
-    } catch (e) {
-      setActionResult({ ok: false, msg: `Failed: ${String(e)}` });
+      toast(`${action} sent to ${ip}`);
+    } catch {
+      toast(`${action} failed for ${ip}`, 'error');
     }
-    setTimeout(() => setActionResult(null), 3000);
   };
 
   const doBulkAction = async (action: string) => {
-    for (const ip of selected) {
-      await api.axeos.action(ip, action as 'pause' | 'resume' | 'restart' | 'identify').catch(() => {});
+    const ips = Array.from(selected);
+    try {
+      await api.axeos.batchAction(ips, action as 'pause' | 'resume' | 'restart' | 'identify');
+      toast(`${action} sent to ${ips.length} device${ips.length !== 1 ? 's' : ''}`);
+    } catch {
+      toast(`Batch ${action} failed`, 'error');
     }
     setSelected(new Set());
   };
@@ -75,10 +78,6 @@ export function AxeOS() {
 
   return (
     <div>
-      {actionResult && (
-        <Banner t={t} sev={actionResult.ok ? 'info' : 'critical'}>{actionResult.msg}</Banner>
-      )}
-
       {/* Stats header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10 }}>

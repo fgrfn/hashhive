@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AppShell } from './components/layout/AppShell';
 import { PageErrorBoundary } from './components/ErrorBoundary';
 import { LoginGate } from './components/LoginGate';
+import { ToastContainer } from './components/Toast';
 import { useDeviceStream } from './hooks/useDeviceStream';
 import { useThemeStore } from './store/theme';
 import { api } from './api';
@@ -70,6 +71,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppInner />
+      <ToastContainer />
     </BrowserRouter>
   );
 }

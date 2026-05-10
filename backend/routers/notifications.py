@@ -159,6 +159,21 @@ async def _send_weekly_summary() -> None:
         except Exception:
             pass
 
+    # ── Ntfy ──────────────────────────────────────────────────────────────────
+    if notifications.get("ntfy_enabled") and notifications.get("ntfy_url") and notifications.get("ntfy_topic"):
+        ntfy_url = notifications["ntfy_url"].rstrip("/")
+        ntfy_topic = notifications["ntfy_topic"]
+        ntfy_token = notifications.get("ntfy_token", "")
+        body = f"Last 7 days: {total} events | {shares_accepted:,} accepted / {shares_rejected:,} rejected ({share_acc_pct}) | Offline events: {offline_events}"
+        headers = {"Title": "HashHive Weekly Summary", "Priority": "3", "Tags": "honeybee,chart_with_upwards_trend"}
+        if ntfy_token:
+            headers["Authorization"] = f"Bearer {ntfy_token}"
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                await client.post(f"{ntfy_url}/{ntfy_topic}", content=body, headers=headers)
+        except Exception:
+            pass
+
 
 async def _weekly_summary_loop() -> None:
     """Background task: send weekly summary at the configured day+time (UTC)."""
@@ -244,6 +259,23 @@ async def test_notification():
                 results["gotify"] = resp.status_code == 200
             except Exception:
                 results["gotify"] = False
+
+        if notifications.get("ntfy_enabled") and notifications.get("ntfy_url") and notifications.get("ntfy_topic"):
+            ntfy_url = notifications["ntfy_url"].rstrip("/")
+            ntfy_topic = notifications["ntfy_topic"]
+            ntfy_token = notifications.get("ntfy_token", "")
+            headers = {"Title": "HashHive Test", "Priority": "3", "Tags": "honeybee,white_check_mark"}
+            if ntfy_token:
+                headers["Authorization"] = f"Bearer {ntfy_token}"
+            try:
+                resp = await client.post(
+                    f"{ntfy_url}/{ntfy_topic}",
+                    content="🟢 [TEST] Test notification — everything is working!",
+                    headers=headers,
+                )
+                results["ntfy"] = resp.status_code == 200
+            except Exception:
+                results["ntfy"] = False
 
     return {"results": results}
 

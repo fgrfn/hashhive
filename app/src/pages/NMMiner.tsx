@@ -6,6 +6,7 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig } from '../api';
 import { Cpu, Edit3 } from 'lucide-react';
+import { toast } from '../store/toast';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
@@ -35,7 +36,10 @@ export function NMMiner() {
         LedEnable: config.LedEnable ? 1 : 0,
         AutoBrightness: config.AutoBrightness ? 1 : 0,
       });
-    } catch { /* save failed — close modal anyway */ }
+      toast('Device config saved');
+    } catch {
+      toast('Failed to save config', 'error');
+    }
     setSaving(false);
     setEditDevice(null);
   };

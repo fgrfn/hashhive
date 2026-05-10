@@ -5,6 +5,7 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Wallet } from '../api';
 import { Wallet as WalletIcon, Plus, Copy, Eye, Edit3, Trash2, Check } from 'lucide-react';
+import { toast } from '../store/toast';
 
 const COIN_META: Record<string, { label: string; symbol: string; color: string }> = {
   BTC:  { label: 'Bitcoin',          symbol: '₿',    color: '#F7931A' },
@@ -40,13 +41,15 @@ export function Wallets() {
 
   const addWallet = async (w: Partial<Wallet>) => {
     const created = await api.wallets.create(w).catch(() => null);
-    if (created) setWallets(prev => [...prev, created]);
+    if (created) { setWallets(prev => [...prev, created]); toast('Wallet added'); }
+    else toast('Failed to add wallet', 'error');
     setShowAdd(false);
   };
 
   const deleteWallet = async (id: string) => {
-    await api.wallets.delete(id).catch(() => {});
-    setWallets(wallets.filter(w => w.id !== id));
+    const ok = await api.wallets.delete(id).then(() => true).catch(() => false);
+    if (ok) { setWallets(wallets.filter(w => w.id !== id)); toast('Wallet removed'); }
+    else toast('Failed to delete wallet', 'error');
   };
 
   const copyAddress = (addr: string, id: string) => {
