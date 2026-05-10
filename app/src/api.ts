@@ -373,6 +373,25 @@ export function fmtHashrate(ghs: number): string {
   return `${ghs.toFixed(1)} GH/s`;
 }
 
+/** Format a best-share / best-diff value with K/M/G/T suffix.
+ * Accepts either a raw number (BitAxe sends e.g. 1970479522) or a
+ * pre-formatted string (NMMiner sends "1.97G" already). */
+export function fmtBestDiff(v: number | string | null | undefined): string {
+  if (v == null || v === '') return '—';
+  if (typeof v === 'string') {
+    // If the string is numeric, format it; otherwise pass through
+    const n = Number(v);
+    if (!Number.isNaN(n) && /^[\d.]+$/.test(v)) return fmtBestDiff(n);
+    return v;
+  }
+  if (!Number.isFinite(v) || v <= 0) return '—';
+  if (v >= 1e12) return `${(v / 1e12).toFixed(2)}T`;
+  if (v >= 1e9)  return `${(v / 1e9).toFixed(2)}G`;
+  if (v >= 1e6)  return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3)  return `${(v / 1e3).toFixed(1)}K`;
+  return String(Math.round(v));
+}
+
 export function getAxeStatus(d: AxeDevice): 'online' | 'offline' | 'warning' | 'paused' {
   if (!d._online) return 'offline';
   if (d.miningPaused) return 'paused';

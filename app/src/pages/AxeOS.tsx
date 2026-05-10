@@ -4,7 +4,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, btnStyle, Banner } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime } from '../api';
+import { api, fmtUptime, fmtBestDiff } from '../api';
 import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 
@@ -130,7 +130,7 @@ export function AxeOS() {
           const name = d._name || d.hostname || ip;
           const status = d.status || (d._online ? 'online' : 'offline');
           const temp = d.temp ?? null;
-          const best = d.bestDiff != null ? `${(d.bestDiff / 1e6).toFixed(0)}M` : '—';
+          const best = fmtBestDiff(d.bestDiff);
           const uptime = fmtUptime(d.uptimeSeconds);
           return (
             <div key={ip || i}

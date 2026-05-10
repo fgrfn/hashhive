@@ -7,12 +7,20 @@ import type { Wallet } from '../api';
 import { Wallet as WalletIcon, Plus, Copy, Eye, Edit3, Trash2, Check } from 'lucide-react';
 
 const COIN_META: Record<string, { label: string; symbol: string; color: string }> = {
-  BTC:  { label: 'Bitcoin',   symbol: '₿',   color: '#F7931A' },
-  LN:   { label: 'Lightning', symbol: '⚡',  color: '#792EE5' },
-  LTC:  { label: 'Litecoin',  symbol: 'Ł',   color: '#BFBBBB' },
-  DOGE: { label: 'Dogecoin',  symbol: 'Ð',   color: '#C3A634' },
-  KAS:  { label: 'Kaspa',     symbol: 'KAS', color: '#70C7BA' },
-  XMR:  { label: 'Monero',    symbol: 'ɱ',   color: '#FF6600' },
+  BTC:  { label: 'Bitcoin',          symbol: '₿',    color: '#F7931A' },
+  LN:   { label: 'Lightning',        symbol: '⚡',    color: '#792EE5' },
+  LTC:  { label: 'Litecoin',         symbol: 'Ł',    color: '#BFBBBB' },
+  DOGE: { label: 'Dogecoin',         symbol: 'Ð',    color: '#C3A634' },
+  DGB:  { label: 'DigiByte',         symbol: 'DGB',  color: '#0066CC' },
+  KAS:  { label: 'Kaspa',            symbol: 'KAS',  color: '#70C7BA' },
+  XMR:  { label: 'Monero',           symbol: 'ɱ',    color: '#FF6600' },
+  BCH:  { label: 'Bitcoin Cash',     symbol: 'BCH',  color: '#0AC18E' },
+  ZEC:  { label: 'Zcash',            symbol: 'ZEC',  color: '#ECB244' },
+  RVN:  { label: 'Ravencoin',        symbol: 'RVN',  color: '#384182' },
+  ETC:  { label: 'Ethereum Classic', symbol: 'ETC',  color: '#328332' },
+  DASH: { label: 'Dash',             symbol: 'DASH', color: '#008CE7' },
+  ERG:  { label: 'Ergo',             symbol: 'ERG',  color: '#FF5E5B' },
+  ALPH: { label: 'Alephium',         symbol: 'ALPH', color: '#1F6FFF' },
 };
 
 export function Wallets() {

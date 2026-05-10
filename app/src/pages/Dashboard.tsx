@@ -34,9 +34,35 @@ export function Dashboard() {
   const hrBase = totalHr || 2800;
   const chartData = genSparkline(hrBase, range === '7d' ? 168 : range === '30d' ? 720 : 96);
 
+  const [hrTrend, setHrTrend] = useState<{ pct: number; window: string } | null>(null);
+
   useEffect(() => {
     api.alerts.list(1).then(a => setLogLines(a.slice(-40))).catch(() => {});
   }, []);
+
+  // Compute hashrate trend from /api/stats/hashrate (last 24h samples)
+  useEffect(() => {
+    fetch('/api/stats/hashrate?days=1')
+      .then(r => r.ok ? r.json() : null)
+      .then((samples: Array<{ ts: number; total_ghs?: number; ghs?: number }> | null) => {
+        if (!samples || samples.length < 4) { setHrTrend(null); return; }
+        const latest = samples[samples.length - 1];
+        const latestHr = latest.total_ghs ?? latest.ghs ?? 0;
+        if (latestHr <= 0) { setHrTrend(null); return; }
+        // Find sample closest to 1h ago
+        const targetTs = (latest.ts ?? Date.now() / 1000) - 3600;
+        let candidate = samples[0];
+        for (const s of samples) {
+          if ((s.ts ?? 0) <= targetTs) candidate = s;
+          else break;
+        }
+        const refHr = candidate.total_ghs ?? candidate.ghs ?? 0;
+        if (refHr <= 0) { setHrTrend(null); return; }
+        const pct = ((latestHr - refHr) / refHr) * 100;
+        setHrTrend({ pct, window: '1h' });
+      })
+      .catch(() => setHrTrend(null));
+  }, [devices.length, axeDevices.length]);
 
   const filteredLog = logLines.filter(l => {
     if (logFilter === 'NMMiner') return l.source === 'nmminer';
@@ -64,7 +90,7 @@ export function Dashboard() {
     <div>
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-        <KpiCard t={t} label="Total Hashrate" value={fmtHashrate(totalHr)} accent={t.accent} trend={{ pos: true, label: '+2.1% · 1h' }} spark={genSparkline(1, 30)} sparkColor={t.accent} />
+        <KpiCard t={t} label="Total Hashrate" value={fmtHashrate(totalHr)} accent={t.accent} trend={hrTrend ? { pos: hrTrend.pct >= 0, label: `${hrTrend.pct >= 0 ? '+' : ''}${hrTrend.pct.toFixed(1)}% · ${hrTrend.window}` } : undefined} spark={genSparkline(1, 30)} sparkColor={t.accent} />
         <KpiCard t={t} label="Devices Online" value={`${devicesOnline}/${devicesTotal}`} accent={t.success} trend={{ pos: true, label: devicesTotal > 0 ? `${Math.round(devicesOnline / devicesTotal * 100)}% uptime` : '' }} />
         <KpiCard t={t} label="Max Temp" value={maxTemp > 0 ? `${maxTemp}°C` : '—'} accent={maxTemp > 70 ? t.danger : maxTemp > 65 ? t.warning : t.success} />
         <KpiCard t={t} label="Total Power" value={totalPower > 0 ? `${totalPower.toFixed(1)}W` : '—'} accent={t.honey} spark={genSparkline(1, 30)} sparkColor={t.honey} />

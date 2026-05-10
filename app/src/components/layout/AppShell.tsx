@@ -284,20 +284,33 @@ function Topbar({ t, active, dark, onToggleDark, globalSearch, setGlobalSearch, 
   );
 }
 
-const CURRENT_VERSION = 'v1.4.2';
-const LATEST_VERSION  = 'v1.5.0';
-const RELEASE_NOTES = [
-  'Power-curve auto-tuning per ASIC',
-  'BitAxe Gamma support (BM1370)',
-  'Telegram bot inline commands',
-  'Fixed: stratum reconnect storm on flaky links',
-];
-
 function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
-  const [state, setState] = useState<'checking' | 'up-to-date' | 'available'>('available');
+  const [state, setState] = useState<'checking' | 'up-to-date' | 'available'>('checking');
+  const [current, setCurrent] = useState<string>('');
+  const [latest, setLatest] = useState<string>('');
+  const [releaseNotes, setReleaseNotes] = useState<string[]>([]);
+  const [releaseSize, setReleaseSize] = useState<string>('');
   const [showPopover, setShowPopover] = useState(false);
   const [installing, setInstalling] = useState(false);
   const { devicesTotal } = useAppStore();
+
+  useEffect(() => {
+    const ver = (v: string) => v.startsWith('v') ? v : `v${v}`;
+    fetch('/api/updates/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) { setState('up-to-date'); return; }
+        const cur = ver(d.current || '');
+        setCurrent(cur);
+        if (d.latest) {
+          setLatest(ver(d.latest.version || ''));
+          setReleaseNotes(Array.isArray(d.latest.notes) ? d.latest.notes : []);
+          if (d.latest.size_mb) setReleaseSize(`${d.latest.size_mb} MB`);
+        }
+        setState(d.update_available ? 'available' : 'up-to-date');
+      })
+      .catch(() => setState('up-to-date'));
+  }, []);
 
   const doInstall = () => {
     setInstalling(true);
@@ -315,8 +328,8 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
 
   const cfg = {
     checking:    { color: t.textMuted, dot: t.textMuted, label: 'Checking for updates…', sub: '' },
-    'up-to-date': { color: t.success,  dot: t.success,   label: 'Up to date',            sub: `${CURRENT_VERSION} · latest` },
-    available:   { color: t.warning,   dot: t.warning,   label: 'Update available',       sub: `${CURRENT_VERSION} → ${LATEST_VERSION}` },
+    'up-to-date': { color: t.success,  dot: t.success,   label: 'Up to date',            sub: 'latest version' },
+    available:   { color: t.warning,   dot: t.warning,   label: 'Update available',       sub: latest ? `${current} → ${latest}` : '' },
   }[state];
 
   return (
@@ -337,7 +350,7 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
         )}
       </div>
       <div style={{ fontSize: 10, color: t.textDim, display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-        <span>{CURRENT_VERSION}</span>
+        <span>{current || '—'}</span>
         <span>{devicesTotal} devices</span>
       </div>
 
@@ -348,15 +361,17 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 10, color: t.warning, fontWeight: 700, fontFamily: FONT_MONO, letterSpacing: '0.06em' }}>UPDATE AVAILABLE</div>
-                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>HashHive {LATEST_VERSION}</div>
-                <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2 }}>released 2 days ago · 8.4 MB</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>HashHive {latest}</div>
+                {releaseSize && <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2 }}>{releaseSize}</div>}
               </div>
               <button onClick={() => setShowPopover(false)} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer' }}><X size={14} /></button>
             </div>
             <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: FONT_MONO }}>What's new</div>
-            <ul style={{ margin: '0 0 12px', padding: '0 0 0 14px', fontSize: 11, color: t.text, lineHeight: 1.6 }}>
-              {RELEASE_NOTES.map((n, i) => <li key={i}>{n}</li>)}
-            </ul>
+            {releaseNotes.length > 0 && (
+              <ul style={{ margin: '0 0 12px', padding: '0 0 0 14px', fontSize: 11, color: t.text, lineHeight: 1.6 }}>
+                {releaseNotes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            )}
             <button onClick={doInstall} disabled={installing} style={{ ...btnStyle(t, 'primary'), width: '100%', padding: '9px 12px', fontSize: 12, justifyContent: 'center', marginBottom: 6, opacity: installing ? 0.7 : 1, boxSizing: 'border-box' }}>
               {installing ? <><Spinner t={t} size={11} /> Installing…</> : <><Download size={12} /> Install & restart</>}
             </button>

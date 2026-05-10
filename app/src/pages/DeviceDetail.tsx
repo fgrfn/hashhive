@@ -5,7 +5,7 @@ import { useAppStore } from '../store/app';
 import { Card, Label, Pill, StatusPill, Spinner, btnStyle } from '../components/primitives';
 import { AreaChart, Sparkline } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, getHashrate, fmtUptime, fmtHashrate } from '../api';
+import { api, getHashrate, fmtUptime, fmtHashrate, fmtBestDiff } from '../api';
 import type { NMMinerDevice, AxeDevice, HealthData } from '../api';
 import { ArrowLeft, Cpu, Activity, FileText, Terminal, Zap, Settings, RefreshCw, Power, Play, Pause, AlertTriangle } from 'lucide-react';
 
@@ -141,7 +141,7 @@ function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
     ['Uptime', uptime != null ? fmtUptime(typeof uptime === 'string' ? parseInt(uptime) : uptime) : '—'],
     ['Pool', nmDevice.stratumURL || nmDevice.pool || '—'],
     ['Worker', nmDevice.stratumUser || nmDevice.worker || '—'],
-    ['Best share', nmDevice.bestShare || nmDevice.best_share || nmDevice.bestDiff || '—'],
+    ['Best share', fmtBestDiff(nmDevice.bestShare ?? nmDevice.best_share ?? nmDevice.bestDiff)],
     ['Accepted', String(nmDevice.shares_ok ?? '—'), t.success],
     ['Rejected', String(nmDevice.shares_err ?? '—'), nmDevice.shares_err ? t.danger : t.text],
     ['Version', nmDevice.version || '—'],
@@ -156,7 +156,7 @@ function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
     ['Fan', axeDevice.fanspeed != null ? `${axeDevice.fanspeed}%` : axeDevice.fanrpm != null ? `${axeDevice.fanrpm} RPM` : '—'],
     ['Accepted', String(axeDevice.sharesAccepted ?? '—'), t.success],
     ['Rejected', String(axeDevice.sharesRejected ?? '—'), axeDevice.sharesRejected ? t.danger : t.text],
-    ['Best diff', axeDevice.bestDiff != null ? String(axeDevice.bestDiff) : '—'],
+    ['Best diff', fmtBestDiff(axeDevice.bestDiff)],
     ['Error rate', axeDevice.errorPercentage != null ? `${axeDevice.errorPercentage.toFixed(2)}%` : '—', axeDevice.errorPercentage && axeDevice.errorPercentage > 2 ? t.warning : t.text],
     ['Uptime', axeDevice.uptimeSeconds != null ? fmtUptime(axeDevice.uptimeSeconds) : '—'],
     ['Model', axeDevice.ASICModel || axeDevice._type || '—'],
