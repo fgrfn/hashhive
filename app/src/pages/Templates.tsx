@@ -3,16 +3,8 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Modal, FormField, EmptyState, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
+import { api, type DeviceTemplate as Template } from '../api';
 import { FileText, Plus, Edit, Trash2, Send, Check, X } from 'lucide-react';
-
-interface Template {
-  id: string;
-  name: string;
-  type: 'nmminer' | 'axeos' | 'both';
-  description?: string;
-  config: Record<string, unknown>;
-  created_at?: string;
-}
 
 export function Templates() {
   const { theme: t } = useThemeStore();
@@ -22,7 +14,7 @@ export function Templates() {
   const [pushTarget, setPushTarget] = useState<Template | null>(null);
 
   useEffect(() => {
-    fetch('/api/templates').then(r => r.json()).then(setTemplates).catch(() => setTemplates([]));
+    api.templates.list().then(setTemplates).catch(() => setTemplates([]));
   }, []);
 
   const deleteTemplate = (id: string) => {
@@ -133,7 +125,7 @@ function PushModal({ t, template, onClose }: { t: Theme; template: Template; onC
 
     for (const ip of ips) {
       try {
-        await fetch(`/api/device/${ip}/apply-template`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: template.id, config: template.config }) });
+        await api.templates.apply(ip, template.id, template.config);
         setProgress(prev => ({ ...prev, [ip]: 'ok' }));
       } catch {
         setProgress(prev => ({ ...prev, [ip]: 'error' }));

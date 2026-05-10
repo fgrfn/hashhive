@@ -59,11 +59,24 @@ export const api = {
   },
   axeos: {
     devices:     ()                                               => get<AxeDevice[]>('/api/axeos/devices'),
-    action:      (ip: string, action: AxeAction)                 => post(`/api/axeos/action/${ip}?action=${action}`),
+    action:      (ip: string, action: AxeAction)                 => post<AxeActionResponse>(`/api/axeos/action/${ip}?action=${action}`),
     batchAction: (ips: string[], action: AxeAction)              => post('/api/axeos/action/batch', { ips, action }),
     configAll:   (cfg: Record<string, unknown>)                  => patch('/api/axeos/config/all', cfg),
     configBatch: (ips: string[], freq: number, voltage: number)  => patch('/api/axeos/config/batch', { ips, frequency: freq, coreVoltage: voltage }),
+    configOne:   (ip: string, cfg: Record<string, unknown>)      => patch<AxeActionResponse>(`/api/axeos/config/${ip}`, cfg),
     scan:        ()                                               => get<AxeDevice[]>('/api/axeos/scan'),
+  },
+  device: {
+    logs:    (ip: string)              => get<string[] | { logs: string[] }>(`/api/device/${ip}/logs`),
+    exec:    (ip: string, cmd: string) => post<{ output?: string; result?: string; error?: string }>(`/api/device/${ip}/exec`, { cmd }),
+    restart: (ip: string)              => post(`/api/device/${ip}/restart`),
+  },
+  templates: {
+    list:  ()                                                                       => get<DeviceTemplate[]>('/api/templates'),
+    apply: (ip: string, templateId: string, config: Record<string, unknown>)       => post(`/api/device/${ip}/apply-template`, { template_id: templateId, config }),
+  },
+  stats: {
+    hashrate: (days: number) => get<StatSample[]>(`/api/stats/hashrate?days=${days}`),
   },
   groups: {
     list:   ()                               => get<Group[]>('/api/groups'),
@@ -102,9 +115,19 @@ export const api = {
   },
 };
 
-// ─── Shared response shape ────────────────────────────────────────────────────
+// ─── Shared response shapes ───────────────────────────────────────────────────
 
 export interface OkResponse { ok?: boolean; status?: string }
+export interface AxeActionResponse { ip: string; action: string; status: number }
+export interface StatSample { ts: number; total_ghs?: number; ghs?: number }
+export interface DeviceTemplate {
+  id: string;
+  name: string;
+  type: 'nmminer' | 'axeos' | 'both';
+  description?: string;
+  config: Record<string, unknown>;
+  created_at?: string;
+}
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
