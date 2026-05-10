@@ -34,6 +34,30 @@ jobs:
         env:
           HASHHIVE_DATA_DIR: /tmp/hashhive-ci
 
+  frontend:
+    name: Frontend build & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: app
+
+      - name: Lint (eslint)
+        run: npm run lint
+        working-directory: app
+
+      - name: Type-check & build
+        run: npm run build
+        working-directory: app
+
   secret-scan:
     name: Detect secrets & API key leaks
     runs-on: ubuntu-latest
