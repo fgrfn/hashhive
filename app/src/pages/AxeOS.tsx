@@ -5,8 +5,10 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff } from '../api';
+import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 import { toast } from '../store/toast';
+import { useMobile } from '../hooks/useWindowWidth';
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
@@ -17,6 +19,7 @@ export function AxeOS() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [bulkFreqOpen, setBulkFreqOpen] = useState(false);
+  const mobile = useMobile();
 
   const filtered = axeDevices.filter(d => {
     const ip = d._ip || '';
@@ -110,6 +113,13 @@ export function AxeOS() {
         </div>
       )}
 
+      {mobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map(d => (
+            <AxeMobileCard key={d._ip || ''} t={t} d={d} onAction={doAction} onNavigate={navigate} />
+          ))}
+        </div>
+      ) : (
       <Card t={t} noPad>
         <div style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 80px 90px 80px 80px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
           <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d._ip || ''))); }} style={{ accentColor: t.info }} /></div>
@@ -174,6 +184,7 @@ export function AxeOS() {
           );
         })}
       </Card>
+      )}
 
       {bulkFreqOpen && (
         <BulkFreqModal t={t} onClose={() => setBulkFreqOpen(false)}
@@ -184,6 +195,52 @@ export function AxeOS() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function AxeMobileCard({ t, d, onAction, onNavigate }: { t: Theme; d: AxeDevice; onAction: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => void; onNavigate: (path: string) => void }) {
+  const ip = d._ip || '';
+  const name = d._name || d.hostname || ip;
+  const status = d.status || (d._online ? 'online' : 'offline');
+  const temp = d.temp ?? null;
+  return (
+    <Card t={t}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div onClick={() => onNavigate(`/devices/${ip}`)} style={{ cursor: 'pointer', flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
+          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+          {d._type && <div style={{ fontSize: 10, color: t.info, fontFamily: FONT_MONO, textTransform: 'uppercase' }}>{d._type}</div>}
+        </div>
+        <StatusPill t={t} status={status} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 10 }}>
+        <AxeKv t={t} label="Hashrate" value={d.hashRate ? `${d.hashRate.toFixed(1)} GH/s` : '—'} />
+        <AxeKv t={t} label="Temp" value={temp != null ? `${temp}°` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
+        <AxeKv t={t} label="Power" value={d.power ? `${d.power.toFixed(1)} W` : '—'} />
+        <AxeKv t={t} label="Best Diff" value={fmtBestDiff(d.bestDiff)} color={t.honey} />
+        <AxeKv t={t} label="Uptime" value={fmtUptime(d.uptimeSeconds)} />
+        <AxeKv t={t} label="ASIC" value={d.ASICModel || '—'} />
+      </div>
+      {d._online && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+          {status !== 'paused'
+            ? <button onClick={() => onAction(ip, 'pause')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Pause size={11} /> Pause</button>
+            : <button onClick={() => onAction(ip, 'resume')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Play size={11} /> Resume</button>
+          }
+          <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>
+          <button onClick={() => onAction(ip, 'identify')} style={{ ...btnStyle(t), padding: '5px 10px' }}><Lightbulb size={11} /></button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function AxeKv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text }}>{value}</div>
     </div>
   );
 }

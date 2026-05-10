@@ -8,6 +8,7 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { AppSettings } from '../api';
 import { toast } from '../store/toast';
+import { useMobile } from '../hooks/useWindowWidth';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
@@ -65,13 +66,17 @@ export function Settings() {
     autoSaveTimer.current = setTimeout(save, 500);
   };
 
+  const mobile = useMobile();
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '220px 1fr', gap: mobile ? 16 : 24 }}>
       {/* Side nav */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={mobile
+        ? { display: 'flex', flexDirection: 'row', gap: 4, overflowX: 'auto', paddingBottom: 4 }
+        : { display: 'flex', flexDirection: 'column', gap: 2 }}>
         {SECTIONS.map(({ id, label, Icon }) => (
-          <div key={id} onClick={() => { setSection(id); navigate(`/settings/${id}`); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, background: section === id ? t.accentGlow : 'transparent', color: section === id ? t.accent : t.textMuted, transition: 'all .12s' }}>
-            <Icon size={15} />
+          <div key={id} onClick={() => { setSection(id); navigate(`/settings/${id}`); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: mobile ? '8px 12px' : '10px 12px', borderRadius: 8, cursor: 'pointer', fontSize: mobile ? 12 : 13, fontWeight: 500, background: section === id ? t.accentGlow : 'transparent', color: section === id ? t.accent : t.textMuted, transition: 'all .12s', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <Icon size={14} />
             {label}
           </div>
         ))}
