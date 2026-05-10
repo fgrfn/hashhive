@@ -71,6 +71,7 @@ export function Settings() {
   const [discoveryOpen, setDiscoveryOpen] = useState(false);
 
   return (
+    <>
     <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '220px 1fr', gap: mobile ? 16 : 24 }}>
       {/* Side nav */}
       <div style={mobile
@@ -258,6 +259,7 @@ export function Settings() {
       </div>
     </div>
     {discoveryOpen && <DiscoveryModal onClose={() => setDiscoveryOpen(false)} />}
+    </>
   );
 }
 

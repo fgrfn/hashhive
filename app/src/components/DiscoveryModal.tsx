@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Modal, Spinner, StatusPill, btnStyle } from './primitives';
+import { Modal, Spinner, btnStyle } from './primitives';
 import { FONT_MONO } from '../tokens';
 import { api } from '../api';
 import type { DiscoveredDevice } from '../api';
@@ -54,7 +54,7 @@ export function DiscoveryModal({ onClose }: { onClose: () => void }) {
 
     const devicesToAdd = result.found.filter(d => selected.has(d.ip));
     const current = settings || {};
-    let patch: Record<string, unknown> = {};
+    const patch: Record<string, unknown> = {};
 
     const nmMasters = devicesToAdd.filter(d => d.type === 'nmminer_master' || d.type === 'nmminer_device');
     const axeDevices = devicesToAdd.filter(d => d.type === 'bitaxe' || d.type === 'nerdaxe');
