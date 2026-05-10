@@ -10,15 +10,10 @@ import { useThemeStore } from '../../store/theme';
 import { type Theme, FONT_MONO, bodyFont } from '../../tokens';
 import { HiveMark, Spinner, btnStyle } from '../primitives';
 import { useAppStore } from '../../store/app';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 
-function useWindowWidth() {
-  const [w, setW] = useState(window.innerWidth);
-  useEffect(() => {
-    const fn = () => setW(window.innerWidth);
-    window.addEventListener('resize', fn);
-    return () => window.removeEventListener('resize', fn);
-  }, []);
-  return w;
+function useWindowWidthLocal() {
+  return useWindowWidth();
 }
 
 const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIcon; badge?: boolean }> = [
@@ -66,7 +61,7 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
   const t = theme;
   const navigate = useNavigate();
   const location = useLocation();
-  const winW = useWindowWidth();
+  const winW = useWindowWidthLocal();
 
   const isTablet = winW >= 640 && winW < 1080;
   const isMobile = winW < 640;

@@ -69,11 +69,11 @@ export function Dashboard() {
   if (loading) {
     return (
       <div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
           {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} t={t} height={100} />)}
         </div>
         <SkeletonCard t={t} height={240} style={{ marginBottom: 16 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           <SkeletonCard t={t} height={200} />
           <SkeletonCard t={t} height={200} />
         </div>
@@ -84,7 +84,7 @@ export function Dashboard() {
   return (
     <div>
       {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
         <KpiCard t={t} label="Total Hashrate" value={fmtHashrate(totalHr)} accent={t.accent} trend={hrTrend ? { pos: hrTrend.pct >= 0, label: `${hrTrend.pct >= 0 ? '+' : ''}${hrTrend.pct.toFixed(1)}% · ${hrTrend.window}` } : undefined} spark={sparkData.length > 1 ? sparkData : undefined} sparkColor={t.accent} />
         <KpiCard t={t} label="Devices Online" value={`${devicesOnline}/${devicesTotal}`} accent={t.success} trend={{ pos: true, label: devicesTotal > 0 ? `${Math.round(devicesOnline / devicesTotal * 100)}% uptime` : '' }} />
         <KpiCard t={t} label="Max Temp" value={maxTemp > 0 ? `${maxTemp}°C` : '—'} accent={maxTemp > 70 ? t.danger : maxTemp > 65 ? t.warning : t.success} />
@@ -118,7 +118,7 @@ export function Dashboard() {
       </Card>
 
       {/* Device mini tables */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
         <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={devices.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/nmminer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
         <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={axeDevices.slice(0, 6).map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'online', hr: d.hashRate || 0, temp: d.temp ?? null }))} onViewAll={() => navigate('/miners/axeos')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
       </div>
@@ -223,15 +223,15 @@ function DeviceMini({ t, title, accent, rows, onViewAll, onDevice }: {
           </button>
         </div>
       </div>
-      <div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '6px 18px', borderBottom: `1px solid ${t.border}`, borderTop: `1px solid ${t.border}`, background: t.surface2 }}>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: 320, display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '6px 18px', borderBottom: `1px solid ${t.border}`, borderTop: `1px solid ${t.border}`, background: t.surface2 }}>
           <Label t={t}>Name</Label><Label t={t}>Hashrate</Label><Label t={t}>Temp</Label><Label t={t}>Status</Label>
         </div>
         {rows.length === 0 && (
           <div style={{ padding: '16px 18px', color: t.textMuted, fontSize: 13 }}>No devices</div>
         )}
         {rows.map((r, i) => (
-          <div key={r.ip || i} onClick={() => onDevice(r)} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '10px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, cursor: 'pointer', transition: 'background .1s' }}
+          <div key={r.ip || i} onClick={() => onDevice(r)} style={{ minWidth: 320, display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '10px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, cursor: 'pointer', transition: 'background .1s' }}
             onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
             onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
           >

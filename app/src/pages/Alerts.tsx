@@ -6,6 +6,7 @@ import { FONT_MONO } from '../tokens';
 import { api } from '../api';
 import type { Alert } from '../api';
 import { Bell, Check, Eye, Download, Plus, Edit, MoreHorizontal } from 'lucide-react';
+import { useMobile } from '../hooks/useWindowWidth';
 
 export function Alerts() {
   const { theme: t } = useThemeStore();
@@ -114,12 +115,42 @@ const MOCK_RULES = [
 function AlertRules() {
   const { theme: t } = useThemeStore();
   const [rules, setRules] = useState(MOCK_RULES);
+  const mobile = useMobile();
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: t.textMuted }}>Rules are evaluated every 10 seconds.</div>
         <button style={{ ...btnStyle(t, 'primary') }}><Plus size={13} /> New rule</button>
       </div>
+      {mobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rules.map(r => (
+            <Card key={r.id} t={t} style={{ opacity: r.enabled ? 1 : 0.55 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>Scope: {r.scope}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <Pill t={t} sev={r.severity === 'critical' ? 'critical' : 'warning'}>{r.severity}</Pill>
+                  <Toggle t={t} on={r.enabled} onChange={v => setRules(rules.map(x => x.id === r.id ? { ...x, enabled: v } : x))} size="sm" />
+                </div>
+              </div>
+              <div style={{ fontSize: 12, fontFamily: FONT_MONO, color: t.accent, marginBottom: 8 }}>{r.condition}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {r.channels.map(c => <span key={c} style={{ padding: '2px 7px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 10, fontFamily: FONT_MONO }}>{c}</span>)}
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}x</span>
+                  <Edit size={13} style={{ cursor: 'pointer', color: t.textMuted }} />
+                  <MoreHorizontal size={13} style={{ cursor: 'pointer', color: t.textMuted }} />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
       <Card t={t} noPad>
         <div style={{ display: 'grid', gridTemplateColumns: '40px 1.5fr 1fr 0.9fr 1fr 100px 50px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
           <span /><span>Rule</span><span>Condition</span><span>Severity</span><span>Channels</span><span>Fired 24h</span><span />
@@ -144,6 +175,7 @@ function AlertRules() {
           </div>
         ))}
       </Card>
+      )}
     </div>
   );
 }
@@ -157,7 +189,7 @@ const CHANNELS = [
 function AlertChannels() {
   const { theme: t } = useThemeStore();
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
       {CHANNELS.map(c => (
         <Card key={c.id} t={t}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>

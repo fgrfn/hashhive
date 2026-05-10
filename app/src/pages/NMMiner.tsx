@@ -4,9 +4,10 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
-import type { NMMinerConfig } from '../api';
+import type { NMMinerConfig, NMMinerDevice } from '../api';
 import { Cpu, Edit3 } from 'lucide-react';
 import { toast } from '../store/toast';
+import { useMobile } from '../hooks/useWindowWidth';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
@@ -44,11 +45,18 @@ export function NMMiner() {
     setEditDevice(null);
   };
 
+  const mobile = useMobile();
   const cols = ['IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Share', 'Actions'];
   const colWidths = ['120px', '1fr', '90px', '110px', '80px', '160px', '160px', '80px', '90px', '60px'];
 
   if (loading) {
-    return (
+    return mobile ? (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} t={t}><SkeletonRow t={t} cols={['80px', '120px', '60px', '80px']} /></Card>
+        ))}
+      </div>
+    ) : (
       <Card t={t} noPad>
         <div style={{ padding: '12px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12 }}>
@@ -74,6 +82,13 @@ export function NMMiner() {
 
   return (
     <>
+      {mobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {devices.map(d => (
+            <NmMobileCard key={d.ip} t={t} d={d} onEdit={() => openEdit(d.ip || '')} />
+          ))}
+        </div>
+      ) : (
       <Card t={t} noPad>
         <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12 }}>
@@ -115,6 +130,7 @@ export function NMMiner() {
           );
         })}
       </Card>
+      )}
 
       {editDevice && config && (
         <Modal t={t} title={`Configure ${config.Hostname || editDevice}`} onClose={() => setEditDevice(null)} width={560}>
@@ -172,6 +188,48 @@ export function NMMiner() {
         </Modal>
       )}
     </>
+  );
+}
+
+function NmMobileCard({ t, d, onEdit }: { t: Theme; d: NMMinerDevice; onEdit: () => void }) {
+  const status = getNmStatus(d);
+  const hr = getHashrate(d);
+  const temp = getTemp(d);
+  const ip = d.ip || '';
+  const name = d.name ?? d.hostname ?? ip;
+  const pool = d.pool ?? d.stratumURL ?? '—';
+  const worker = d.worker ?? d.stratumUser ?? '—';
+  return (
+    <Card t={t}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
+          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <StatusPill t={t} status={status} />
+          <button onClick={onEdit} style={{ ...btnStyle(t), padding: '4px 7px' }}><Edit3 size={12} /></button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
+        <Kv t={t} label="Hashrate" value={hr > 0 ? `${hr.toFixed(1)} GH/s` : '—'} />
+        <Kv t={t} label="Temp" value={temp != null ? `${temp}°C` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
+        <Kv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
+        <Kv t={t} label="Best Share" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />
+      </div>
+      <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}`, fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {pool} · {worker}
+      </div>
+    </Card>
+  );
+}
+
+function Kv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text }}>{value}</div>
+    </div>
   );
 }
 
