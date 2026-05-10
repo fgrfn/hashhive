@@ -22,13 +22,7 @@ export function Templates() {
   const [pushTarget, setPushTarget] = useState<Template | null>(null);
 
   useEffect(() => {
-    fetch('/api/templates').then(r => r.json()).then(setTemplates).catch(() => {
-      setTemplates([
-        { id: 't1', name: 'High performance', type: 'nmminer', description: 'Max freq, optimized pools', config: { frequency: 600, fan_speed: 100 } },
-        { id: 't2', name: 'Efficiency mode', type: 'nmminer', description: 'Balanced power/hashrate', config: { frequency: 450, fan_speed: 70 } },
-        { id: 't3', name: 'BitAxe stock', type: 'axeos', description: 'Factory defaults', config: { frequency: 525, core_voltage: 1100 } },
-      ]);
-    });
+    fetch('/api/templates').then(r => r.json()).then(setTemplates).catch(() => setTemplates([]));
   }, []);
 
   const deleteTemplate = (id: string) => {
