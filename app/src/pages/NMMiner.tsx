@@ -3,7 +3,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, Toggle, Select, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, getHashrate, getTemp, getNmStatus } from '../api';
+import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig } from '../api';
 import { Cpu, Edit3, ChevronDown } from 'lucide-react';
 
@@ -83,7 +83,7 @@ export function NMMiner() {
           const pool = d.pool ?? d.stratumURL ?? '—';
           const worker = d.worker ?? d.stratumUser ?? '—';
           const uptime = fmtUptime(d.uptime);
-          const best = d.bestShare ?? d.best_share ?? d.bestDiff ?? '—';
+          const best = fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff);
           const ip = d.ip || '';
           const name = d.name ?? d.hostname ?? ip;
           return (
