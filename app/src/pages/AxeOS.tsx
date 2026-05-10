@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, btnStyle, Banner } from '../components/primitives';
+import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle, Banner } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
-  const { axeDevices } = useAppStore();
+  const { axeDevices, wsStatus } = useAppStore();
   const navigate = useNavigate();
-  const loading = useLoading(600);
+  const loading = useDataReady(wsStatus !== 'connecting');
   const [selected, setSelected] = useState(new Set<string>());
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
-import { Card, Label, Modal, FormField, EmptyState, useLoading, SkeletonCard, btnStyle } from '../components/primitives';
+import { Card, Label, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Wallet } from '../api';
@@ -25,14 +25,14 @@ const COIN_META: Record<string, { label: string; symbol: string; color: string }
 
 export function Wallets() {
   const { theme: t } = useThemeStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [coinFilter, setCoinFilter] = useState('ALL');
   const [showAdd, setShowAdd] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    api.wallets.list().then(setWallets).catch(() => {});
+    api.wallets.list().then(setWallets).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
   const coins = ['ALL', ...Object.keys(COIN_META).filter(c => wallets.some(w => w.coin === c))];
@@ -55,7 +55,7 @@ export function Wallets() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>

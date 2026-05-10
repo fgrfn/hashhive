@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
-import { Card, Label, Segmented, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
+import { Card, Label, Segmented, SkeletonCard, btnStyle } from '../components/primitives';
 import { AreaChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
@@ -9,12 +9,12 @@ import { Download } from 'lucide-react';
 
 export function Earnings() {
   const { theme: t } = useThemeStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [range, setRange] = useState('30d');
   const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
 
   useEffect(() => {
-    api.earnings(60).then(setEarnings).catch(() => {});
+    api.earnings(60).then(setEarnings).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 60;
@@ -25,7 +25,7 @@ export function Earnings() {
   const totalCost = data.reduce((a, d) => a + d.usd_cost, 0);
   const profit = totalUsd - totalCost;
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>

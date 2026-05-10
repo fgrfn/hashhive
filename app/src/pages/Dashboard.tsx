@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, Segmented, SkeletonCard, useLoading } from '../components/primitives';
+import { Card, Label, StatusPill, Segmented, SkeletonCard, useDataReady } from '../components/primitives';
 import { AreaChart, MiniChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, type StatSample } from '../api';
@@ -10,9 +10,9 @@ import type { Alert } from '../api';
 
 export function Dashboard() {
   const { theme: t } = useThemeStore();
-  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal } = useAppStore();
+  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, wsStatus } = useAppStore();
   const navigate = useNavigate();
-  const loading = useLoading(800);
+  const loading = useDataReady(wsStatus !== 'connecting');
   const [range, setRange] = useState('24h');
   const [logLines, setLogLines] = useState<Alert[]>([]);
   const [logFilter, setLogFilter] = useState('All');

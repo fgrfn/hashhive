@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
-import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Schedule } from '../api';
@@ -11,12 +11,12 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function Schedules() {
   const { theme: t } = useThemeStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    api.schedules.list().then(setSchedules).catch(() => {});
+    api.schedules.list().then(setSchedules).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
   const toggleSchedule = async (id: string, enabled: boolean) => {
@@ -35,7 +35,7 @@ export function Schedules() {
     setShowAdd(false);
   };
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div>
         <SkeletonCard t={t} height={200} style={{ marginBottom: 14 }} />

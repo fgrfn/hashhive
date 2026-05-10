@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, Modal, FormField, EmptyState, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, type DeviceTemplate as Template } from '../api';
 import { FileText, Plus, Edit, Trash2, Send, Check, X } from 'lucide-react';
 
 export function Templates() {
   const { theme: t } = useThemeStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [pushTarget, setPushTarget] = useState<Template | null>(null);
 
   useEffect(() => {
-    api.templates.list().then(setTemplates).catch(() => setTemplates([]));
+    api.templates.list().then(setTemplates).catch(() => setTemplates([])).finally(() => setFetched(true));
   }, []);
 
   const deleteTemplate = (id: string) => {
     setTemplates(templates.filter(t => t.id !== id));
   };
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} t={t} height={200} />)}
