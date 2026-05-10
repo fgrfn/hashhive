@@ -11,7 +11,6 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import main as m  # noqa: E402
 from main import _append_entry, _load_recent, _today, LOGS_DIR  # noqa: E402
 
 
@@ -44,7 +43,8 @@ def test_append_entry_most_recent_first():
 
 
 def test_append_entry_caps_at_max(monkeypatch):
-    monkeypatch.setattr(m, "MAX_ENTRIES_PER_DAY", 3)
+    import core
+    monkeypatch.setattr(core, "MAX_ENTRIES_PER_DAY", 3)
     _clear_today_log()
     for i in range(5):
         _append_entry({"id": f"e{i}", "severity": "info", "message": f"msg{i}", "read": False})
