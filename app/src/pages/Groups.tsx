@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Pill, SkeletonCard, useLoading, EmptyState, btnStyle } from '../components/primitives';
-import { AreaChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Group } from '../api';

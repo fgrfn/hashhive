@@ -5,7 +5,7 @@ import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, 
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { PoolPreset } from '../api';
-import { Database, Plus, Edit, Trash2, Send, Check, ChevronRight } from 'lucide-react';
+import { Database, Plus, Edit, Trash2, Send, Check } from 'lucide-react';
 
 export function Pool() {
   const { theme: t } = useThemeStore();

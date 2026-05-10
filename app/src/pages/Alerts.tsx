@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, StatusPill, Toggle, Segmented, SkeletonRow, useLoading, EmptyState, btnStyle } from '../components/primitives';
+import { Card, Pill, Toggle, Segmented, SkeletonRow, useLoading, EmptyState, btnStyle } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api } from '../api';
 import type { Alert } from '../api';

@@ -36,7 +36,7 @@ export function useDeviceStream() {
         const nmTotal = (data.nmminer?.devices || []).length;
         const axeTotal = (data.axeos?.devices || []).length;
         store.setDeviceCounts(nmTotal + axeTotal, nmOnline + axeOnline);
-      } catch {}
+      } catch { /* malformed WS frame — ignore */ }
     };
 
     ws.onclose = () => {

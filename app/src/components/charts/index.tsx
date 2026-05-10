@@ -70,15 +70,6 @@ interface AreaChartProps {
 export function AreaChart({ t, data, accent, h = 200, labels, unit = 'GH/s' }: AreaChartProps) {
   const chartData = data.map((v, i) => ({ i, v, label: labels?.[i] || i }));
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number }> }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', fontFamily: FONT_MONO, fontSize: 12 }}>
-        <div style={{ color: accent, fontWeight: 600 }}>{payload[0].value.toFixed(1)} {unit}</div>
-      </div>
-    );
-  };
-
   return (
     <ResponsiveContainer width="100%" height={h}>
       <ReAreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
@@ -91,7 +82,15 @@ export function AreaChart({ t, data, accent, h = 200, labels, unit = 'GH/s' }: A
         <CartesianGrid stroke={t.border} strokeDasharray="4 4" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 10, fill: t.textDim, fontFamily: FONT_MONO }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={{ fontSize: 10, fill: t.textDim, fontFamily: FONT_MONO }} tickLine={false} axisLine={false} width={45} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(1)}T` : `${v}`} />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip content={({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const val = Number(payload[0].value ?? 0);
+          return (
+            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', fontFamily: FONT_MONO, fontSize: 12 }}>
+              <div style={{ color: accent, fontWeight: 600 }}>{val.toFixed(1)} {unit}</div>
+            </div>
+          );
+        }} />
         <Area type="monotone" dataKey="v" stroke={accent} strokeWidth={2} fill={`url(#areaGrad-${accent.replace('#', '')})`} dot={false} />
       </ReAreaChart>
     </ResponsiveContainer>

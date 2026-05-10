@@ -28,6 +28,7 @@ export function Settings() {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings || {});
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (settings) setLocalSettings(settings);
   }, [settings]);
 
@@ -36,7 +37,7 @@ export function Settings() {
     try {
       const updated = await api.settings.save(localSettings);
       setSettings(updated);
-    } catch {}
+    } catch { /* save failed — keep local state */ }
     setSaving(false);
   };
 

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, Segmented, SkeletonCard, useLoading } from '../components/primitives';
-import { AreaChart, MiniChart, Sparkline } from '../components/charts';
+import { AreaChart, MiniChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, getHashrate, getTemp, fmtHashrate, getAxeHashrate } from '../api';
+import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate } from '../api';
 import type { Alert } from '../api';
 
 function genSparkline(base: number, n = 30): number[] {
@@ -14,7 +14,7 @@ function genSparkline(base: number, n = 30): number[] {
 
 export function Dashboard() {
   const { theme: t } = useThemeStore();
-  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, btcPrice } = useAppStore();
+  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal } = useAppStore();
   const navigate = useNavigate();
   const loading = useLoading(800);
   const [range, setRange] = useState('24h');

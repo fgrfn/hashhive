@@ -5,7 +5,6 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, btnStyle, Banner } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff } from '../api';
-import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 
 export function AxeOS() {

@@ -5,6 +5,7 @@ import { type Theme, FONT_MONO, RADIUS } from '../../tokens';
 
 export type BtnVariant = 'ghost' | 'primary' | 'honey' | 'danger';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function btnStyle(t: Theme, v: BtnVariant = 'ghost'): React.CSSProperties {
   const r = RADIUS.btn(t._rs);
   const base: React.CSSProperties = {
@@ -349,6 +350,7 @@ export function SkeletonRow({ t, cols, height = 52 }: { t: Theme; cols: (string 
 
 // ─── useLoading ─────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLoading(ms = 1200): boolean {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
