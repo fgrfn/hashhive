@@ -311,6 +311,10 @@ export interface AppSettings {
     gotify_enabled?: boolean;
     gotify_url?: string;
     gotify_token?: string;
+    ntfy_enabled?: boolean;
+    ntfy_url?: string;
+    ntfy_topic?: string;
+    ntfy_token?: string;
   };
   alert_types?: Record<string, boolean>;
   weekly_summary?: { enabled: boolean; day: string; time: string };
