@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock, Radar } from 'lucide-react';
+import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock, Radar, Upload } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Toggle, Input, Select, FormField, Segmented, Spinner, btnStyle, HiveMark } from '../components/primitives';
@@ -196,23 +196,7 @@ export function Settings() {
         )}
 
         {section === 'backup' && (
-          <div>
-            <SectionHeader t={t} title="Backup & Data" desc="Export configuration and historical data." />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Card t={t}>
-                <Label t={t} style={{ marginBottom: 8 }}>Configuration</Label>
-                <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>Export all settings, pools, and alert rules as JSON.</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <a href="/api/settings/backup" download="hashhive-config.json" style={{ ...btnStyle(t, 'primary'), textDecoration: 'none' }}>Export JSON</a>
-                </div>
-              </Card>
-              <Card t={t}>
-                <Label t={t} style={{ marginBottom: 8 }}>Alert log</Label>
-                <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>Download the current alert log as JSON.</div>
-                <a href="/api/alerts?days=30" download="alerts.json" style={{ ...btnStyle(t), textDecoration: 'none' }}>Export alerts</a>
-              </Card>
-            </div>
-          </div>
+          <BackupSection t={t} />
         )}
 
         {section === 'about' && (
@@ -260,6 +244,96 @@ export function Settings() {
     </div>
     {discoveryOpen && <DiscoveryModal onClose={() => setDiscoveryOpen(false)} />}
     </>
+  );
+}
+
+function BackupSection({ t }: { t: Theme }) {
+  const { setSettings } = useAppStore();
+  const [importing, setImporting] = useState(false);
+  const [pending, setPending] = useState<Record<string, unknown> | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Not an object');
+        setPending(parsed);
+      } catch {
+        toast('Invalid backup file — expected a JSON object', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const confirmImport = async () => {
+    if (!pending) return;
+    setImporting(true);
+    try {
+      await api.settings.restore(pending);
+      const updated = await api.settings.get();
+      setSettings(updated);
+      toast('Configuration restored — settings reloaded');
+      setPending(null);
+    } catch {
+      toast('Restore failed', 'error');
+    }
+    setImporting(false);
+  };
+
+  return (
+    <div>
+      <SectionHeader t={t} title="Backup & Data" desc="Export and import your HashHive configuration." />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+        {/* Export */}
+        <Card t={t}>
+          <Label t={t} style={{ marginBottom: 8 }}>Export configuration</Label>
+          <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>Download all settings, pools, and alert rules as JSON.</div>
+          <a href="/api/settings/backup" download="hashhive-config.json" style={{ ...btnStyle(t, 'primary'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Download size={13} /> Export JSON
+          </a>
+        </Card>
+
+        {/* Import */}
+        <Card t={t} style={{ borderColor: pending ? t.accent : undefined }}>
+          <Label t={t} style={{ marginBottom: 8 }}>Import configuration</Label>
+          <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>
+            Restore settings from a previously exported JSON file. Existing settings will be overwritten.
+          </div>
+          <input ref={fileRef} type="file" accept=".json,application/json" onChange={onFile} style={{ display: 'none' }} />
+          {!pending ? (
+            <button onClick={() => fileRef.current?.click()} style={{ ...btnStyle(t), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Upload size={13} /> Choose file…
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: t.accent, fontFamily: FONT_MONO, marginBottom: 10, padding: '6px 10px', background: t.accentGlow, borderRadius: 6 }}>
+                Ready to restore — {Object.keys(pending).length} keys loaded
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setPending(null)} style={btnStyle(t)}>Cancel</button>
+                <button onClick={confirmImport} disabled={importing} style={{ ...btnStyle(t, 'primary'), opacity: importing ? 0.7 : 1 }}>
+                  {importing ? 'Restoring…' : 'Confirm restore'}
+                </button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Alert log */}
+        <Card t={t}>
+          <Label t={t} style={{ marginBottom: 8 }}>Alert log</Label>
+          <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>Download the last 30 days of alert history as JSON.</div>
+          <a href="/api/alerts?days=30" download="hashhive-alerts.json" style={{ ...btnStyle(t), textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Download size={13} /> Export alerts
+          </a>
+        </Card>
+      </div>
+    </div>
   );
 }
 
