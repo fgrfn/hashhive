@@ -38,7 +38,6 @@ export function Earnings() {
 
   const hrSeries = data.map(d => d.avg_hr_ghs);
   const rewardSeries = data.map(d => d.usd_reward);
-  const costSeries = data.map(d => d.usd_cost);
   const labels = data.map(d => d.date.slice(5)); // MM-DD
 
   const maxBar = Math.max(...data.map(d => d.btc_reward), 0.000001);

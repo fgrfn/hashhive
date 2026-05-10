@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, Toggle, Select, btnStyle } from '../components/primitives';
+import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig } from '../api';
-import { Cpu, Edit3, ChevronDown } from 'lucide-react';
+import { Cpu, Edit3 } from 'lucide-react';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
@@ -35,7 +35,7 @@ export function NMMiner() {
         LedEnable: config.LedEnable ? 1 : 0,
         AutoBrightness: config.AutoBrightness ? 1 : 0,
       });
-    } catch {}
+    } catch { /* save failed — close modal anyway */ }
     setSaving(false);
     setEditDevice(null);
   };

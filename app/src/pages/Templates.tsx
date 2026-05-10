@@ -3,8 +3,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Modal, FormField, EmptyState, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api } from '../api';
-import { FileText, Plus, Edit, Trash2, Send, Check, X, ChevronDown } from 'lucide-react';
+import { FileText, Plus, Edit, Trash2, Send, Check, X } from 'lucide-react';
 
 interface Template {
   id: string;

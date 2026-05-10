@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Pill, StatusPill, Spinner, btnStyle } from '../components/primitives';
-import { AreaChart, Sparkline } from '../components/charts';
+import { AreaChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, getHashrate, fmtUptime, fmtHashrate, fmtBestDiff } from '../api';
 import type { NMMinerDevice, AxeDevice, HealthData } from '../api';
-import { ArrowLeft, Cpu, Activity, FileText, Terminal, Zap, Settings, RefreshCw, Power, Play, Pause, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Cpu, Activity, FileText, Terminal, Zap, Settings, RefreshCw, Play, Pause, AlertTriangle } from 'lucide-react';
 
 const TABS = [
   { id: 'overview', label: 'Overview', Icon: Activity },
@@ -213,7 +213,7 @@ function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
   );
 }
 
-function ChartsTab({ t, ip, health }: { t: Theme; ip: string; health: HealthData | null }) {
+function ChartsTab({ t, health }: { t: Theme; ip?: string; health: HealthData | null }) {
   if (!health) {
     return <div style={{ color: t.textMuted, fontSize: 13 }}>Loading chart data…</div>;
   }
@@ -328,16 +328,16 @@ function ConsoleTab({ t, ip }: { t: Theme; ip: string }) {
 }
 
 function PowerCurveTab({ t, ip, axeDevice }: { t: Theme; ip: string; axeDevice?: AxeDevice }) {
-  if (!axeDevice) {
-    return <div style={{ color: t.textMuted, fontSize: 13 }}>Power curve is only available for AxeOS devices.</div>;
-  }
-
-  const curFreq = axeDevice.frequency || 525;
-  const curVolt = axeDevice.core_voltage || axeDevice.voltage || 1100;
+  const curFreq = axeDevice?.frequency ?? 525;
+  const curVolt = axeDevice?.core_voltage ?? axeDevice?.voltage ?? 1100;
   const [freq, setFreq] = useState(curFreq);
   const [volt, setVolt] = useState(curVolt);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  if (!axeDevice) {
+    return <div style={{ color: t.textMuted, fontSize: 13 }}>Power curve is only available for AxeOS devices.</div>;
+  }
 
   const estimatedPower = (freq / 525) * (volt / 1100) * (axeDevice.power || 15);
 
@@ -397,7 +397,7 @@ function PowerCurveTab({ t, ip, axeDevice }: { t: Theme; ip: string; axeDevice?:
   );
 }
 
-function ConfigTab({ t, ip, nmDevice, axeDevice }: { t: Theme; ip: string; nmDevice?: NMMinerDevice; axeDevice?: AxeDevice }) {
+function ConfigTab({ t, nmDevice, axeDevice }: { t: Theme; ip?: string; nmDevice?: NMMinerDevice; axeDevice?: AxeDevice }) {
   const raw = nmDevice ? nmDevice : axeDevice;
 
   return (

@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
   Activity, Wallet, TrendingUp, Bell, Settings,
-  Sun, Moon, Plus, Search, Menu, X, ChevronRight,
-  Download, AlertCircle, type LucideIcon,
+  Sun, Moon, Plus, Search, Menu, X,
+  Download, type LucideIcon,
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme';
 import { type Theme, FONT_MONO, bodyFont } from '../../tokens';

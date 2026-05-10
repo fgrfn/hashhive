@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
-import { Card, Label, Pill, Modal, FormField, EmptyState, useLoading, SkeletonCard, btnStyle } from '../components/primitives';
-import { FONT_MONO, COIN_COLORS, type Theme } from '../tokens';
+import { Card, Label, Modal, FormField, EmptyState, useLoading, SkeletonCard, btnStyle } from '../components/primitives';
+import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Wallet } from '../api';
 import { Wallet as WalletIcon, Plus, Copy, Eye, Edit3, Trash2, Check } from 'lucide-react';
@@ -163,7 +163,7 @@ function AddWalletModal({ t, onClose, onAdd }: { t: Theme; onClose: () => void; 
   const [coin, setCoin] = useState('BTC');
   const [label, setLabel] = useState('');
   const [address, setAddress] = useState('');
-  const [derivation, setDerivation] = useState('native segwit (bech32)');
+  const [derivation] = useState('native segwit (bech32)');
   const valid = label.trim() && address.trim();
   const meta = COIN_META[coin] || { color: t.accent, symbol: coin, label: coin };
 
