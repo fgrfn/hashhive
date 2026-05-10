@@ -855,7 +855,7 @@ _FAVICON_FILES = {
 @app.get("/android-chrome-512x512.png", include_in_schema=False)
 async def serve_favicon(request: Request):
     filename = request.url.path.lstrip("/")
-    f = FRONTEND_DIR / filename
+    f = FRONTEND_DIR / "dist" / filename
     if f.exists():
         return FileResponse(str(f), media_type=_FAVICON_FILES.get(filename, "image/png"))
     raise HTTPException(status_code=404)
