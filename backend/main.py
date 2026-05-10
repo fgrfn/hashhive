@@ -106,6 +106,7 @@ import routers.wallets as _wallets_router
 import routers.earnings as _earnings_router
 import routers.stats as _stats_router
 import routers.discovery as _discovery_router
+import routers.pools as _pools_router
 
 
 @asynccontextmanager
@@ -167,6 +168,7 @@ app.include_router(_wallets_router.router)
 app.include_router(_earnings_router.router)
 app.include_router(_stats_router.router)
 app.include_router(_discovery_router.router)
+app.include_router(_pools_router.router)
 
 # ── Static assets ──────────────────────────────────────────────────────────────
 
