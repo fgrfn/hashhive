@@ -191,9 +191,13 @@ export interface NMMinerDevice {
   bestShare?: string;
   best_share?: string;
   bestDiff?: string;
+  lastDiff?: string | number;
+  lastShare?: string;
   version?: string;
   shares_ok?: number;
   shares_err?: number;
+  rssi?: number;
+  wifi_rssi?: number;
   _online?: boolean;
 }
 
@@ -233,6 +237,7 @@ export interface AxeDevice {
   miningPaused?: boolean;
   bestDiff?: number;
   bestSessionDiff?: number;
+  lastDiff?: number;
   ASICModel?: string;
   boardVersion?: string;
   version?: string;
@@ -427,6 +432,16 @@ export function fmtUptime(seconds: number | string | undefined): string {
   if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+export function fmtRssi(rssi: number | undefined): string {
+  if (rssi == null) return '—';
+  return `${rssi} dBm`;
+}
+
+export function fmtShares(ok: number | undefined, err: number | undefined): string {
+  if (ok == null && err == null) return '—';
+  return `${ok ?? 0}/${err ?? 0}`;
 }
 
 export function fmtHashrate(ghs: number): string {

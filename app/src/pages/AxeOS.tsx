@@ -4,7 +4,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, fmtBestDiff } from '../api';
+import { api, fmtUptime, fmtBestDiff, fmtRssi, fmtShares } from '../api';
 import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 import { toast } from '../store/toast';
@@ -120,17 +120,22 @@ export function AxeOS() {
           ))}
         </div>
       ) : (
-      <Card t={t} noPad>
-        <div style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 80px 90px 80px 80px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
+      <div style={{ overflowX: 'auto' }}>
+      <Card t={t} noPad style={{ minWidth: 1100 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 75px 85px 80px 80px 80px 65px 70px 80px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
           <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d._ip || ''))); }} style={{ accentColor: t.info }} /></div>
           <Label t={t}>Name / IP</Label>
           <Label t={t}>ASIC / Board</Label>
           <Label t={t}>Status</Label>
           <Label t={t}>Hashrate</Label>
           <Label t={t}>Temp</Label>
-          <Label t={t}>Power (W)</Label>
+          <Label t={t}>Power W</Label>
           <Label t={t}>Best Diff</Label>
+          <Label t={t}>Last Diff</Label>
           <Label t={t}>Uptime</Label>
+          <Label t={t}>Shares A/R</Label>
+          <Label t={t}>RSSI</Label>
+          <Label t={t}>Version</Label>
           <Label t={t}>Actions</Label>
         </div>
         {filtered.map((d, i) => {
@@ -139,10 +144,13 @@ export function AxeOS() {
           const status = d.status || (d._online ? 'online' : 'offline');
           const temp = d.temp ?? null;
           const best = fmtBestDiff(d.bestDiff);
+          const lastDiff = fmtBestDiff(d.lastDiff);
           const uptime = fmtUptime(d.uptimeSeconds);
+          const shares = fmtShares(d.sharesAccepted, d.sharesRejected);
+          const rssi = fmtRssi(d.rssi);
           return (
             <div key={ip || i}
-              style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 80px 90px 80px 80px', gap: 10, padding: '11px 16px', borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 12 }}
+              style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 75px 85px 80px 80px 80px 65px 70px 80px', gap: 10, padding: '11px 16px', borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 12 }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
             >
@@ -167,7 +175,11 @@ export function AxeOS() {
               </div>
               <div style={{ fontFamily: FONT_MONO }}>{d.power ? d.power.toFixed(1) : '—'}</div>
               <div style={{ fontFamily: FONT_MONO, color: t.honey, fontSize: 11 }}>{best}</div>
+              <div style={{ fontFamily: FONT_MONO, color: t.honey, fontSize: 11 }}>{lastDiff}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{uptime}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : (d.rssi ?? 0) > -65 ? t.success : (d.rssi ?? 0) > -80 ? t.warning : t.danger }}>{rssi}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || d.axeOSVersion || '—'}</div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {d._online && (
                   <>
@@ -184,6 +196,7 @@ export function AxeOS() {
           );
         })}
       </Card>
+      </div>
       )}
 
       {bulkFreqOpen && (
@@ -219,7 +232,11 @@ function AxeMobileCard({ t, d, onAction, onNavigate }: { t: Theme; d: AxeDevice;
         <AxeKv t={t} label="Temp" value={temp != null ? `${temp}°` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
         <AxeKv t={t} label="Power" value={d.power ? `${d.power.toFixed(1)} W` : '—'} />
         <AxeKv t={t} label="Best Diff" value={fmtBestDiff(d.bestDiff)} color={t.honey} />
+        <AxeKv t={t} label="Last Diff" value={fmtBestDiff(d.lastDiff)} color={t.honey} />
         <AxeKv t={t} label="Uptime" value={fmtUptime(d.uptimeSeconds)} />
+        <AxeKv t={t} label="Shares A/R" value={fmtShares(d.sharesAccepted, d.sharesRejected)} />
+        <AxeKv t={t} label="RSSI" value={fmtRssi(d.rssi)} />
+        <AxeKv t={t} label="Version" value={d.version || d.axeOSVersion || '—'} />
         <AxeKv t={t} label="ASIC" value={d.ASICModel || '—'} />
       </div>
       {d._online && (

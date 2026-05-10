@@ -3,7 +3,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, fmtBestDiff, fmtHashrate, getHashrate, getTemp, getNmStatus } from '../api';
+import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
 import { Cpu, Edit3, Search, RotateCcw } from 'lucide-react';
 import { toast } from '../store/toast';
@@ -67,8 +67,8 @@ export function NMMiner() {
   };
 
   const mobile = useMobile();
-  const cols = ['', 'IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Share', 'Actions'];
-  const colWidths = ['28px', '120px', '1fr', '90px', '110px', '80px', '160px', '160px', '80px', '90px', '60px'];
+  const cols = ['', 'IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Diff', 'Last Diff', 'RSSI', 'Shares A/R', 'Version', 'Actions'];
+  const colWidths = ['28px', '110px', '1fr', '90px', '110px', '70px', '130px', '130px', '70px', '80px', '80px', '75px', '70px', '80px', '60px'];
 
   if (loading) {
     return mobile ? (
@@ -185,6 +185,9 @@ export function NMMiner() {
           const worker = d.worker ?? d.stratumUser ?? '—';
           const uptime = fmtUptime(d.uptime);
           const best = fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff);
+          const lastDiff = fmtBestDiff(d.lastDiff ?? d.lastShare);
+          const rssi = fmtRssi(d.rssi ?? d.wifi_rssi);
+          const shares = fmtShares(d.shares_ok, d.shares_err);
           const ip = d.ip || '';
           const name = d.name ?? d.hostname ?? ip;
           return (
@@ -208,6 +211,10 @@ export function NMMiner() {
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{worker}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{uptime}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.honey }}>{best}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.honey }}>{lastDiff}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : Number(d.rssi ?? d.wifi_rssi) > -65 ? t.success : Number(d.rssi ?? d.wifi_rssi) > -80 ? t.warning : t.danger }}>{rssi}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || '—'}</div>
               <button onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '5px 8px', fontSize: 11 }}>
                 <Edit3 size={12} />
               </button>
@@ -304,7 +311,11 @@ function NmMobileCard({ t, d, selected, onToggle, onEdit }: { t: Theme; d: NMMin
         <Kv t={t} label="Hashrate" value={fmtHashrate(hr)} />
         <Kv t={t} label="Temp" value={temp != null ? `${temp}°C` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
         <Kv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
-        <Kv t={t} label="Best Share" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />
+        <Kv t={t} label="Best Diff" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />
+        <Kv t={t} label="Last Diff" value={fmtBestDiff(d.lastDiff ?? d.lastShare)} color={t.honey} />
+        <Kv t={t} label="RSSI" value={fmtRssi(d.rssi ?? d.wifi_rssi)} />
+        <Kv t={t} label="Shares A/R" value={fmtShares(d.shares_ok, d.shares_err)} />
+        <Kv t={t} label="Version" value={d.version || '—'} />
       </div>
       <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}`, fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {pool} · {worker}
