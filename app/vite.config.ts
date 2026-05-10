@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 export default defineConfig({
+  test: {
+    environment: 'node',
+  },
   plugins: [react()],
   build: {
     outDir: resolve(__dirname, '../frontend/dist'),
