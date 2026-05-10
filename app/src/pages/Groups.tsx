@@ -21,7 +21,7 @@ function NewGroupModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const g = await api.groups.create({ name: name.trim(), desc, color }) as Group;
+      const g = await api.groups.create({ name: name.trim(), description: desc, color }) as Group;
       toast(`Group "${g.name}" created`);
       onCreate(g);
       onClose();
