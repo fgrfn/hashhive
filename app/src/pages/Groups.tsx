@@ -2,17 +2,65 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, SkeletonCard, EmptyState, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, SkeletonCard, EmptyState, Modal, FormField, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Group } from '../api';
 import { Grid3x3, Plus, ArrowLeft } from 'lucide-react';
+import { toast } from '../store/toast';
+
+const PRESET_COLORS = ['#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
+
+function NewGroupModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void; onCreate: (g: Group) => void }) {
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const g = await api.groups.create({ name: name.trim(), description: desc, color }) as Group;
+      toast(`Group "${g.name}" created`);
+      onCreate(g);
+      onClose();
+    } catch {
+      toast('Failed to create group', 'error');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Modal t={t} title="New Group" onClose={onClose} width={420}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <FormField t={t} label="Name" value={name} onChange={setName} placeholder="e.g. Living room miners" />
+        <FormField t={t} label="Description (optional)" value={desc} onChange={setDesc} placeholder="Short note" />
+        <div>
+          <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Color</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {PRESET_COLORS.map(c => (
+              <div key={c} onClick={() => setColor(c)} style={{ width: 26, height: 26, borderRadius: 6, background: c, cursor: 'pointer', border: color === c ? `2px solid ${t.text}` : `2px solid transparent`, boxSizing: 'border-box' }} />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+          <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
+          <button onClick={submit} disabled={!name.trim() || saving} style={{ ...btnStyle(t, 'primary'), opacity: !name.trim() || saving ? 0.6 : 1 }}>
+            {saving ? 'Creating…' : 'Create group'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 export function GroupsPage() {
   const { theme: t } = useThemeStore();
   const navigate = useNavigate();
   const [fetched, setFetched] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     api.groups.list().then(setGroups).catch(() => {}).finally(() => setFetched(true));
@@ -33,7 +81,10 @@ export function GroupsPage() {
 
   if (groups.length === 0) {
     return (
-      <EmptyState t={t} icon={<Grid3x3 size={32} />} title="No groups yet" detail="Create groups to organize your miners and push pool configs to them." action={<button style={btnStyle(t, 'primary')}><Plus size={13} /> New group</button>} />
+      <>
+        <EmptyState t={t} icon={<Grid3x3 size={32} />} title="No groups yet" detail="Create groups to organize your miners and push pool configs to them." action={<button onClick={() => setCreateOpen(true)} style={btnStyle(t, 'primary')}><Plus size={13} /> New group</button>} />
+        {createOpen && <NewGroupModal t={t} onClose={() => setCreateOpen(false)} onCreate={g => setGroups(gs => [...gs, g])} />}
+      </>
     );
   }
 
@@ -43,8 +94,9 @@ export function GroupsPage() {
         <KpiSm t={t} label="Groups" value={String(groups.length)} color={t.accent} />
         <KpiSm t={t} label="Devices" value={String(groups.reduce((a, g) => a + (g.total || 0), 0))} color={t.success} />
         <div style={{ flex: 1 }} />
-        <button style={{ ...btnStyle(t, 'primary'), padding: '8px 12px' }}><Plus size={13} /> New group</button>
+        <button onClick={() => setCreateOpen(true)} style={{ ...btnStyle(t, 'primary'), padding: '8px 12px' }}><Plus size={13} /> New group</button>
       </div>
+      {createOpen && <NewGroupModal t={t} onClose={() => setCreateOpen(false)} onCreate={g => setGroups(gs => [...gs, g])} />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
         {groups.map(g => {
           const onlinePct = g.total ? ((g.online || 0) / g.total) * 100 : 0;
