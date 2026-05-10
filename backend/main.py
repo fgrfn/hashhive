@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, field_validator
 
 from alerts import check_alerts
 
@@ -53,6 +54,36 @@ MAX_ENTRIES_PER_DAY = 1000
 KEEP_DAYS = 30
 
 _startup_time = datetime.now(timezone.utc)
+
+
+# ── Request models ────────────────────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("password required")
+        return v
+
+
+class PatchDeviceRequest(BaseModel):
+    ip: str
+    name: str | None = None
+    temp_max: float | None = None
+
+
+class AxeConfigBatchRequest(BaseModel):
+    ips: list[str]
+    frequency: int | None = None
+    coreVoltage: int | None = None
+
+
+class AxeActionBatchRequest(BaseModel):
+    ips: list[str]
+    action: str
 
 
 def _validate_device_ip(ip: str) -> str:
@@ -408,11 +439,31 @@ _price_cache: dict = {"ts": 0.0, "data": {}}
 # ── Auth sessions ─────────────────────────────────────────────────────────────
 _sessions: dict[str, float] = {}  # token → expiry unix timestamp
 _SESSION_TTL = 86400 * 30         # 30 days
+_SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 # Brute-force protection: track failed login timestamps per IP
 _login_attempts: dict[str, list[float]] = {}
 _MAX_ATTEMPTS = 5
 _ATTEMPT_WINDOW = 300  # 5-minute sliding window
+
+
+def _load_sessions() -> None:
+    """Load persisted sessions from disk, pruning expired ones."""
+    global _sessions
+    now = time.time()
+    try:
+        data = load_json(_SESSIONS_FILE, {})
+        _sessions = {k: v for k, v in data.items() if isinstance(v, (int, float)) and v > now}
+    except Exception:
+        _sessions = {}
+
+
+def _persist_sessions() -> None:
+    """Write the current session map to disk."""
+    try:
+        save_json(_SESSIONS_FILE, _sessions)
+    except Exception:
+        pass
 
 
 async def _check_auto_restart(config: dict, axeos_results: list, client: httpx.AsyncClient) -> None:
@@ -779,13 +830,11 @@ async def _weekly_summary_loop() -> None:
 
 
 def _bootstrap_auth() -> None:
-    """If HASHHIVE_PASSWORD is set and no password is configured yet, enable auth automatically."""
+    """If HASHHIVE_PASSWORD is set, enforce it as the current password (allows env-based recovery)."""
     pw = os.environ.get("HASHHIVE_PASSWORD", "").strip()
     if not pw:
         return
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    if config.get("auth", {}).get("password_hash"):
-        return  # already configured — env var is ignored after first setup
     config.setdefault("auth", {})["enabled"] = True
     config["auth"]["password_hash"] = _hash_pw(pw)
     save_json(CONFIG_FILE, config)
@@ -802,6 +851,7 @@ async def lifespan(app: FastAPI):
     _cleanup_old_logs()
     _cleanup_old_stats()
     _bootstrap_auth()
+    _load_sessions()
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
     _append_entry({
@@ -1396,32 +1446,30 @@ async def get_axeos_info(ip: str):
 
 
 @app.patch("/api/settings/device")
-async def patch_device_settings(data: dict):
+async def patch_device_settings(data: PatchDeviceRequest):
     """Update per-device HashHive config overrides (e.g. temp_max)."""
-    ip = data.get("ip")
-    if not ip:
-        raise HTTPException(status_code=400, detail="ip required")
+    ip = data.ip
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     updated = False
     for d in config.get("axeos_devices", []):
         if d.get("ip") == ip:
-            if "temp_max" in data and data["temp_max"] is not None:
-                d["temp_max"] = float(data["temp_max"])
-            elif d.get("temp_max") is not None and data.get("temp_max") is None:
+            if data.temp_max is not None:
+                d["temp_max"] = data.temp_max
+            elif "temp_max" in d:
                 d.pop("temp_max", None)
-            if "name" in data and data["name"] is not None:
-                d["name"] = str(data["name"]).strip()
+            if data.name is not None:
+                d["name"] = data.name.strip()
             updated = True
             break
     if not updated:
         for d in config.get("nmminer_devices", []):
             if d.get("ip") == ip:
-                if "temp_max" in data and data["temp_max"] is not None:
-                    d["temp_max"] = float(data["temp_max"])
-                elif d.get("temp_max") is not None and data.get("temp_max") is None:
+                if data.temp_max is not None:
+                    d["temp_max"] = data.temp_max
+                elif "temp_max" in d:
                     d.pop("temp_max", None)
-                if "name" in data and data["name"] is not None:
-                    d["name"] = str(data["name"]).strip()
+                if data.name is not None:
+                    d["name"] = data.name.strip()
                 break
     save_json(CONFIG_FILE, config)
     return {"status": "ok"}
@@ -1456,10 +1504,10 @@ async def patch_axeos_config_one(ip: str, data: dict):
 
 
 @app.post("/api/axeos/action/batch")
-async def axeos_action_batch(data: dict):
+async def axeos_action_batch(data: AxeActionBatchRequest):
     """Batch action across multiple AxeOS devices. Body: {action, ips: [...]}"""
-    action = data.get("action", "")
-    ips: list[str] = data.get("ips", [])
+    action = data.action
+    ips: list[str] = data.ips
     valid = {"pause", "resume", "restart", "identify"}
     if action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
@@ -1481,22 +1529,21 @@ async def axeos_action_batch(data: dict):
 
 
 @app.patch("/api/axeos/config/batch")
-async def patch_axeos_config_batch(data: dict):
-    """Batch PATCH config (frequency, voltage …) to multiple AxeOS devices.
-    Body: {"ips": ["10.0.0.1", ...], "frequency": 490, "coreVoltage": 1200, ...}
-    Omit "ips" to target all configured devices."""
-    ips: list[str] = data.pop("ips", [])
+async def patch_axeos_config_batch(data: AxeConfigBatchRequest):
+    """Batch PATCH config (frequency, voltage …) to multiple AxeOS devices."""
+    ips: list[str] = data.ips
     if not ips:
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
-    if not data:
+    payload = {k: v for k, v in data.model_dump().items() if k != "ips" and v is not None}
+    if not payload:
         raise HTTPException(status_code=400, detail="No config fields to update")
     results: list[dict] = []
     limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
     async with httpx.AsyncClient(timeout=15, limits=limits) as client:
         async def _patch(ip: str):
             try:
-                resp = await client.patch(f"http://{ip}/api/system", json=data)
+                resp = await client.patch(f"http://{ip}/api/system", json=payload)
                 results.append({"ip": ip, "status": resp.status_code})
             except Exception as exc:
                 results.append({"ip": ip, "error": str(exc)})
@@ -1917,7 +1964,7 @@ async def auth_check(request: Request) -> dict:
 
 
 @app.post("/api/auth/login")
-async def auth_login(request: Request, data: dict) -> JSONResponse:
+async def auth_login(request: Request, data: LoginRequest) -> JSONResponse:
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     auth_cfg = config.get("auth", {})
     if not auth_cfg.get("enabled"):
@@ -1927,7 +1974,7 @@ async def auth_login(request: Request, data: dict) -> JSONResponse:
     if _rate_limited(client_ip):
         raise HTTPException(status_code=429, detail="Too many login attempts. Please wait.")
 
-    pw = data.get("password", "")
+    pw = data.password
     stored = auth_cfg.get("password_hash", "")
     if not _verify_pw(pw, stored):
         _record_attempt(client_ip)
@@ -1941,8 +1988,19 @@ async def auth_login(request: Request, data: dict) -> JSONResponse:
     _login_attempts.pop(client_ip, None)  # clear on success
     token = secrets.token_hex(32)
     _sessions[token] = time.time() + _SESSION_TTL
+    _persist_sessions()
     resp = JSONResponse({"ok": True})
-    resp.set_cookie("hh_session", token, max_age=_SESSION_TTL, httponly=True, samesite="lax")
+    is_https = (
+        request.headers.get("x-forwarded-proto") == "https"
+        or request.url.scheme == "https"
+    )
+    resp.set_cookie(
+        "hh_session", token,
+        max_age=_SESSION_TTL,
+        httponly=True,
+        samesite="lax",
+        secure=is_https,
+    )
     return resp
 
 
@@ -1950,9 +2008,30 @@ async def auth_login(request: Request, data: dict) -> JSONResponse:
 async def auth_logout(request: Request) -> JSONResponse:
     token = request.cookies.get("hh_session", "")
     _sessions.pop(token, None)
+    _persist_sessions()
     resp = JSONResponse({"ok": True})
     resp.delete_cookie("hh_session")
     return resp
+
+
+@app.middleware("http")
+async def _security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self' wss: ws:; "
+        "font-src 'self' data:; "
+        "object-src 'none'; "
+        "base-uri 'self';",
+    )
+    return response
 
 
 @app.middleware("http")
