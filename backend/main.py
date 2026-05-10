@@ -814,8 +814,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend subdirectories (shared/, prototype/, assets/)
-for _subdir in ("shared", "prototype", "assets"):
+# Serve Vite build assets (new React SPA: frontend/dist/assets/)
+_vite_assets = FRONTEND_DIR / "dist" / "assets"
+if _vite_assets.exists():
+    app.mount("/assets", StaticFiles(directory=str(_vite_assets)), name="vite-assets")
+
+# Serve legacy frontend subdirectories (shared/, prototype/)
+for _subdir in ("shared", "prototype"):
     _path = FRONTEND_DIR / _subdir
     if _path.exists():
         app.mount(f"/{_subdir}", StaticFiles(directory=str(_path)), name=_subdir)
@@ -862,12 +867,35 @@ async def serve_favicon(request: Request):
     raise HTTPException(status_code=404)
 
 
+def _get_index() -> Path | None:
+    """Return path to index.html, preferring the Vite build."""
+    vite = FRONTEND_DIR / "dist" / "index.html"
+    if vite.exists():
+        return vite
+    legacy = FRONTEND_DIR / "index.html"
+    if legacy.exists():
+        return legacy
+    return None
+
+
 @app.get("/", include_in_schema=False)
 async def root():
-    index = FRONTEND_DIR / "index.html"
-    if index.exists():
+    index = _get_index()
+    if index:
         return FileResponse(str(index))
     return JSONResponse({"status": "HashHive API running. Frontend not found."})
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
+    """Catch-all that serves the React SPA for all non-API routes."""
+    # Don't intercept API / WebSocket / static asset paths
+    if full_path.startswith(("api/", "ws", "assets/", "shared/", "prototype/")):
+        raise HTTPException(status_code=404)
+    index = _get_index()
+    if index:
+        return FileResponse(str(index))
+    raise HTTPException(status_code=404)
 
 
 @app.websocket("/ws")

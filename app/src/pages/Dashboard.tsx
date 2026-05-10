@@ -1,0 +1,226 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useThemeStore } from '../store/theme';
+import { useAppStore } from '../store/app';
+import { Card, Label, StatusPill, Segmented, SkeletonCard, useLoading } from '../components/primitives';
+import { AreaChart, MiniChart, Sparkline } from '../components/charts';
+import { FONT_MONO, type Theme } from '../tokens';
+import { api, fmtUptime, getHashrate, getTemp, fmtHashrate, getAxeHashrate } from '../api';
+import type { Alert } from '../api';
+
+function genSparkline(base: number, n = 30): number[] {
+  return Array.from({ length: n }, (_, i) => base + base * 0.15 * Math.sin(i / 4.2) + base * 0.06 * Math.cos(i * 1.1));
+}
+
+export function Dashboard() {
+  const { theme: t } = useThemeStore();
+  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, btcPrice } = useAppStore();
+  const navigate = useNavigate();
+  const loading = useLoading(800);
+  const [range, setRange] = useState('24h');
+  const [logLines, setLogLines] = useState<Alert[]>([]);
+  const [logFilter, setLogFilter] = useState('All');
+  const logRef = useRef<HTMLDivElement>(null);
+
+  const totalHr = devices.reduce((a, d) => a + getHashrate(d), 0) + axeDevices.reduce((a, d) => a + getAxeHashrate(d), 0);
+  const maxTemp = Math.max(
+    ...devices.map(d => getTemp(d) ?? 0),
+    ...axeDevices.map(d => d.temp ?? 0),
+    0
+  );
+  const totalPower = axeDevices.reduce((a, d) => a + (d.power ?? 0), 0);
+
+  // Generate chart data from current hashrate
+  const hrBase = totalHr || 2800;
+  const chartData = genSparkline(hrBase, range === '7d' ? 168 : range === '30d' ? 720 : 96);
+
+  useEffect(() => {
+    api.alerts.list(1).then(a => setLogLines(a.slice(-40))).catch(() => {});
+  }, []);
+
+  const filteredLog = logLines.filter(l => {
+    if (logFilter === 'NMMiner') return l.source === 'nmminer';
+    if (logFilter === 'BitAxe')  return l.source === 'axeos';
+    if (logFilter === 'System')  return l.source === 'system';
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} t={t} height={100} />)}
+        </div>
+        <SkeletonCard t={t} height={240} style={{ marginBottom: 16 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <SkeletonCard t={t} height={200} />
+          <SkeletonCard t={t} height={200} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+        <KpiCard t={t} label="Total Hashrate" value={fmtHashrate(totalHr)} accent={t.accent} trend={{ pos: true, label: '+2.1% · 1h' }} spark={genSparkline(1, 30)} sparkColor={t.accent} />
+        <KpiCard t={t} label="Devices Online" value={`${devicesOnline}/${devicesTotal}`} accent={t.success} trend={{ pos: true, label: devicesTotal > 0 ? `${Math.round(devicesOnline / devicesTotal * 100)}% uptime` : '' }} />
+        <KpiCard t={t} label="Max Temp" value={maxTemp > 0 ? `${maxTemp}°C` : '—'} accent={maxTemp > 70 ? t.danger : maxTemp > 65 ? t.warning : t.success} />
+        <KpiCard t={t} label="Total Power" value={totalPower > 0 ? `${totalPower.toFixed(1)}W` : '—'} accent={t.honey} spark={genSparkline(1, 30)} sparkColor={t.honey} />
+        <KpiCard t={t} label="Open Alerts" value={String(unreadAlerts)} unit="unread" accent={t.danger} onClick={() => navigate('/alerts')} />
+      </div>
+
+      {/* Hero chart */}
+      <Card t={t} style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <Label t={t}>Hashrate · {range}</Label>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 4 }}>
+              {fmtHashrate(chartData.reduce((a, b) => a + b, 0) / chartData.length)}
+              <span style={{ color: t.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 6 }}>avg</span>
+            </div>
+          </div>
+          <Segmented t={t} options={['24h', '7d', '30d']} value={range} onChange={setRange} />
+        </div>
+        <AreaChart t={t} data={chartData} accent={t.accent} h={200} unit="GH/s" />
+        <div style={{ fontSize: 10, color: t.textDim, marginTop: 6, fontFamily: FONT_MONO, textAlign: 'right' }}>
+          hover for exact value
+        </div>
+      </Card>
+
+      {/* Device mini tables */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={devices.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/nmminer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
+        <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={axeDevices.slice(0, 6).map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'online', hr: d.hashRate || 0, temp: d.temp ?? null }))} onViewAll={() => navigate('/miners/axeos')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
+      </div>
+
+      {/* Live log */}
+      <Card t={t}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Label t={t}>Live Log</Label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: t.success, fontFamily: FONT_MONO }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.success, boxShadow: `0 0 6px ${t.success}` }} />
+              live
+            </div>
+          </div>
+          <Segmented t={t} options={['All', 'NMMiner', 'BitAxe', 'System']} value={logFilter} onChange={setLogFilter} />
+        </div>
+        <div ref={logRef} style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', fontFamily: FONT_MONO, fontSize: 12, maxHeight: 220, overflow: 'auto' }}>
+          {filteredLog.length === 0 ? (
+            <div style={{ color: t.textDim, padding: '8px 0' }}>No log entries yet.</div>
+          ) : filteredLog.map((l, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 0', lineHeight: 1.6, alignItems: 'flex-start' }}>
+              <span style={{ color: t.textDim, fontSize: 11, flexShrink: 0 }}>{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : l.when || ''}</span>
+              <span style={{
+                fontSize: 10, padding: '0 6px', borderRadius: 3, fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
+                background: l.source === 'nmminer' ? t.accentGlow : l.source === 'axeos' ? t.info + '22' : t.success + '22',
+                color: l.source === 'nmminer' ? t.accent : l.source === 'axeos' ? t.info : t.success,
+              }}>
+                {l.source || 'sys'}
+              </span>
+              <span style={{
+                color: l.severity === 'critical' ? t.danger : l.severity === 'warning' ? t.warning : l.severity === 'info' ? t.info : t.success,
+                flex: 1,
+              }}>
+                {l.message}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── KPI Card ────────────────────────────────────────────────────────────────
+
+function KpiCard({ t, label, value, unit, accent, trend, spark, sparkColor, onClick }: {
+  t: Theme;
+  label: string; value: string; unit?: string; accent: string;
+  trend?: { pos: boolean; label: string };
+  spark?: number[]; sparkColor?: string; onClick?: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: t.surface, border: `1px solid ${hovered && onClick ? accent : t.border}`,
+        borderRadius: 12, padding: '14px 16px', position: 'relative', overflow: 'hidden',
+        cursor: onClick ? 'pointer' : 'default', transition: 'border-color .15s',
+      }}
+    >
+      <Label t={t}>{label}</Label>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+        <div style={{ fontSize: 26, fontWeight: 700, color: accent, letterSpacing: '-0.02em', fontFamily: FONT_MONO }}>{value}</div>
+        {unit && <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{unit}</div>}
+      </div>
+      {trend && trend.label && (
+        <div style={{ fontSize: 11, color: trend.pos ? t.success : t.danger, marginTop: 4, fontFamily: FONT_MONO }}>
+          {trend.pos ? '▲' : '▼'} {trend.label}
+        </div>
+      )}
+      {spark && sparkColor && (
+        <div style={{ position: 'absolute', right: 10, bottom: 8, width: 80, opacity: 0.85 }}>
+          <MiniChart data={spark} color={sparkColor} h={30} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Device Mini Table ───────────────────────────────────────────────────────
+
+interface MiniRow { ip: string; name: string; status: string; hr: number; temp: number | null }
+
+function DeviceMini({ t, title, accent, rows, onViewAll, onDevice }: {
+  t: Theme;
+  title: string; accent: string; rows: MiniRow[];
+  onViewAll: () => void; onDevice: (d: MiniRow) => void;
+}) {
+  return (
+    <Card t={t} noPad style={{ position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent }} />
+      <div style={{ padding: '14px 18px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{rows.filter(r => r.status === 'online').length}/{rows.length} online</div>
+          <button onClick={onViewAll} style={{ background: 'transparent', border: `1px solid ${t.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: t.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            View all →
+          </button>
+        </div>
+      </div>
+      <div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '6px 18px', borderBottom: `1px solid ${t.border}`, borderTop: `1px solid ${t.border}`, background: t.surface2 }}>
+          <Label t={t}>Name</Label><Label t={t}>Hashrate</Label><Label t={t}>Temp</Label><Label t={t}>Status</Label>
+        </div>
+        {rows.length === 0 && (
+          <div style={{ padding: '16px 18px', color: t.textMuted, fontSize: 13 }}>No devices</div>
+        )}
+        {rows.map((r, i) => (
+          <div key={r.ip || i} onClick={() => onDevice(r)} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 70px 90px', gap: 8, padding: '10px 18px', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, cursor: 'pointer', transition: 'background .1s' }}
+            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
+            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+          >
+            <div>
+              <div style={{ fontWeight: 500 }}>{r.name}</div>
+              <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{r.ip}</div>
+            </div>
+            <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
+              {r.hr > 0 ? <>{r.hr.toFixed(1)} <span style={{ color: t.textMuted, fontWeight: 400, fontSize: 11 }}>GH/s</span></> : <span style={{ color: t.textMuted }}>—</span>}
+            </div>
+            <div style={{ fontFamily: FONT_MONO, color: r.temp == null ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success }}>
+              {r.temp != null ? `${r.temp}°` : '—'}
+            </div>
+            <StatusPill t={t} status={r.status} />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
