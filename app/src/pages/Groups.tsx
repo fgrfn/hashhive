@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, SkeletonCard, useLoading, EmptyState, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, SkeletonCard, EmptyState, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Group } from '../api';
@@ -11,14 +11,14 @@ import { Grid3x3, Plus, ArrowLeft } from 'lucide-react';
 export function GroupsPage() {
   const { theme: t } = useThemeStore();
   const navigate = useNavigate();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   useEffect(() => {
-    api.groups.list().then(setGroups).catch(() => {});
+    api.groups.list().then(setGroups).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>

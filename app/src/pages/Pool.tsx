@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, useLoading, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { PoolPreset } from '../api';
@@ -28,13 +28,13 @@ export function Pool() {
 
 function PoolLibrary() {
   const { theme: t } = useThemeStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [pools, setPools] = useState<PoolPreset[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<PoolPreset | null>(null);
 
   useEffect(() => {
-    api.pools.list().then(setPools).catch(() => {});
+    api.pools.list().then(setPools).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
   const deletePool = async (id: string) => {
@@ -54,7 +54,7 @@ function PoolLibrary() {
     setEditing(null);
   };
 
-  if (loading) {
+  if (!fetched) {
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} t={t} height={180} />)}

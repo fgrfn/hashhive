@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, SkeletonRow, useLoading, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
+import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig } from '../api';
@@ -9,8 +9,8 @@ import { Cpu, Edit3 } from 'lucide-react';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
-  const { devices } = useAppStore();
-  const loading = useLoading(600);
+  const { devices, wsStatus } = useAppStore();
+  const loading = useDataReady(wsStatus !== 'connecting');
   const [editDevice, setEditDevice] = useState<string | null>(null);
   const [config, setConfig] = useState<NMMinerConfig | null>(null);
   const [saving, setSaving] = useState(false);

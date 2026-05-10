@@ -348,16 +348,19 @@ export function SkeletonRow({ t, cols, height = 52 }: { t: Theme; cols: (string 
   );
 }
 
-// ─── useLoading ─────────────────────────────────────────────────────────────
+// ─── useDataReady ────────────────────────────────────────────────────────────
+// Returns true (still loading) until `ready` flips true, or until maxWaitMs
+// elapses as a safety valve for cases where data never arrives.
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useLoading(ms = 1200): boolean {
-  const [loading, setLoading] = useState(true);
+export function useDataReady(ready: boolean, maxWaitMs = 8000): boolean {
+  const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
-    const id = setTimeout(() => setLoading(false), ms);
-    return () => clearTimeout(id);
-  }, [ms]);
-  return loading;
+    if (ready) return;
+    const t = setTimeout(() => setTimedOut(true), maxWaitMs);
+    return () => clearTimeout(t);
+  }, [ready, maxWaitMs]);
+  return !ready && !timedOut;
 }
 
 // ─── EmptyState ─────────────────────────────────────────────────────────────

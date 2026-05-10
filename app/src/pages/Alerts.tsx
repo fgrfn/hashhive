@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Pill, Toggle, Segmented, SkeletonRow, useLoading, EmptyState, btnStyle } from '../components/primitives';
+import { Card, Pill, Toggle, Segmented, SkeletonRow, EmptyState, btnStyle } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api } from '../api';
 import type { Alert } from '../api';
@@ -30,14 +30,14 @@ export function Alerts() {
 function AlertFeed() {
   const { theme: t } = useThemeStore();
   const { unreadAlerts, setUnreadAlerts } = useAppStore();
-  const loading = useLoading(600);
+  const [fetched, setFetched] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [sev, setSev] = useState('all');
   const [state, setState] = useState('all');
   const [selected, setSelected] = useState(new Set<string>());
 
   useEffect(() => {
-    api.alerts.list(7).then(setAlerts).catch(() => {});
+    api.alerts.list(7).then(setAlerts).catch(() => {}).finally(() => setFetched(true));
   }, []);
 
   const markAllRead = async () => {
@@ -53,7 +53,7 @@ function AlertFeed() {
     return true;
   });
 
-  if (loading) {
+  if (!fetched) {
     return (
       <Card t={t} noPad>
         {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} t={t} cols={['20px', '80px', '200px', '100px', '60px']} height={68} />)}
