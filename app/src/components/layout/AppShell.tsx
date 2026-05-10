@@ -62,7 +62,7 @@ function activeId(pathname: string): string {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, dark, toggleDark, personality } = useThemeStore();
-  const { unreadAlerts, btcPrice, btcChange, globalSearch, setGlobalSearch } = useAppStore();
+  const { unreadAlerts, btcPrice, btcChange, globalSearch, setGlobalSearch, wsStatus } = useAppStore();
   const t = theme;
   const navigate = useNavigate();
   const location = useLocation();
@@ -178,6 +178,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           compact={isTablet} btcPrice={btcPrice} btcChange={btcChange}
           onAddDevice={() => navigate('/miners/axeos')}
         />
+        {(wsStatus === 'disconnected' || wsStatus === 'reconnecting') && (
+          <div style={{ background: wsStatus === 'reconnecting' ? t.warning + '22' : t.danger + '22', borderBottom: `1px solid ${wsStatus === 'reconnecting' ? t.warning : t.danger}44`, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: wsStatus === 'reconnecting' ? t.warning : t.danger, fontFamily: FONT_MONO }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+            {wsStatus === 'reconnecting' ? 'Reconnecting to server…' : 'Connection lost — retrying…'}
+          </div>
+        )}
         <div style={{ flex: 1, overflow: 'auto' }}>
           <div style={{ padding: isTablet ? '16px 18px 40px' : '22px 26px 40px' }}>
             {children}
