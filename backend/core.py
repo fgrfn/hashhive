@@ -191,6 +191,11 @@ class AxeActionBatchRequest(BaseModel):
     action: str
 
 
+class NmActionBatchRequest(BaseModel):
+    ips: list[str]
+    action: str
+
+
 # ── JSON helpers ───────────────────────────────────────────────────────────────
 
 def load_json(path: Path, default: Any) -> Any:
