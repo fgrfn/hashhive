@@ -235,6 +235,7 @@ async def pwa_manifest():
 
 _FAVICON_FILES = {
     "favicon.ico": "image/x-icon",
+    "favicon.svg": "image/svg+xml",
     "favicon-16x16.png": "image/png",
     "favicon-32x32.png": "image/png",
     "apple-touch-icon.png": "image/png",
@@ -244,6 +245,7 @@ _FAVICON_FILES = {
 
 
 @app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.svg", include_in_schema=False)
 @app.get("/favicon-16x16.png", include_in_schema=False)
 @app.get("/favicon-32x32.png", include_in_schema=False)
 @app.get("/apple-touch-icon.png", include_in_schema=False)
