@@ -819,12 +819,6 @@ _vite_assets = FRONTEND_DIR / "dist" / "assets"
 if _vite_assets.exists():
     app.mount("/assets", StaticFiles(directory=str(_vite_assets)), name="vite-assets")
 
-# Serve legacy frontend subdirectories (shared/, prototype/)
-for _subdir in ("shared", "prototype"):
-    _path = FRONTEND_DIR / _subdir
-    if _path.exists():
-        app.mount(f"/{_subdir}", StaticFiles(directory=str(_path)), name=_subdir)
-
 
 @app.get("/manifest.json", include_in_schema=False)
 async def pwa_manifest():
@@ -868,14 +862,8 @@ async def serve_favicon(request: Request):
 
 
 def _get_index() -> Path | None:
-    """Return path to index.html, preferring the Vite build."""
     vite = FRONTEND_DIR / "dist" / "index.html"
-    if vite.exists():
-        return vite
-    legacy = FRONTEND_DIR / "index.html"
-    if legacy.exists():
-        return legacy
-    return None
+    return vite if vite.exists() else None
 
 
 @app.get("/", include_in_schema=False)
@@ -2396,7 +2384,7 @@ async def get_earnings(days: int = Query(30, ge=1, le=365)):
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
     """Serve the React SPA for all non-API client-side routes."""
-    if full_path.startswith(("api/", "ws", "assets/", "shared/", "prototype/")):
+    if full_path.startswith(("api/", "ws", "assets/")):
         raise HTTPException(status_code=404)
     index = _get_index()
     if index:
