@@ -93,6 +93,7 @@ function PoolLibrary() {
 }
 
 function PoolCard({ t, pool: p, onEdit, onDelete }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void }) {
+  const wallet = p.wallet || p.worker || '—';
   return (
     <Card t={t}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
@@ -108,8 +109,11 @@ function PoolCard({ t, pool: p, onEdit, onDelete }: { t: Theme; pool: PoolPreset
 
       <div style={{ padding: '10px 12px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.accent, wordBreak: 'break-all' }}>{p.url}</div>
-        <div style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textMuted, marginTop: 4 }}>Worker: {p.worker || '—'}</div>
-        {p.url2 && <div style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textDim, marginTop: 4, borderTop: `1px solid ${t.border}`, paddingTop: 4 }}>Backup: {p.url2}</div>}
+        <div style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textMuted, marginTop: 4, wordBreak: 'break-all' }}>
+          Wallet: {wallet}
+        </div>
+        <div style={{ fontSize: 10, color: t.textDim, marginTop: 2, fontStyle: 'italic' }}>Worker → {wallet === '—' ? '—' : `${wallet}.hostname`}</div>
+        {p.url2 && <div style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textDim, marginTop: 6, borderTop: `1px solid ${t.border}`, paddingTop: 6 }}>Backup: {p.url2}</div>}
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
@@ -121,43 +125,73 @@ function PoolCard({ t, pool: p, onEdit, onDelete }: { t: Theme; pool: PoolPreset
   );
 }
 
+function parseUrlPort(full: string): { base: string; port: string } {
+  const m = full.match(/^(.*):(\d+)$/);
+  return m ? { base: m[1], port: m[2] } : { base: full, port: '' };
+}
+
+function PoolSection({ t, label, base, port, wallet, password, onBase, onPort, onWallet, onPassword, optional }: {
+  t: Theme; label: string; base: string; port: string; wallet: string; password: string;
+  onBase: (v: string) => void; onPort: (v: string) => void; onWallet: (v: string) => void; onPassword: (v: string) => void;
+  optional?: boolean;
+}) {
+  return (
+    <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8, border: `1px solid ${t.border}` }}>
+      <Label t={t} style={{ marginBottom: 10 }}>{label}{optional && <span style={{ color: t.textDim, fontWeight: 400, marginLeft: 6 }}>(optional)</span>}</Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
+          <FormField t={t} label="Host" value={base} onChange={onBase} mono placeholder="stratum+tcp://pool.example.com" />
+          <FormField t={t} label="Port" value={port} onChange={onPort} mono placeholder="3333" type="number" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <FormField t={t} label="Wallet address" value={wallet} onChange={onWallet} mono placeholder="bc1q… or username" />
+            {wallet && (
+              <div style={{ fontSize: 10, color: t.textDim, fontFamily: FONT_MONO, marginTop: 4 }}>
+                Worker → {wallet}.<em>hostname</em>
+              </div>
+            )}
+          </div>
+          <FormField t={t} label="Password" value={password} onChange={onPassword} mono placeholder="x" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PoolModal({ t, pool, onClose, onSave }: { t: Theme; pool: PoolPreset | null; onClose: () => void; onSave: (data: Partial<PoolPreset>) => void }) {
+  const p1 = parseUrlPort(pool?.url || '');
+  const p2 = parseUrlPort(pool?.url2 || '');
   const [name, setName] = useState(pool?.name || '');
-  const [url, setUrl] = useState(pool?.url || '');
-  const [worker, setWorker] = useState(pool?.worker || '');
+  const [base, setBase] = useState(p1.base);
+  const [port, setPort] = useState(p1.port);
+  const [wallet, setWallet] = useState(pool?.wallet || pool?.worker || '');
   const [password, setPassword] = useState(pool?.password || 'x');
-  const [url2, setUrl2] = useState(pool?.url2 || '');
-  const [worker2, setWorker2] = useState(pool?.worker2 || '');
+  const [base2, setBase2] = useState(p2.base);
+  const [port2, setPort2] = useState(p2.port);
+  const [wallet2, setWallet2] = useState(pool?.wallet2 || pool?.worker2 || '');
+  const [password2, setPassword2] = useState(pool?.password2 || 'x');
   const [coin, setCoin] = useState(pool?.coin || 'BTC');
   const [isDefault, setIsDefault] = useState(pool?.is_default || false);
-  const valid = name.trim() && url.trim();
+
+  const buildUrl = (b: string, p: string) => b ? (p ? `${b}:${p}` : b) : '';
+  const valid = name.trim() && base.trim();
 
   return (
-    <Modal t={t} title={pool ? 'Edit pool' : 'New pool'} onClose={onClose} width={520}>
+    <Modal t={t} title={pool ? 'Edit pool' : 'New pool'} onClose={onClose} width={540}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <FormField t={t} label="Name" value={name} onChange={setName} placeholder="e.g. Ocean.xyz main" />
           <FormField t={t} label="Coin" value={coin} onChange={setCoin} placeholder="BTC" mono />
         </div>
 
-        <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8, border: `1px solid ${t.border}` }}>
-          <Label t={t} style={{ marginBottom: 10 }}>Primary pool</Label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <FormField t={t} label="URL" value={url} onChange={setUrl} mono placeholder="stratum+tcp://..." />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <FormField t={t} label="Worker" value={worker} onChange={setWorker} mono placeholder="wallet.worker1" />
-              <FormField t={t} label="Password" value={password} onChange={setPassword} mono placeholder="x" />
-            </div>
-          </div>
-        </div>
+        <PoolSection t={t} label="Primary pool"
+          base={base} port={port} wallet={wallet} password={password}
+          onBase={setBase} onPort={setPort} onWallet={setWallet} onPassword={setPassword} />
 
-        <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8, border: `1px solid ${t.border}` }}>
-          <Label t={t} style={{ marginBottom: 10 }}>Backup pool (optional)</Label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <FormField t={t} label="URL" value={url2} onChange={setUrl2} mono placeholder="stratum+tcp://..." />
-            <FormField t={t} label="Worker" value={worker2} onChange={setWorker2} mono placeholder="wallet.worker1" />
-          </div>
-        </div>
+        <PoolSection t={t} label="Backup pool" optional
+          base={base2} port={port2} wallet={wallet2} password={password2}
+          onBase={setBase2} onPort={setPort2} onWallet={setWallet2} onPassword={setPassword2} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Toggle t={t} on={isDefault} onChange={setIsDefault} />
@@ -166,7 +200,9 @@ function PoolModal({ t, pool, onClose, onSave }: { t: Theme; pool: PoolPreset | 
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
           <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
-          <button onClick={() => valid && onSave({ name, url, worker, password, url2, worker2, coin, is_default: isDefault })} disabled={!valid} style={{ ...btnStyle(t, 'primary'), opacity: valid ? 1 : 0.5 }}>
+          <button
+            onClick={() => valid && onSave({ name, coin, is_default: isDefault, url: buildUrl(base, port), wallet, password, url2: buildUrl(base2, port2), wallet2, password2 })}
+            disabled={!valid} style={{ ...btnStyle(t, 'primary'), opacity: valid ? 1 : 0.5 }}>
             {pool ? 'Save changes' : <><Plus size={13} /> Add pool</>}
           </button>
         </div>

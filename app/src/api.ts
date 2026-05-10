@@ -391,14 +391,13 @@ export interface PoolPreset {
   id: string;
   name: string;
   url: string;
-  worker: string;
-  password: string;
+  wallet?: string;
+  worker?: string;
+  password?: string;
   url2?: string;
+  wallet2?: string;
   worker2?: string;
   password2?: string;
-  fallback_url?: string;
-  fallback_worker?: string;
-  fallback_password?: string;
   coin?: string;
   is_default?: boolean;
 }
