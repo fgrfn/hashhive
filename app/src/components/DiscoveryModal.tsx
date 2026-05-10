@@ -66,9 +66,15 @@ export function DiscoveryModal({ onClose }: { onClose: () => void }) {
     }
 
     if (axeDevices.length > 0) {
-      const existingAxe: string[] = (current as Record<string, unknown>).axeos_devices as string[] ?? [];
-      const newIps = axeDevices.map(d => d.ip).filter(ip => !existingAxe.includes(ip));
-      patch.axeos_devices = [...existingAxe, ...newIps];
+      const rawExisting = (current as Record<string, unknown>).axeos_devices ?? [];
+      const existingAxe = (rawExisting as Array<unknown>).map(d =>
+        typeof d === 'string' ? { ip: d, name: d, type: 'bitaxe' } : d as { ip: string; name: string; type: string }
+      );
+      const existingIps = new Set(existingAxe.map(d => d.ip));
+      const newDevices = axeDevices
+        .filter(d => !existingIps.has(d.ip))
+        .map(d => ({ ip: d.ip, name: d.name || d.ip, type: d.type === 'nerdaxe' ? 'nerdaxe' : 'bitaxe' }));
+      patch.axeos_devices = [...existingAxe, ...newDevices];
     }
 
     try {
