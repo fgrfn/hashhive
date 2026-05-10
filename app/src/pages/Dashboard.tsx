@@ -5,7 +5,7 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, Segmented, SkeletonCard, useLoading } from '../components/primitives';
 import { AreaChart, MiniChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate } from '../api';
+import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, type StatSample } from '../api';
 import type { Alert } from '../api';
 
 export function Dashboard() {
@@ -26,7 +26,6 @@ export function Dashboard() {
   );
   const totalPower = axeDevices.reduce((a, d) => a + (d.power ?? 0), 0);
 
-  type StatSample = { ts: number; total_ghs?: number; ghs?: number };
   const [statSamples, setStatSamples] = useState<StatSample[]>([]);
   const [hrTrend, setHrTrend] = useState<{ pct: number; window: string } | null>(null);
 
@@ -37,11 +36,10 @@ export function Dashboard() {
   // Fetch real hashrate history; derive chart data and trend from it
   useEffect(() => {
     const days = range === '30d' ? 30 : range === '7d' ? 7 : 1;
-    fetch(`/api/stats/hashrate?days=${days}`)
-      .then(r => r.ok ? r.json() : null)
-      .then((samples: StatSample[] | null) => {
-        setStatSamples(samples ?? []);
-        if (!samples || samples.length < 4) { setHrTrend(null); return; }
+    api.stats.hashrate(days)
+      .then(samples => {
+        setStatSamples(samples);
+        if (samples.length < 4) { setHrTrend(null); return; }
         const latest = samples[samples.length - 1];
         const latestHr = latest.total_ghs ?? latest.ghs ?? 0;
         if (latestHr <= 0) { setHrTrend(null); return; }

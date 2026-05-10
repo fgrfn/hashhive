@@ -25,6 +25,7 @@ export function DeviceDetail() {
   const { devices, axeDevices } = useAppStore();
   const [tab, setTab] = useState('overview');
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const nmDevice = devices.find(d => d.ip === ip);
   const axeDevice = axeDevices.find(d => d._ip === ip);
@@ -71,21 +72,30 @@ export function DeviceDetail() {
             <span style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textMuted }}>{ip}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {actionError && (
+            <span style={{ fontSize: 11, color: t.danger, fontFamily: FONT_MONO }}>{actionError}</span>
+          )}
           {isAxe && axeDevice!.miningPaused && (
             <button style={{ ...btnStyle(t, 'primary'), fontSize: 12 }}
-              onClick={() => fetch(`/api/axe/${ip}/resume`, { method: 'POST' })}>
+              onClick={() => { setActionError(null); api.axeos.action(ip!, 'resume').catch(e => setActionError(String(e))); }}>
               <Play size={12} /> Resume
             </button>
           )}
           {isAxe && !axeDevice!.miningPaused && (
             <button style={{ ...btnStyle(t), fontSize: 12 }}
-              onClick={() => fetch(`/api/axe/${ip}/pause`, { method: 'POST' })}>
+              onClick={() => { setActionError(null); api.axeos.action(ip!, 'pause').catch(e => setActionError(String(e))); }}>
               <Pause size={12} /> Pause
             </button>
           )}
           <button style={{ ...btnStyle(t), fontSize: 12 }}
-            onClick={() => fetch(`/api/device/${ip}/restart`, { method: 'POST' })}>
+            onClick={() => {
+              setActionError(null);
+              const call = isAxe
+                ? api.axeos.action(ip!, 'restart')
+                : api.device.restart(ip!);
+              call.catch(e => setActionError(String(e)));
+            }}>
             <RefreshCw size={12} /> Restart
           </button>
         </div>
@@ -243,7 +253,7 @@ function LogsTab({ t, ip }: { t: Theme; ip: string }) {
   const [logs, setLogs] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch(`/api/device/${ip}/logs`).then(r => r.json()).then((d: string[] | { logs: string[] }) => {
+    api.device.logs(ip).then(d => {
       setLogs(Array.isArray(d) ? d : d.logs || []);
     }).catch(() => {
       setLogs(['[INFO] No log data available for this device.']);
@@ -287,8 +297,7 @@ function ConsoleTab({ t, ip }: { t: Theme; ip: string }) {
     setInput('');
     setRunning(true);
     try {
-      const res = await fetch(`/api/device/${ip}/exec`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd }) });
-      const data = await res.json();
+      const data = await api.device.exec(ip, cmd);
       setHistory(prev => [...prev, { cmd, out: data.output || data.result || JSON.stringify(data) }]);
     } catch {
       setHistory(prev => [...prev, { cmd, out: 'Error: command failed' }]);
@@ -343,7 +352,7 @@ function PowerCurveTab({ t, ip, axeDevice }: { t: Theme; ip: string; axeDevice?:
 
   const apply = async () => {
     setSaving(true);
-    await fetch(`/api/axe/${ip}/settings`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequency: freq, core_voltage: volt }) }).catch(() => {});
+    await api.axeos.configOne(ip, { frequency: freq, core_voltage: volt }).catch(() => { /* save failed */ });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
