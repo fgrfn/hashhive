@@ -19,7 +19,9 @@ from core import (
 router = APIRouter()
 
 
-async def _fetch_axeos_device(client: httpx.AsyncClient, device: dict) -> dict:
+async def _fetch_axeos_device(client: httpx.AsyncClient, device) -> dict:
+    if isinstance(device, str):
+        device = {"ip": device, "name": device, "type": "bitaxe"}
     ip = device.get("ip", "")
     name = device.get("name", ip)
     device_type = device.get("type", "bitaxe")
