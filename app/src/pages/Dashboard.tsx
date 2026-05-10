@@ -240,7 +240,7 @@ function DeviceMini({ t, title, accent, rows, onViewAll, onDevice }: {
               <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{r.ip}</div>
             </div>
             <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
-              {r.hr > 0 ? <>{r.hr.toFixed(1)} <span style={{ color: t.textMuted, fontWeight: 400, fontSize: 11 }}>GH/s</span></> : <span style={{ color: t.textMuted }}>—</span>}
+              {fmtHashrate(r.hr)}
             </div>
             <div style={{ fontFamily: FONT_MONO, color: r.temp == null ? t.textMuted : r.temp > 70 ? t.danger : r.temp > 65 ? t.warning : t.success }}>
               {r.temp != null ? `${r.temp}°` : '—'}

@@ -3,7 +3,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
+import { api, fmtUptime, fmtBestDiff, fmtHashrate, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
 import { Cpu, Edit3, Search, RotateCcw } from 'lucide-react';
 import { toast } from '../store/toast';
@@ -121,7 +121,7 @@ export function NMMiner() {
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 100 }}>
             <Label t={t}>Hashrate</Label>
             <div style={{ fontSize: 20, fontWeight: 700, color: t.info, fontFamily: FONT_MONO, marginTop: 4 }}>
-              {totalHr.toFixed(1)} <span style={{ fontSize: 11, color: t.textMuted, fontWeight: 400 }}>GH/s</span>
+              {fmtHashrate(totalHr)}
             </div>
           </div>
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 80 }}>
@@ -199,7 +199,7 @@ export function NMMiner() {
               <div style={{ fontWeight: 500 }}>{name}</div>
               <StatusPill t={t} status={status} />
               <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
-                {hr > 0 ? <>{hr.toFixed(1)} <span style={{ color: t.textMuted, fontSize: 11, fontWeight: 400 }}>GH/s</span></> : <span style={{ color: t.textMuted }}>—</span>}
+                {fmtHashrate(hr)}
               </div>
               <div style={{ fontFamily: FONT_MONO, color: temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success }}>
                 {temp != null ? `${temp}°C` : '—'}
@@ -301,7 +301,7 @@ function NmMobileCard({ t, d, selected, onToggle, onEdit }: { t: Theme; d: NMMin
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-        <Kv t={t} label="Hashrate" value={hr > 0 ? `${hr.toFixed(1)} GH/s` : '—'} />
+        <Kv t={t} label="Hashrate" value={fmtHashrate(hr)} />
         <Kv t={t} label="Temp" value={temp != null ? `${temp}°C` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
         <Kv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
         <Kv t={t} label="Best Share" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />

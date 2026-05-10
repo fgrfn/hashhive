@@ -430,8 +430,11 @@ export function fmtUptime(seconds: number | string | undefined): string {
 }
 
 export function fmtHashrate(ghs: number): string {
+  if (ghs <= 0) return '—';
   if (ghs >= 1000) return `${(ghs / 1000).toFixed(2)} TH/s`;
-  return `${ghs.toFixed(1)} GH/s`;
+  if (ghs >= 1) return `${ghs.toFixed(2)} GH/s`;
+  if (ghs >= 0.001) return `${(ghs * 1000).toFixed(2)} MH/s`;
+  return `${(ghs * 1_000_000).toFixed(0)} KH/s`;
 }
 
 /** Format a best-share/best-diff value. Accepts a raw number or pre-formatted string. */
