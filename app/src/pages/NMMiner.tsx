@@ -5,7 +5,7 @@ import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, T
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
-import { Cpu, Edit3 } from 'lucide-react';
+import { Cpu, Edit3, Search } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
 
@@ -16,6 +16,8 @@ export function NMMiner() {
   const [editDevice, setEditDevice] = useState<string | null>(null);
   const [config, setConfig] = useState<NMMinerConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const openEdit = async (ip: string) => {
     setEditDevice(ip);
@@ -80,22 +82,71 @@ export function NMMiner() {
     );
   }
 
+  const filtered = devices.filter(d => {
+    const ip = d.ip || '';
+    const name = d.name ?? d.hostname ?? ip;
+    const status = getNmStatus(d);
+    if (statusFilter !== 'all' && status !== statusFilter) return false;
+    if (query && !name.toLowerCase().includes(query.toLowerCase()) && !ip.includes(query)) return false;
+    return true;
+  });
+
+  const totalHr = filtered.reduce((a, d) => a + getHashrate(d), 0);
+  const online = filtered.filter(d => getNmStatus(d) === 'online').length;
+
   return (
     <>
+      {/* Filter bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 100 }}>
+            <Label t={t}>Hashrate</Label>
+            <div style={{ fontSize: 20, fontWeight: 700, color: t.info, fontFamily: FONT_MONO, marginTop: 4 }}>
+              {totalHr.toFixed(1)} <span style={{ fontSize: 11, color: t.textMuted, fontWeight: 400 }}>GH/s</span>
+            </div>
+          </div>
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 80 }}>
+            <Label t={t}>Online</Label>
+            <div style={{ fontSize: 20, fontWeight: 700, color: t.success, fontFamily: FONT_MONO, marginTop: 4 }}>
+              {online}/{filtered.length}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8 }}>
+            <Search size={13} style={{ color: t.textMuted }} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter…" style={{ background: 'transparent', border: 'none', outline: 'none', color: t.text, fontSize: 12, fontFamily: FONT_MONO, width: 140 }} />
+          </div>
+          {(['all', 'online', 'warning', 'offline'] as const).map(f => (
+            <button key={f} onClick={() => setStatusFilter(f)} style={{ ...btnStyle(t), padding: '4px 10px', fontSize: 11, background: statusFilter === f ? t.accentGlow : 'transparent', color: statusFilter === f ? t.accent : t.textMuted }}>
+              {f[0].toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 48, color: t.textMuted }}>
+          <Search size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 4 }}>No devices match</div>
+          <div style={{ fontSize: 13 }}>Try a different name, IP, or status filter.</div>
+        </div>
+      )}
+
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {devices.map(d => (
+          {filtered.map(d => (
             <NmMobileCard key={d.ip} t={t} d={d} onEdit={() => openEdit(d.ip || '')} />
           ))}
         </div>
-      ) : (
+      ) : filtered.length > 0 && (
       <Card t={t} noPad>
         <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12 }}>
             {cols.map(c => <Label key={c} t={t}>{c}</Label>)}
           </div>
         </div>
-        {devices.map((d, i) => {
+        {filtered.map((d, i) => {
           const status = getNmStatus(d);
           const hr = getHashrate(d);
           const temp = getTemp(d);
@@ -106,7 +157,7 @@ export function NMMiner() {
           const ip = d.ip || '';
           const name = d.name ?? d.hostname ?? ip;
           return (
-            <div key={ip} style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, padding: '12px 18px', borderBottom: i === devices.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}
+            <div key={ip} style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, padding: '12px 18px', borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
             >
