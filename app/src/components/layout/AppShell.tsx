@@ -182,7 +182,15 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
           t={t} active={active} dark={dark} onToggleDark={toggleDark}
           globalSearch={globalSearch} setGlobalSearch={setGlobalSearch}
           compact={isTablet} btcPrice={btcPrice} btcChange={btcChange}
-          onAddDevice={() => navigate('/miners/axeos')}
+          onAddDevice={() => {
+            if (location.pathname.startsWith('/miners/nmminer')) {
+              navigate('/settings/general');
+            } else if (location.pathname.startsWith('/miners/axeos')) {
+              navigate('/settings/network');
+            } else {
+              navigate('/settings/general');
+            }
+          }}
         />
         {(wsStatus === 'disconnected' || wsStatus === 'reconnecting') && (
           <div style={{ background: wsStatus === 'reconnecting' ? t.warning + '22' : t.danger + '22', borderBottom: `1px solid ${wsStatus === 'reconnecting' ? t.warning : t.danger}44`, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: wsStatus === 'reconnecting' ? t.warning : t.danger, fontFamily: FONT_MONO }}>
