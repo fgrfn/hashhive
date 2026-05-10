@@ -1,5 +1,4 @@
 """Tests for alert helpers."""
-import json
 import os
 import sys
 import tempfile
@@ -12,8 +11,8 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import main as m
-from main import load_json, save_json, _append_entry, _load_recent, _today, LOGS_DIR
+import main as m  # noqa: E402
+from main import _append_entry, _load_recent, _today, LOGS_DIR  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

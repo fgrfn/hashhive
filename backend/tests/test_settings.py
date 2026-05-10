@@ -5,14 +5,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from main import load_json, save_json, DEFAULT_CONFIG
+from main import load_json, save_json, DEFAULT_CONFIG  # noqa: E402
 
 
 def test_load_json_returns_default_when_missing(tmp_path):

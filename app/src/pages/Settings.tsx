@@ -28,8 +28,11 @@ export function Settings() {
   const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings || {});
   const latestSettings = useRef(localSettings);
-  latestSettings.current = localSettings;
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    latestSettings.current = localSettings;
+  });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -169,7 +172,7 @@ export function Settings() {
         )}
 
         {section === 'security' && (
-          <SecuritySection t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} save={save} />
+          <SecuritySection t={t} localSettings={localSettings} updToggle={updToggle} />
         )}
 
         {section === 'backup' && (
@@ -259,12 +262,10 @@ function SettingRow({ t, label, desc, children, last }: { t: Theme; label: strin
   );
 }
 
-function SecuritySection({ t, localSettings, upd, updToggle, save }: {
+function SecuritySection({ t, localSettings, updToggle }: {
   t: Theme;
   localSettings: AppSettings;
-  upd: (patch: Partial<AppSettings>) => void;
   updToggle: (patch: Partial<AppSettings>) => void;
-  save: () => Promise<void>;
 }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');

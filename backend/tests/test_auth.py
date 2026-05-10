@@ -1,4 +1,5 @@
 """Tests for auth helpers and API endpoints."""
+import hashlib
 import json
 import os
 import sys
@@ -6,15 +7,12 @@ import time
 import tempfile
 from pathlib import Path
 
-import pytest
-
-# Point DATA_DIR at a temp directory so tests never touch real data.
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from main import (
+from main import (  # noqa: E402
     _hash_pw,
     _verify_pw,
     _rate_limited,
@@ -22,7 +20,6 @@ from main import (
     _login_attempts,
     _MAX_ATTEMPTS,
     _bootstrap_auth,
-    CONFIG_FILE,
     load_json,
     DEFAULT_CONFIG,
 )
@@ -60,7 +57,6 @@ def test_unique_salts():
 
 
 def test_legacy_sha256_verify():
-    import hashlib
     legacy = hashlib.sha256("legacypassword".encode()).hexdigest()
     assert _verify_pw("legacypassword", legacy)
     assert not _verify_pw("wrong", legacy)
@@ -91,8 +87,6 @@ def test_rate_limit_resets_after_window():
 
 def test_bootstrap_auth_sets_password(tmp_path, monkeypatch):
     monkeypatch.setenv("HASHHIVE_PASSWORD", "bootstrapme")
-    monkeypatch.setattr("main.CONFIG_FILE", tmp_path / "config.json")
-    monkeypatch.setattr("main.DATA_DIR", tmp_path)
     import main as m
     m.CONFIG_FILE = tmp_path / "config.json"
     _bootstrap_auth()
