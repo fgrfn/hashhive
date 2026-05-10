@@ -57,10 +57,11 @@ export const api = {
     patchDevice: (data: { ip: string; name?: string; temp_max?: number })      => patch('/api/settings/device', data),
   },
   nmminer: {
-    swarm:            ()                             => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/nmminer/swarm'),
-    deviceConfig:     (ip: string)                  => get<NMMinerConfig>(`/api/nmminer/device-config?ip=${ip}`),
-    saveDeviceConfig: (cfg: NMMinerConfig)           => post('/api/nmminer/device-config', cfg),
-    broadcastConfig:  (cfg: Record<string, unknown>) => post('/api/nmminer/broadcast-config', cfg),
+    swarm:            ()                                         => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/nmminer/swarm'),
+    deviceConfig:     (ip: string)                              => get<NMMinerConfig>(`/api/nmminer/device-config?ip=${ip}`),
+    saveDeviceConfig: (cfg: NMMinerConfig)                      => post('/api/nmminer/device-config', cfg),
+    broadcastConfig:  (cfg: Record<string, unknown>)            => post('/api/nmminer/broadcast-config', cfg),
+    batchAction:      (ips: string[], action: NmAction)         => post('/api/nmminer/action/batch', { ips, action }),
   },
   axeos: {
     devices:     ()                                               => get<AxeDevice[]>('/api/axeos/devices'),
@@ -372,6 +373,7 @@ export interface PoolPreset {
 }
 
 export type AxeAction = 'pause' | 'resume' | 'restart' | 'identify';
+export type NmAction = 'restart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

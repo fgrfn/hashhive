@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from core import (
     CONFIG_FILE,
     DEFAULT_CONFIG,
+    NmActionBatchRequest,
     _append_entry,
     _validate_device_ip,
     load_json,
@@ -265,6 +266,45 @@ async def scan_nmminer_devices():
         await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
 
     return {"subnet": f"{subnet}.0/24", "local_ip": local_ip, "found": found}
+
+
+_NM_ACTION_MAP = {
+    "restart": "/reboot",
+}
+
+
+@router.post("/api/nmminer/action/batch")
+async def nmminer_action_batch(data: NmActionBatchRequest):
+    """Batch action across multiple NMMiner devices. Body: {action, ips: [...]}"""
+    valid = set(_NM_ACTION_MAP)
+    if data.action not in valid:
+        raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
+    path = _NM_ACTION_MAP[data.action]
+
+    results: list[dict] = []
+
+    async def _act(ip: str):
+        _validate_device_ip(ip)
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.post(f"http://{ip}{path}")
+                results.append({"ip": ip, "status": resp.status_code})
+                now = datetime.now(timezone.utc).isoformat()
+                _append_entry({
+                    "id": f"nmminer:{ip}:{data.action}:{now}",
+                    "device": f"nmminer:{ip}",
+                    "kind": f"device_{data.action}",
+                    "severity": "info",
+                    "message": f"NMMiner {ip}: {data.action} triggered",
+                    "timestamp": now,
+                    "read": True,
+                    "source": "nmminer",
+                })
+        except Exception as exc:
+            results.append({"ip": ip, "status": 0, "error": str(exc)})
+
+    await asyncio.gather(*[_act(ip) for ip in data.ips])
+    return {"action": data.action, "results": results}
 
 
 @router.post("/api/nmminer/broadcast-config")

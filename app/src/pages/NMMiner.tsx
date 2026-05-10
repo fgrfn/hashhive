@@ -5,9 +5,10 @@ import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, T
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, getHashrate, getTemp, getNmStatus } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
-import { Cpu, Edit3, Search } from 'lucide-react';
+import { Cpu, Edit3, Search, RotateCcw } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
+import type { NmAction } from '../api';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
@@ -18,6 +19,7 @@ export function NMMiner() {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selected, setSelected] = useState(new Set<string>());
 
   const openEdit = async (ip: string) => {
     setEditDevice(ip);
@@ -47,9 +49,26 @@ export function NMMiner() {
     setEditDevice(null);
   };
 
+  const toggleSelect = (ip: string) => {
+    const s = new Set(selected);
+    if (s.has(ip)) s.delete(ip); else s.add(ip);
+    setSelected(s);
+  };
+
+  const doBulkAction = async (action: NmAction) => {
+    const ips = Array.from(selected);
+    try {
+      await api.nmminer.batchAction(ips, action);
+      toast(`${action} sent to ${ips.length} device${ips.length !== 1 ? 's' : ''}`);
+    } catch {
+      toast(`Batch ${action} failed`, 'error');
+    }
+    setSelected(new Set());
+  };
+
   const mobile = useMobile();
-  const cols = ['IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Share', 'Actions'];
-  const colWidths = ['120px', '1fr', '90px', '110px', '80px', '160px', '160px', '80px', '90px', '60px'];
+  const cols = ['', 'IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Share', 'Actions'];
+  const colWidths = ['28px', '120px', '1fr', '90px', '110px', '80px', '160px', '160px', '80px', '90px', '60px'];
 
   if (loading) {
     return mobile ? (
@@ -125,6 +144,16 @@ export function NMMiner() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div style={{ background: t.accentGlow, border: `1px solid ${t.accent}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 13, color: t.accent, fontWeight: 600 }}>{selected.size} selected</div>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => doBulkAction('restart')} style={{ ...btnStyle(t), fontSize: 12 }}><RotateCcw size={13} /> Restart</button>
+          <button onClick={() => setSelected(new Set())} style={{ ...btnStyle(t), padding: 6 }}>✕</button>
+        </div>
+      )}
+
       {filtered.length === 0 && (
         <div style={{ textAlign: 'center', padding: 48, color: t.textMuted }}>
           <Search size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
@@ -136,14 +165,15 @@ export function NMMiner() {
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <NmMobileCard key={d.ip} t={t} d={d} onEdit={() => openEdit(d.ip || '')} />
+            <NmMobileCard key={d.ip} t={t} d={d} selected={selected.has(d.ip || '')} onToggle={() => toggleSelect(d.ip || '')} onEdit={() => openEdit(d.ip || '')} />
           ))}
         </div>
       ) : filtered.length > 0 && (
       <Card t={t} noPad>
         <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-          <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12 }}>
-            {cols.map(c => <Label key={c} t={t}>{c}</Label>)}
+          <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, alignItems: 'center' }}>
+            <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d.ip || ''))); }} style={{ accentColor: t.info }} /></div>
+            {cols.slice(1).map(c => <Label key={c} t={t}>{c}</Label>)}
           </div>
         </div>
         {filtered.map((d, i) => {
@@ -161,6 +191,9 @@ export function NMMiner() {
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
             >
+              <div onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={selected.has(ip)} onChange={() => toggleSelect(ip)} style={{ accentColor: t.info }} />
+              </div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{ip}</div>
               <div style={{ fontWeight: 500 }}>{name}</div>
               <StatusPill t={t} status={status} />
@@ -242,7 +275,7 @@ export function NMMiner() {
   );
 }
 
-function NmMobileCard({ t, d, onEdit }: { t: Theme; d: NMMinerDevice; onEdit: () => void }) {
+function NmMobileCard({ t, d, selected, onToggle, onEdit }: { t: Theme; d: NMMinerDevice; selected: boolean; onToggle: () => void; onEdit: () => void }) {
   const status = getNmStatus(d);
   const hr = getHashrate(d);
   const temp = getTemp(d);
@@ -251,11 +284,14 @@ function NmMobileCard({ t, d, onEdit }: { t: Theme; d: NMMinerDevice; onEdit: ()
   const pool = d.pool ?? d.stratumURL ?? '—';
   const worker = d.worker ?? d.stratumUser ?? '—';
   return (
-    <Card t={t}>
+    <Card t={t} style={{ background: selected ? t.accentGlow : undefined, borderColor: selected ? t.accent : undefined }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
-          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <input type="checkbox" checked={selected} onChange={onToggle} style={{ accentColor: t.info, marginTop: 3 }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
+            <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <StatusPill t={t} status={status} />
