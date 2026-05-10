@@ -175,6 +175,7 @@ export interface NMMinerDevice {
   hostname?: string;
   status?: 'online' | 'offline' | 'warning';
   hashrate?: number;
+  GHs?: number;
   GHs5s?: number;
   GHs5?: number;
   GHs1m?: number;
@@ -316,7 +317,7 @@ export interface HealthData {
 
 export interface AppSettings {
   nmminer_master?: string;
-  nmminer_devices?: string[];
+  nmminer_devices?: Array<{ ip: string; name?: string }>;
   axeos_devices?: Array<{ ip: string; name: string; type: string }>;
   refresh_interval?: number;
   offline_grace_minutes?: number;
@@ -403,7 +404,7 @@ export type NmAction = 'restart';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function getHashrate(d: NMMinerDevice): number {
-  return d.GHs5s ?? d.GHs5 ?? d.GHs1m ?? d.GHsav ?? d.hashrate ?? 0;
+  return d.GHs5s ?? d.GHs5 ?? d.GHs1m ?? d.GHsav ?? d.GHs ?? d.hashrate ?? 0;
 }
 
 export function getAxeHashrate(d: AxeDevice): number {

@@ -101,6 +101,18 @@ export function Settings() {
               <SettingRow t={t} label="NMMiner Master IP" desc="IP address of your NMMiner swarm master.">
                 <Input t={t} value={localSettings.nmminer_master || ''} onChange={v => upd({ nmminer_master: v })} placeholder="192.168.1.100" mono style={{ width: 200 }} />
               </SettingRow>
+              <div style={{ padding: '14px 0 8px' }}>
+                <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Individual NMMiner Devices</div>
+                <div style={{ fontSize: 12, color: t.textDim, marginBottom: 10 }}>Devices not behind a master — monitored directly by IP.</div>
+                {(localSettings.nmminer_devices || []).map((d, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <Input t={t} value={d.ip} onChange={v => { const devs = [...(localSettings.nmminer_devices || [])]; devs[i] = { ...devs[i], ip: v }; upd({ nmminer_devices: devs }); }} placeholder="IP address" mono />
+                    <Input t={t} value={d.name || ''} onChange={v => { const devs = [...(localSettings.nmminer_devices || [])]; devs[i] = { ...devs[i], name: v }; upd({ nmminer_devices: devs }); }} placeholder="Name (optional)" />
+                    <button onClick={() => upd({ nmminer_devices: (localSettings.nmminer_devices || []).filter((_, j) => j !== i) })} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}>✕</button>
+                  </div>
+                ))}
+                <button onClick={() => upd({ nmminer_devices: [...(localSettings.nmminer_devices || []), { ip: '', name: '' }] })} style={{ ...btnStyle(t), fontSize: 12 }}>+ Add device</button>
+              </div>
               <SettingRow t={t} label="Polling interval" desc="How often devices are queried (seconds).">
                 <Input t={t} value={String(localSettings.refresh_interval || 30)} onChange={v => upd({ refresh_interval: Number(v) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
