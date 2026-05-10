@@ -119,11 +119,35 @@ export const api = {
   notifications: {
     test: () => post('/api/notifications/test'),
   },
+  discovery: {
+    scan: () => get<DiscoveryScanResult>('/api/discovery/scan'),
+  },
 };
 
 // ─── Shared response shapes ───────────────────────────────────────────────────
 
 export interface OkResponse { ok?: boolean; status?: string }
+
+export interface DiscoveredDevice {
+  ip: string;
+  type: 'bitaxe' | 'nerdaxe' | 'nmminer_master' | 'nmminer_device';
+  name: string;
+  discovered_via: 'arp' | 'mdns' | 'scan';
+  asic?: string;
+  hashrate?: number;
+  temp?: number;
+  device_count?: number;
+}
+
+export interface DiscoveryScanResult {
+  local_ip: string;
+  subnet: string;
+  arp_count: number;
+  mdns_count: number;
+  probed: number;
+  method: string;
+  found: DiscoveredDevice[];
+}
 export interface AxeActionResponse { ip: string; action: string; status: number }
 export interface StatSample { ts: number; total_ghs?: number; ghs?: number }
 export interface DeviceTemplate {

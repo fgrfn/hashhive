@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock } from 'lucide-react';
+import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock, Radar } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Toggle, Input, Select, FormField, Segmented, Spinner, btnStyle, HiveMark } from '../components/primitives';
@@ -9,6 +9,7 @@ import { api } from '../api';
 import type { AppSettings } from '../api';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
+import { DiscoveryModal } from '../components/DiscoveryModal';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
@@ -67,6 +68,7 @@ export function Settings() {
   };
 
   const mobile = useMobile();
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '220px 1fr', gap: mobile ? 16 : 24 }}>
@@ -87,6 +89,13 @@ export function Settings() {
         {section === 'general' && (
           <div>
             <SectionHeader t={t} title="General" desc="Basic preferences for your HashHive instance." />
+            <Card t={t} style={{ marginBottom: 14 }}>
+              <SettingRow t={t} label="Auto-Discover Devices" desc="Scan your local network to find NMMiner and BitAxe/NerdAxe devices automatically." last>
+                <button onClick={() => setDiscoveryOpen(true)} style={{ ...btnStyle(t, 'primary'), fontSize: 12 }}>
+                  <Radar size={13} /> Discover
+                </button>
+              </SettingRow>
+            </Card>
             <Card t={t}>
               <SettingRow t={t} label="NMMiner Master IP" desc="IP address of your NMMiner swarm master.">
                 <Input t={t} value={localSettings.nmminer_master || ''} onChange={v => upd({ nmminer_master: v })} placeholder="192.168.1.100" mono style={{ width: 200 }} />
@@ -248,6 +257,7 @@ export function Settings() {
         )}
       </div>
     </div>
+    {discoveryOpen && <DiscoveryModal onClose={() => setDiscoveryOpen(false)} />}
   );
 }
 
