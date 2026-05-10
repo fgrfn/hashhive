@@ -10,6 +10,14 @@ services:
       - hashhive-data:/app/backend/data
     environment:
       - HASHHIVE_DATA_DIR=/app/backend/data
+      # ── Auth-Konfiguration (optional) ────────────────────────────────────────
+      #
+      # Passwort per Umgebungsvariable setzen oder zurücksetzen.
+      # Wird bei jedem Start angewendet – kann für Password-Recovery genutzt werden.
+      # Nach dem Start kann die Variable entfernt werden (Passwort bleibt gespeichert).
+      #
+      # - HASHHIVE_PASSWORD=my_secure_password
+      #
       # ── HTTPS-Konfiguration (optional) ───────────────────────────────────────
       #
       # Option 1: Selbst-signiertes Zertifikat automatisch erstellen

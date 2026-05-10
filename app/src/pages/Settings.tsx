@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
@@ -27,22 +27,36 @@ export function Settings() {
   const [section, setSection] = useState(params.section || 'general');
   const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings || {});
+  const latestSettings = useRef(localSettings);
+  latestSettings.current = localSettings;
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (settings) setLocalSettings(settings);
   }, [settings]);
 
-  const save = async () => {
+  const save = useCallback(async () => {
     setSaving(true);
     try {
-      const updated = await api.settings.save(localSettings);
+      const updated = await api.settings.save(latestSettings.current);
       setSettings(updated);
     } catch { /* save failed — keep local state */ }
     setSaving(false);
-  };
+  }, [setSettings]);
 
   const upd = (patch: Partial<AppSettings>) => setLocalSettings(s => ({ ...s, ...patch }));
+
+  // For toggles: patch state and debounce-save after 500ms so rapid changes coalesce.
+  const updToggle = (patch: Partial<AppSettings>) => {
+    setLocalSettings(s => {
+      const next = { ...s, ...patch };
+      latestSettings.current = next;
+      return next;
+    });
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(save, 500);
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24 }}>
@@ -136,7 +150,7 @@ export function Settings() {
                   <Card key={key} t={t}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color }}>{label}</div>
-                      <Toggle t={t} on={!!enabled} onChange={v => upd({ notifications: { ...notifs, [`${key}_enabled`]: v } })} />
+                      <Toggle t={t} on={!!enabled} onChange={v => updToggle({ notifications: { ...notifs, [`${key}_enabled`]: v } })} />
                     </div>
                     {fields.map(([field, fieldLabel]) => (
                       <div key={field} style={{ marginBottom: 10 }}>
@@ -155,7 +169,7 @@ export function Settings() {
         )}
 
         {section === 'security' && (
-          <SecuritySection t={t} localSettings={localSettings} upd={upd} save={save} />
+          <SecuritySection t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} save={save} />
         )}
 
         {section === 'backup' && (
@@ -245,10 +259,11 @@ function SettingRow({ t, label, desc, children, last }: { t: Theme; label: strin
   );
 }
 
-function SecuritySection({ t, localSettings, upd, save }: {
+function SecuritySection({ t, localSettings, upd, updToggle, save }: {
   t: Theme;
   localSettings: AppSettings;
   upd: (patch: Partial<AppSettings>) => void;
+  updToggle: (patch: Partial<AppSettings>) => void;
   save: () => Promise<void>;
 }) {
   const [password, setPassword] = useState('');
@@ -278,7 +293,7 @@ function SecuritySection({ t, localSettings, upd, save }: {
       <SectionHeader t={t} title="Security" desc="Password-protect the dashboard when exposed to the internet. Requires HTTPS for full protection." />
       <Card t={t}>
         <SettingRow t={t} label="Enable authentication" desc="Require a password to access the dashboard.">
-          <Toggle t={t} on={authEnabled} onChange={v => { upd({ auth: { ...localSettings.auth, enabled: v } }); save(); }} />
+          <Toggle t={t} on={authEnabled} onChange={v => updToggle({ auth: { ...localSettings.auth, enabled: v } })} />
         </SettingRow>
         {authEnabled && (
           <div style={{ paddingTop: 14 }}>
@@ -296,7 +311,7 @@ function SecuritySection({ t, localSettings, upd, save }: {
               </button>
             </div>
             <div style={{ fontSize: 11, color: t.textMuted, marginTop: 16 }}>
-              Bootstrap tip: set <code style={{ fontFamily: FONT_MONO, background: t.surface2, padding: '1px 4px', borderRadius: 3 }}>HASHHIVE_PASSWORD=...</code> env var on first start to enable auth automatically.
+              Recovery: set <code style={{ fontFamily: FONT_MONO, background: t.surface2, padding: '1px 4px', borderRadius: 3 }}>HASHHIVE_PASSWORD=...</code> env var to override the password on every start — useful if locked out.
             </div>
           </div>
         )}
