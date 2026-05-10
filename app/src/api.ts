@@ -1,119 +1,116 @@
-const BASE = '';
+// ─── HTTP primitives (module-private) ────────────────────────────────────────
 
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(BASE + path);
+  const r = await fetch(path);
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+  return r.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(BASE + path, {
+async function post<T = OkResponse>(path: string, body?: unknown): Promise<T> {
+  const r = await fetch(path, {
     method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+  return r.json() as Promise<T>;
 }
 
-async function put<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(BASE + path, {
+async function put<T = OkResponse>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+  return r.json() as Promise<T>;
 }
 
-async function patch<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(BASE + path, {
+async function patch<T = OkResponse>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+  return r.json() as Promise<T>;
 }
 
-async function del<T>(path: string): Promise<T> {
-  const r = await fetch(BASE + path, { method: 'DELETE' });
+async function del<T = OkResponse>(path: string): Promise<T> {
+  const r = await fetch(path, { method: 'DELETE' });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
+  return r.json() as Promise<T>;
 }
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
-  get,
-  post,
-  put,
-  patch,
-  del,
   dashboard: () => get<DashboardData>('/api/dashboard'),
   settings: {
-    get: () => get<AppSettings>('/api/settings'),
-    save: (data: Partial<AppSettings>) => post<AppSettings>('/api/settings', data),
-    patchDevice: (data: { ip: string; name?: string; temp_max?: number }) =>
-      patch('/api/settings/device', data),
+    get:         ()                                                            => get<AppSettings>('/api/settings'),
+    save:        (data: Partial<AppSettings>)                                  => post<AppSettings>('/api/settings', data),
+    patchDevice: (data: { ip: string; name?: string; temp_max?: number })      => patch('/api/settings/device', data),
   },
   nmminer: {
-    swarm: () => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/nmminer/swarm'),
-    deviceConfig: (ip: string) => get<NMMinerConfig>(`/api/nmminer/device-config?ip=${ip}`),
-    saveDeviceConfig: (cfg: NMMinerConfig) => post('/api/nmminer/device-config', cfg),
-    broadcastConfig: (cfg: object) => post('/api/nmminer/broadcast-config', cfg),
+    swarm:            ()                             => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/nmminer/swarm'),
+    deviceConfig:     (ip: string)                  => get<NMMinerConfig>(`/api/nmminer/device-config?ip=${ip}`),
+    saveDeviceConfig: (cfg: NMMinerConfig)           => post('/api/nmminer/device-config', cfg),
+    broadcastConfig:  (cfg: Record<string, unknown>) => post('/api/nmminer/broadcast-config', cfg),
   },
   axeos: {
-    devices: () => get<AxeDevice[]>('/api/axeos/devices'),
-    action: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') =>
-      post(`/api/axeos/action/${ip}?action=${action}`),
-    batchAction: (ips: string[], action: string) =>
-      post('/api/axeos/action/batch', { ips, action }),
-    configAll: (cfg: object) => patch('/api/axeos/config/all', cfg),
-    configBatch: (ips: string[], freq: number, voltage: number) =>
-      patch('/api/axeos/config/batch', { ips, frequency: freq, coreVoltage: voltage }),
-    scan: () => get<AxeDevice[]>('/api/axeos/scan'),
+    devices:     ()                                               => get<AxeDevice[]>('/api/axeos/devices'),
+    action:      (ip: string, action: AxeAction)                 => post(`/api/axeos/action/${ip}?action=${action}`),
+    batchAction: (ips: string[], action: AxeAction)              => post('/api/axeos/action/batch', { ips, action }),
+    configAll:   (cfg: Record<string, unknown>)                  => patch('/api/axeos/config/all', cfg),
+    configBatch: (ips: string[], freq: number, voltage: number)  => patch('/api/axeos/config/batch', { ips, frequency: freq, coreVoltage: voltage }),
+    scan:        ()                                               => get<AxeDevice[]>('/api/axeos/scan'),
   },
   groups: {
-    list: () => get<Group[]>('/api/groups'),
-    create: (g: Partial<Group>) => post<Group>('/api/groups', g),
+    list:   ()                               => get<Group[]>('/api/groups'),
+    create: (g: Partial<Group>)              => post<Group>('/api/groups', g),
     update: (id: string, g: Partial<Group>) => put<Group>(`/api/groups/${id}`, g),
-    delete: (id: string) => del(`/api/groups/${id}`),
+    delete: (id: string)                    => del(`/api/groups/${id}`),
   },
   alerts: {
-    list: (days = 7) => get<Alert[]>(`/api/alerts?days=${days}`),
-    readAll: () => post('/api/alerts/read-all'),
-    delete: () => del('/api/alerts'),
+    list:    (days = 7) => get<Alert[]>(`/api/alerts?days=${days}`),
+    readAll: ()         => post('/api/alerts/read-all'),
+    delete:  ()         => del('/api/alerts'),
   },
-  health: (ip?: string) => ip ? get<HealthData>(`/api/health/${ip}`) : get<HealthData>('/api/health'),
-  earnings: (days = 30) => get<EarningsEntry[]>(`/api/earnings?days=${days}`),
+  health:   (ip?: string) => ip ? get<HealthData>(`/api/health/${ip}`) : get<HealthData>('/api/health'),
+  earnings: (days = 30)   => get<EarningsEntry[]>(`/api/earnings?days=${days}`),
   pools: {
-    list: () => get<PoolPreset[]>('/api/pools'),
-    create: (p: Partial<PoolPreset>) => post<PoolPreset>('/api/pools', p),
-    update: (id: string, p: Partial<PoolPreset>) => put<PoolPreset>(`/api/pools/${id}`, p),
-    delete: (id: string) => del(`/api/pools/${id}`),
+    list:         ()                                   => get<PoolPreset[]>('/api/pools'),
+    create:       (p: Partial<PoolPreset>)             => post<PoolPreset>('/api/pools', p),
+    update:       (id: string, p: Partial<PoolPreset>) => put<PoolPreset>(`/api/pools/${id}`, p),
+    delete:       (id: string)                         => del(`/api/pools/${id}`),
     pushToDevice: (ip: string, pool: Partial<PoolPreset>) => post(`/api/pools/push/${ip}`, pool),
   },
   wallets: {
-    list: () => get<Wallet[]>('/api/wallets'),
-    create: (w: Partial<Wallet>) => post<Wallet>('/api/wallets', w),
+    list:   ()                                => get<Wallet[]>('/api/wallets'),
+    create: (w: Partial<Wallet>)              => post<Wallet>('/api/wallets', w),
     update: (id: string, w: Partial<Wallet>) => put<Wallet>(`/api/wallets/${id}`, w),
-    delete: (id: string) => del(`/api/wallets/${id}`),
+    delete: (id: string)                     => del(`/api/wallets/${id}`),
   },
   schedules: {
-    list: () => get<Schedule[]>('/api/schedules'),
-    create: (s: Partial<Schedule>) => post<Schedule>('/api/schedules', s),
+    list:   ()                                  => get<Schedule[]>('/api/schedules'),
+    create: (s: Partial<Schedule>)              => post<Schedule>('/api/schedules', s),
     update: (id: string, s: Partial<Schedule>) => put<Schedule>(`/api/schedules/${id}`, s),
-    delete: (id: string) => del(`/api/schedules/${id}`),
+    delete: (id: string)                        => del(`/api/schedules/${id}`),
   },
   notifications: {
     test: () => post('/api/notifications/test'),
   },
 };
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Shared response shape ────────────────────────────────────────────────────
+
+export interface OkResponse { ok?: boolean; status?: string }
+
+// ─── Domain types ─────────────────────────────────────────────────────────────
 
 export interface DashboardData {
   nmminer: { devices: NMMinerDevice[]; _error?: string };
-  axeos: { devices: AxeDevice[] };
+  axeos:   { devices: AxeDevice[] };
   unread_alerts: number;
   config: AppSettings;
 }
@@ -338,7 +335,9 @@ export interface PoolPreset {
   is_default?: boolean;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+export type AxeAction = 'pause' | 'resume' | 'restart' | 'identify';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function getHashrate(d: NMMinerDevice): number {
   return d.GHs5s ?? d.GHs5 ?? d.GHs1m ?? d.GHsav ?? d.hashrate ?? 0;
@@ -349,17 +348,15 @@ export function getAxeHashrate(d: AxeDevice): number {
 }
 
 export function getTemp(d: NMMinerDevice): number | null {
-  const v = d.temp ?? d.temperature ?? d.chipTemp ?? null;
-  return v;
+  return d.temp ?? d.temperature ?? d.chipTemp ?? null;
 }
 
-export function fmtUptime(s: number | string | undefined): string {
-  if (s == null) return '—';
-  if (typeof s === 'string') {
-    if (/^\d+$/.test(s)) s = parseInt(s, 10);
-    else return s;
+export function fmtUptime(seconds: number | string | undefined): string {
+  if (seconds == null) return '—';
+  const s = typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
+  if (!Number.isFinite(s) || s < 0) {
+    return typeof seconds === 'string' && !/^\d+$/.test(seconds) ? seconds : '—';
   }
-  if (typeof s !== 'number' || isNaN(s)) return '—';
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -373,13 +370,10 @@ export function fmtHashrate(ghs: number): string {
   return `${ghs.toFixed(1)} GH/s`;
 }
 
-/** Format a best-share / best-diff value with K/M/G/T suffix.
- * Accepts either a raw number (BitAxe sends e.g. 1970479522) or a
- * pre-formatted string (NMMiner sends "1.97G" already). */
+/** Format a best-share/best-diff value. Accepts a raw number or pre-formatted string. */
 export function fmtBestDiff(v: number | string | null | undefined): string {
   if (v == null || v === '') return '—';
   if (typeof v === 'string') {
-    // If the string is numeric, format it; otherwise pass through
     const n = Number(v);
     if (!Number.isNaN(n) && /^[\d.]+$/.test(v)) return fmtBestDiff(n);
     return v;
@@ -395,9 +389,7 @@ export function fmtBestDiff(v: number | string | null | undefined): string {
 export function getAxeStatus(d: AxeDevice): 'online' | 'offline' | 'warning' | 'paused' {
   if (!d._online) return 'offline';
   if (d.miningPaused) return 'paused';
-  const temp = d.temp ?? 0;
-  const cfg = d._type === 'nerdaxe' ? 65 : 70;
-  if (temp > cfg) return 'warning';
+  if ((d.temp ?? 0) > (d._type === 'nerdaxe' ? 65 : 70)) return 'warning';
   return 'online';
 }
 
