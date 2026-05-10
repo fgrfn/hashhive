@@ -31,11 +31,13 @@ describe('fmtUptime', () => {
 // ─── fmtHashrate ─────────────────────────────────────────────────────────────
 
 describe('fmtHashrate', () => {
-  it('formats 0 as GH/s', () => expect(fmtHashrate(0)).toBe('0.0 GH/s'));
-  it('formats sub-1000 as GH/s', () => expect(fmtHashrate(999.9)).toBe('999.9 GH/s'));
+  it('formats 0 as dash', () => expect(fmtHashrate(0)).toBe('—'));
+  it('formats KH/s range', () => expect(fmtHashrate(0.0003)).toBe('300 KH/s'));
+  it('formats MH/s range', () => expect(fmtHashrate(0.001)).toBe('1.00 MH/s'));
+  it('formats sub-1000 GH/s', () => expect(fmtHashrate(999.9)).toBe('999.90 GH/s'));
   it('formats exactly 1000 as TH/s', () => expect(fmtHashrate(1000)).toBe('1.00 TH/s'));
   it('formats 1234.5 GH/s as TH/s', () => expect(fmtHashrate(1234.5)).toBe('1.23 TH/s'));
-  it('formats 500 GH/s', () => expect(fmtHashrate(500)).toBe('500.0 GH/s'));
+  it('formats 500 GH/s', () => expect(fmtHashrate(500)).toBe('500.00 GH/s'));
   it('formats large TH/s values', () => expect(fmtHashrate(100000)).toBe('100.00 TH/s'));
 });
 
