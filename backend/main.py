@@ -886,18 +886,6 @@ async def root():
     return JSONResponse({"status": "HashHive API running. Frontend not found."})
 
 
-@app.get("/{full_path:path}", include_in_schema=False)
-async def spa_fallback(full_path: str):
-    """Catch-all that serves the React SPA for all non-API routes."""
-    # Don't intercept API / WebSocket / static asset paths
-    if full_path.startswith(("api/", "ws", "assets/", "shared/", "prototype/")):
-        raise HTTPException(status_code=404)
-    index = _get_index()
-    if index:
-        return FileResponse(str(index))
-    raise HTTPException(status_code=404)
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await _ws_manager.connect(ws)
@@ -2401,3 +2389,16 @@ async def get_earnings(days: int = Query(30, ge=1, le=365)):
         })
 
     return result
+
+
+# ── SPA catch-all (must be registered LAST so it never shadows API routes) ───
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
+    """Serve the React SPA for all non-API client-side routes."""
+    if full_path.startswith(("api/", "ws", "assets/", "shared/", "prototype/")):
+        raise HTTPException(status_code=404)
+    index = _get_index()
+    if index:
+        return FileResponse(str(index))
+    raise HTTPException(status_code=404)
