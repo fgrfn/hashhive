@@ -45,6 +45,11 @@ async function del<T = OkResponse>(path: string): Promise<T> {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
+  auth: {
+    check:  ()                     => get<{ authenticated: boolean; auth_enabled: boolean }>('/api/auth/check'),
+    login:  (password: string)     => post<{ ok: boolean }>('/api/auth/login', { password }),
+    logout: ()                     => post('/api/auth/logout'),
+  },
   dashboard: () => get<DashboardData>('/api/dashboard'),
   settings: {
     get:         ()                                                            => get<AppSettings>('/api/settings'),
@@ -315,6 +320,10 @@ export interface AppSettings {
   schedules?: Schedule[];
   groups?: Group[];
   market?: { currency?: string };
+  auth?: {
+    enabled?: boolean;
+    password?: string; // plaintext on write — backend hashes it; never returned on read
+  };
 }
 
 export interface NMMinerConfig {

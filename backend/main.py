@@ -409,6 +409,11 @@ _price_cache: dict = {"ts": 0.0, "data": {}}
 _sessions: dict[str, float] = {}  # token → expiry unix timestamp
 _SESSION_TTL = 86400 * 30         # 30 days
 
+# Brute-force protection: track failed login timestamps per IP
+_login_attempts: dict[str, list[float]] = {}
+_MAX_ATTEMPTS = 5
+_ATTEMPT_WINDOW = 300  # 5-minute sliding window
+
 
 async def _check_auto_restart(config: dict, axeos_results: list, client: httpx.AsyncClient) -> None:
     """Restart AxeOS devices whose hashrate has been below threshold for too long."""
@@ -773,6 +778,19 @@ async def _weekly_summary_loop() -> None:
         await asyncio.sleep(60)
 
 
+def _bootstrap_auth() -> None:
+    """If HASHHIVE_PASSWORD is set and no password is configured yet, enable auth automatically."""
+    pw = os.environ.get("HASHHIVE_PASSWORD", "").strip()
+    if not pw:
+        return
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    if config.get("auth", {}).get("password_hash"):
+        return  # already configured — env var is ignored after first setup
+    config.setdefault("auth", {})["enabled"] = True
+    config["auth"]["password_hash"] = _hash_pw(pw)
+    save_json(CONFIG_FILE, config)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -783,6 +801,7 @@ async def lifespan(app: FastAPI):
     _migrate_legacy()
     _cleanup_old_logs()
     _cleanup_old_stats()
+    _bootstrap_auth()
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
     _append_entry({
@@ -876,6 +895,10 @@ async def root():
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    if config.get("auth", {}).get("enabled") and not _session_valid(ws):
+        await ws.close(1008)  # Policy Violation — reject before accepting
+        return
     await _ws_manager.connect(ws)
     try:
         # Send current data immediately on connect so the client doesn't wait
@@ -915,7 +938,11 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.get("/api/settings")
 async def get_settings() -> dict:
-    return load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    # Never expose the password hash to the frontend
+    auth = config.get("auth", {})
+    config["auth"] = {k: v for k, v in auth.items() if k != "password_hash"}
+    return config
 
 
 @app.post("/api/settings")
@@ -1840,12 +1867,44 @@ async def get_market_prices():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 def _hash_pw(pw: str) -> str:
-    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+    """Hash a password with PBKDF2-HMAC-SHA256 and a random 16-byte salt."""
+    salt = secrets.token_bytes(16)
+    key = hashlib.pbkdf2_hmac("sha256", pw.encode("utf-8"), salt, 260_000)
+    return f"pbkdf2:{salt.hex()}:{key.hex()}"
 
 
-def _session_valid(request: Request) -> bool:
+def _verify_pw(pw: str, stored: str) -> bool:
+    """Verify password against stored hash. Supports legacy plain-SHA-256 hashes."""
+    if not stored:
+        return False
+    if stored.startswith("pbkdf2:"):
+        try:
+            _, salt_hex, key_hex = stored.split(":", 2)
+            key = hashlib.pbkdf2_hmac("sha256", pw.encode("utf-8"), bytes.fromhex(salt_hex), 260_000)
+            return secrets.compare_digest(key.hex(), key_hex)
+        except Exception:
+            return False
+    # Legacy: plain SHA-256 without salt — verify and let login upgrade it
+    return secrets.compare_digest(hashlib.sha256(pw.encode("utf-8")).hexdigest(), stored)
+
+
+def _session_valid(request) -> bool:  # accepts Request or WebSocket (both have .cookies)
     token = request.cookies.get("hh_session", "")
     return bool(token and token in _sessions and _sessions[token] > time.time())
+
+
+def _rate_limited(ip: str) -> bool:
+    now = time.time()
+    recent = [t for t in _login_attempts.get(ip, []) if t > now - _ATTEMPT_WINDOW]
+    _login_attempts[ip] = recent
+    return len(recent) >= _MAX_ATTEMPTS
+
+
+def _record_attempt(ip: str) -> None:
+    attempts = _login_attempts.setdefault(ip, [])
+    attempts.append(time.time())
+    # Keep only the most recent entries to bound memory
+    _login_attempts[ip] = attempts[-20:]
 
 
 @app.get("/api/auth/check")
@@ -1863,9 +1922,23 @@ async def auth_login(request: Request, data: dict) -> JSONResponse:
     auth_cfg = config.get("auth", {})
     if not auth_cfg.get("enabled"):
         return JSONResponse({"ok": True, "message": "auth disabled"})
-    pw_hash = _hash_pw(data.get("password", ""))
-    if pw_hash != auth_cfg.get("password_hash", ""):
-        raise HTTPException(status_code=401, detail="Invalid password")
+
+    client_ip = request.client.host if request.client else "unknown"
+    if _rate_limited(client_ip):
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please wait.")
+
+    pw = data.get("password", "")
+    stored = auth_cfg.get("password_hash", "")
+    if not _verify_pw(pw, stored):
+        _record_attempt(client_ip)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Transparently upgrade legacy plain-SHA-256 hash to PBKDF2
+    if not stored.startswith("pbkdf2:"):
+        config["auth"]["password_hash"] = _hash_pw(pw)
+        save_json(CONFIG_FILE, config)
+
+    _login_attempts.pop(client_ip, None)  # clear on success
     token = secrets.token_hex(32)
     _sessions[token] = time.time() + _SESSION_TTL
     resp = JSONResponse({"ok": True})
