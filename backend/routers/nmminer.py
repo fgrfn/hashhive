@@ -273,14 +273,10 @@ _NM_ACTION_MAP = {
 }
 
 
-@router.post("/api/nmminer/action/batch")
-async def nmminer_action_batch(data: NmActionBatchRequest):
-    """Batch action across multiple NMMiner devices. Body: {action, ips: [...]}"""
-    valid = set(_NM_ACTION_MAP)
-    if data.action not in valid:
-        raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    path = _NM_ACTION_MAP[data.action]
-
+async def nmminer_fanout(action: str, ips: list[str]) -> list[dict]:
+    """Fire an NMMiner action at many devices concurrently. Reused by the batch
+    endpoint, schedules and group actions."""
+    path = _NM_ACTION_MAP[action]
     results: list[dict] = []
 
     async def _act(ip: str):
@@ -291,11 +287,11 @@ async def nmminer_action_batch(data: NmActionBatchRequest):
                 results.append({"ip": ip, "status": resp.status_code})
                 now = datetime.now(timezone.utc).isoformat()
                 _append_entry({
-                    "id": f"nmminer:{ip}:{data.action}:{now}",
+                    "id": f"nmminer:{ip}:{action}:{now}",
                     "device": f"nmminer:{ip}",
-                    "kind": f"device_{data.action}",
+                    "kind": f"device_{action}",
                     "severity": "info",
-                    "message": f"NMMiner {ip}: {data.action} triggered",
+                    "message": f"NMMiner {ip}: {action} triggered",
                     "timestamp": now,
                     "read": True,
                     "source": "nmminer",
@@ -303,7 +299,17 @@ async def nmminer_action_batch(data: NmActionBatchRequest):
         except Exception as exc:
             results.append({"ip": ip, "status": 0, "error": str(exc)})
 
-    await asyncio.gather(*[_act(ip) for ip in data.ips])
+    await asyncio.gather(*[_act(ip) for ip in ips])
+    return results
+
+
+@router.post("/api/nmminer/action/batch")
+async def nmminer_action_batch(data: NmActionBatchRequest):
+    """Batch action across multiple NMMiner devices. Body: {action, ips: [...]}"""
+    valid = set(_NM_ACTION_MAP)
+    if data.action not in valid:
+        raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
+    results = await nmminer_fanout(data.action, data.ips)
     return {"action": data.action, "results": results}
 
 

@@ -4,6 +4,7 @@ import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, type DeviceTemplate as Template } from '../api';
+import { toast } from '../store/toast';
 import { FileText, Plus, Edit, Trash2, Send, Check, X } from 'lucide-react';
 
 export function Templates() {
@@ -11,14 +12,21 @@ export function Templates() {
   const [fetched, setFetched] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [editTarget, setEditTarget] = useState<Template | null>(null);
   const [pushTarget, setPushTarget] = useState<Template | null>(null);
 
   useEffect(() => {
     api.templates.list().then(setTemplates).catch(() => setTemplates([])).finally(() => setFetched(true));
   }, []);
 
-  const deleteTemplate = (id: string) => {
-    setTemplates(templates.filter(t => t.id !== id));
+  const deleteTemplate = async (id: string) => {
+    try {
+      await api.templates.delete(id);
+      setTemplates(prev => prev.filter(t => t.id !== id));
+      toast('Template deleted');
+    } catch {
+      toast('Failed to delete template', 'error');
+    }
   };
 
   if (!fetched) {
@@ -43,18 +51,19 @@ export function Templates() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
           {templates.map(tmpl => (
-            <TemplateCard key={tmpl.id} t={t} template={tmpl} onPush={() => setPushTarget(tmpl)} onDelete={() => deleteTemplate(tmpl.id)} />
+            <TemplateCard key={tmpl.id} t={t} template={tmpl} onPush={() => setPushTarget(tmpl)} onEdit={() => setEditTarget(tmpl)} onDelete={() => deleteTemplate(tmpl.id)} />
           ))}
         </div>
       )}
 
-      {showAdd && <AddTemplateModal t={t} onClose={() => setShowAdd(false)} onCreate={tmpl => { setTemplates(prev => [...prev, tmpl]); setShowAdd(false); }} />}
+      {showAdd && <TemplateModal t={t} onClose={() => setShowAdd(false)} onSaved={tmpl => { setTemplates(prev => [...prev, tmpl]); setShowAdd(false); }} />}
+      {editTarget && <TemplateModal t={t} existing={editTarget} onClose={() => setEditTarget(null)} onSaved={tmpl => { setTemplates(prev => prev.map(x => x.id === tmpl.id ? tmpl : x)); setEditTarget(null); }} />}
       {pushTarget && <PushModal t={t} template={pushTarget} onClose={() => setPushTarget(null)} />}
     </div>
   );
 }
 
-function TemplateCard({ t, template: tmpl, onPush, onDelete }: { t: Theme; template: Template; onPush: () => void; onDelete: () => void }) {
+function TemplateCard({ t, template: tmpl, onPush, onEdit, onDelete }: { t: Theme; template: Template; onPush: () => void; onEdit: () => void; onDelete: () => void }) {
   const typeColor = tmpl.type === 'nmminer' ? t.accent : tmpl.type === 'axeos' ? t.success : t.honey;
 
   return (
@@ -83,7 +92,7 @@ function TemplateCard({ t, template: tmpl, onPush, onDelete }: { t: Theme; templ
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
-        <button style={{ ...btnStyle(t), fontSize: 11 }}><Edit size={11} /> Edit</button>
+        <button onClick={onEdit} style={{ ...btnStyle(t), fontSize: 11 }}><Edit size={11} /> Edit</button>
         <button onClick={onPush} style={{ ...btnStyle(t, 'primary'), fontSize: 11 }}><Send size={11} /> Push</button>
         <button onClick={onDelete} style={{ ...btnStyle(t, 'danger'), fontSize: 11, marginLeft: 'auto' }}><Trash2 size={11} /></button>
       </div>
@@ -189,31 +198,84 @@ function PushModal({ t, template, onClose }: { t: Theme; template: Template; onC
   );
 }
 
-function AddTemplateModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void; onCreate: (tmpl: Template) => void }) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<Template['type']>('nmminer');
-  const [description, setDescription] = useState('');
+interface ConfigRow { k: string; v: string }
+
+function TemplateModal({ t, existing, onClose, onSaved }: { t: Theme; existing?: Template; onClose: () => void; onSaved: (tmpl: Template) => void }) {
+  const [name, setName] = useState(existing?.name ?? '');
+  const [type, setType] = useState<Template['type']>(existing?.type ?? 'nmminer');
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [rows, setRows] = useState<ConfigRow[]>(
+    existing ? Object.entries(existing.config).map(([k, v]) => ({ k, v: String(v) })) : [],
+  );
+  const [saving, setSaving] = useState(false);
   const valid = name.trim();
 
+  const setRow = (i: number, patch: Partial<ConfigRow>) =>
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+
+  const buildConfig = (): Record<string, unknown> => {
+    const cfg: Record<string, unknown> = {};
+    for (const { k, v } of rows) {
+      const key = k.trim();
+      if (!key) continue;
+      const num = Number(v);
+      cfg[key] = v.trim() !== '' && !Number.isNaN(num) ? num : v;
+    }
+    return cfg;
+  };
+
+  const save = async () => {
+    if (!valid) return;
+    setSaving(true);
+    const payload = { name, type, description, config: buildConfig() };
+    try {
+      const tmpl = existing
+        ? await api.templates.update(existing.id, payload)
+        : await api.templates.create(payload);
+      toast(existing ? 'Template updated' : 'Template created');
+      onSaved(tmpl);
+    } catch {
+      toast('Failed to save template', 'error');
+      setSaving(false);
+    }
+  };
+
   return (
-    <Modal t={t} title="New template" onClose={onClose} width={480}>
+    <Modal t={t} title={existing ? 'Edit template' : 'New template'} onClose={onClose} width={520}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <FormField t={t} label="Name" value={name} onChange={setName} placeholder="e.g. High performance" />
         <FormField t={t} label="Description (optional)" value={description} onChange={setDescription} placeholder="Brief description" />
         <div>
           <Label t={t} style={{ marginBottom: 8 }}>Device type</Label>
           <div style={{ display: 'flex', gap: 6 }}>
-            {([['nmminer', 'NMMiner'], ['axeos', 'AxeOS'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
+            {([['nmminer', 'NMMiner'], ['axeos', 'AxeOS'], ['solominer', 'SoloMiner'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
               <button key={v} onClick={() => setType(v)} style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: `1px solid ${type === v ? t.accent : t.border}`, background: type === v ? t.accentGlow : 'transparent', color: type === v ? t.accent : t.textMuted, cursor: 'pointer' }}>
                 {label}
               </button>
             ))}
           </div>
         </div>
+        <div>
+          <Label t={t} style={{ marginBottom: 8 }}>Config fields</Label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input value={r.k} onChange={e => setRow(i, { k: e.target.value })} placeholder="key (e.g. frequency)"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 12, fontFamily: FONT_MONO }} />
+                <input value={r.v} onChange={e => setRow(i, { v: e.target.value })} placeholder="value"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 12, fontFamily: FONT_MONO }} />
+                <button onClick={() => setRows(prev => prev.filter((_, idx) => idx !== i))} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}><X size={12} /></button>
+              </div>
+            ))}
+            <button onClick={() => setRows(prev => [...prev, { k: '', v: '' }])} style={{ ...btnStyle(t), fontSize: 12, alignSelf: 'flex-start' }}>
+              <Plus size={12} /> Add field
+            </button>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
           <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
-          <button onClick={() => valid && onCreate({ id: Date.now().toString(), name, type, description, config: {} })} disabled={!valid} style={{ ...btnStyle(t, 'primary'), opacity: valid ? 1 : 0.5 }}>
-            <Plus size={13} /> Create
+          <button onClick={save} disabled={!valid || saving} style={{ ...btnStyle(t, 'primary'), opacity: valid && !saving ? 1 : 0.5 }}>
+            <Plus size={13} /> {saving ? 'Saving…' : existing ? 'Save' : 'Create'}
           </button>
         </div>
       </div>

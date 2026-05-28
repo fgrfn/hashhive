@@ -79,8 +79,11 @@ export const api = {
     restart: (ip: string)              => post(`/api/device/${ip}/restart`),
   },
   templates: {
-    list:  ()                                                                       => get<DeviceTemplate[]>('/api/templates'),
-    apply: (ip: string, templateId: string, config: Record<string, unknown>)       => post(`/api/device/${ip}/apply-template`, { template_id: templateId, config }),
+    list:   ()                                                                       => get<DeviceTemplate[]>('/api/templates'),
+    create: (t: Partial<DeviceTemplate>)                                             => post<DeviceTemplate>('/api/templates', t),
+    update: (id: string, t: Partial<DeviceTemplate>)                                 => put<DeviceTemplate>(`/api/templates/${id}`, t),
+    delete: (id: string)                                                             => del(`/api/templates/${id}`),
+    apply:  (ip: string, templateId: string, config: Record<string, unknown>)        => post(`/api/device/${ip}/apply-template`, { template_id: templateId, config }),
   },
   stats: {
     hashrate: (days: number) => get<StatSample[]>(`/api/stats/hashrate?days=${days}`),
@@ -90,6 +93,7 @@ export const api = {
     create: (g: Partial<Group>)              => post<Group>('/api/groups', g),
     update: (id: string, g: Partial<Group>) => put<Group>(`/api/groups/${id}`, g),
     delete: (id: string)                    => del(`/api/groups/${id}`),
+    action: (id: string, body: { action: string; pool_id?: string }) => post<GroupActionResult>(`/api/groups/${id}/action`, body),
   },
   alerts: {
     list:    (days = 7) => get<Alert[]>(`/api/alerts?days=${days}`),
@@ -121,7 +125,14 @@ export const api = {
     test: () => post('/api/notifications/test'),
   },
   discovery: {
-    scan: () => get<DiscoveryScanResult>('/api/discovery/scan'),
+    scan: (opts?: { subnet?: string; extra_ips?: string }) => {
+      const q = new URLSearchParams();
+      if (opts?.subnet) q.set('subnet', opts.subnet);
+      if (opts?.extra_ips) q.set('extra_ips', opts.extra_ips);
+      const qs = q.toString();
+      return get<DiscoveryScanResult>(`/api/discovery/scan${qs ? `?${qs}` : ''}`);
+    },
+    add: (devices: DiscoveredDevice[]) => post<{ added: DiscoveredDevice[]; count: number }>('/api/discovery/add', { devices }),
   },
 };
 
@@ -131,13 +142,20 @@ export interface OkResponse { ok?: boolean; status?: string }
 
 export interface DiscoveredDevice {
   ip: string;
-  type: 'bitaxe' | 'nerdaxe' | 'nmminer_master' | 'nmminer_device';
+  type: 'bitaxe' | 'nerdaxe' | 'nmminer_master' | 'nmminer_device' | 'nerdminer' | 'sparkminer';
   name: string;
   discovered_via: 'arp' | 'mdns' | 'scan';
   asic?: string;
-  hashrate?: number;
+  hashrate?: number | string;
   temp?: number;
+  version?: string;
   device_count?: number;
+}
+
+export interface GroupActionResult {
+  group: string;
+  action: string;
+  results: Array<{ ip?: string; status?: number; type?: string; error?: string }>;
 }
 
 export interface DiscoveryScanResult {
@@ -154,7 +172,7 @@ export interface StatSample { ts: number; total_ghs?: number; ghs?: number }
 export interface DeviceTemplate {
   id: string;
   name: string;
-  type: 'nmminer' | 'axeos' | 'both';
+  type: 'nmminer' | 'axeos' | 'both' | 'solominer';
   description?: string;
   config: Record<string, unknown>;
   created_at?: string;
@@ -253,6 +271,11 @@ export interface Group {
   name: string;
   color: string;
   deviceIps: string[];
+  /** Backend storage field — list of device IPs in the group. */
+  devices?: string[];
+  desc?: string;
+  poolId?: string;
+  wallet?: string;
   description?: string;
   total?: number;
   online?: number;
@@ -352,6 +375,7 @@ export interface AppSettings {
   weekly_summary?: { enabled: boolean; day: string; time: string };
   pool_presets?: PoolPreset[];
   electricity_kwh_price?: number;
+  discovery?: { auto_scan?: boolean; interval_minutes?: number; auto_add?: boolean; notify?: boolean };
   wallets?: Wallet[];
   schedules?: Schedule[];
   groups?: Group[];
@@ -477,4 +501,19 @@ export function getAxeStatus(d: AxeDevice): 'online' | 'offline' | 'warning' | '
 export function getNmStatus(d: NMMinerDevice): 'online' | 'offline' | 'warning' {
   if (d._online === false) return 'offline';
   return d.status ?? 'online';
+}
+
+/** Case-insensitive match of a global search query against a device's name/hostname/ip.
+ *  Empty/whitespace queries match everything. Used by the topbar global search. */
+export function matchesSearch(
+  d: { ip?: string; _ip?: string; name?: string; _name?: string; hostname?: string },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [d.name, d._name, d.hostname, d.ip, d._ip]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
 }

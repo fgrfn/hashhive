@@ -24,6 +24,7 @@ from core import (
     FRONTEND_DIR,
     LOGS_DIR,
     STATS_DIR,
+    TEMPLATES_DIR,
     _append_entry,
     _bootstrap_auth,
     _cleanup_old_logs,
@@ -91,6 +92,7 @@ from routers.axeos import _fetch_axeos_device
 from routers.nmminer import _fetch_nmminer_safe
 from routers.dashboard import _dashboard_broadcast_loop
 from routers.notifications import _weekly_summary_loop
+from routers.discovery import _discovery_background_loop
 
 import routers.auth as _auth_router
 import routers.settings as _settings_router
@@ -107,6 +109,7 @@ import routers.earnings as _earnings_router
 import routers.stats as _stats_router
 import routers.discovery as _discovery_router
 import routers.pools as _pools_router
+import routers.templates as _templates_router
 
 
 @asynccontextmanager
@@ -114,6 +117,7 @@ async def lifespan(app: FastAPI):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     STATS_DIR.mkdir(parents=True, exist_ok=True)
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     load_json(CONFIG_FILE, DEFAULT_CONFIG)
     load_json(DEVICE_STATE_FILE, {})
     _migrate_legacy()
@@ -123,6 +127,7 @@ async def lifespan(app: FastAPI):
     _load_sessions()
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
+    disc_task = asyncio.create_task(_discovery_background_loop())
     _append_entry({
         "id": f"system:startup:{datetime.now(timezone.utc).isoformat()}",
         "device": "system",
@@ -136,7 +141,8 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
     ws_task.cancel()
-    for t in (task, ws_task):
+    disc_task.cancel()
+    for t in (task, ws_task, disc_task):
         try:
             await t
         except asyncio.CancelledError:
@@ -169,6 +175,7 @@ app.include_router(_earnings_router.router)
 app.include_router(_stats_router.router)
 app.include_router(_discovery_router.router)
 app.include_router(_pools_router.router)
+app.include_router(_templates_router.router)
 
 # ── Static assets ──────────────────────────────────────────────────────────────
 

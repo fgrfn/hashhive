@@ -24,6 +24,8 @@ ALERT_HISTORY_FILE = DATA_DIR / "alert_history.json"  # legacy – migrated on f
 DEVICE_STATE_FILE = DATA_DIR / "device_state.json"
 LOGS_DIR = DATA_DIR / "logs"
 STATS_DIR = DATA_DIR / "stats"
+TEMPLATES_DIR = DATA_DIR / "templates"  # one JSON file per device template
+DISCOVERY_STATE_FILE = DATA_DIR / "discovery_state.json"  # known IPs for continuous scan
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 _SESSIONS_FILE = DATA_DIR / "sessions.json"
 
@@ -149,6 +151,12 @@ DEFAULT_CONFIG: dict = {
     "auto_restart_solo": {
         "enabled": False,
         "zero_hr_minutes": 10,
+    },
+    "discovery": {
+        "auto_scan": False,
+        "interval_minutes": 30,
+        "auto_add": False,
+        "notify": True,
     },
     "market": {
         "enabled": True,

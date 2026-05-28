@@ -13,6 +13,8 @@ const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   nerdaxe: 'NerdAxe',
   nmminer_master: 'NMMiner Master',
   nmminer_device: 'NMMiner Device',
+  nerdminer: 'NerdMiner',
+  sparkminer: 'SparkMiner',
 };
 
 const VIA_ICON = {
@@ -23,7 +25,7 @@ const VIA_ICON = {
 
 export function DiscoveryModal({ onClose }: { onClose: () => void }) {
   const { theme: t } = useThemeStore();
-  const { settings, setSettings } = useAppStore();
+  const { setSettings } = useAppStore();
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<{ found: DiscoveredDevice[]; method: string; arp_count: number; mdns_count: number } | null>(null);
   const [selected, setSelected] = useState(new Set<string>());
@@ -51,36 +53,13 @@ export function DiscoveryModal({ onClose }: { onClose: () => void }) {
   const addSelected = async () => {
     if (!result) return;
     setAdding(true);
-
     const devicesToAdd = result.found.filter(d => selected.has(d.ip));
-    const current = settings || {};
-    const patch: Record<string, unknown> = {};
-
-    const nmMasters = devicesToAdd.filter(d => d.type === 'nmminer_master' || d.type === 'nmminer_device');
-    const axeDevices = devicesToAdd.filter(d => d.type === 'bitaxe' || d.type === 'nerdaxe');
-
-    if (nmMasters.length > 0) {
-      // Use the first master, or the device IP if it's a standalone device
-      const master = nmMasters.find(d => d.type === 'nmminer_master') ?? nmMasters[0];
-      patch.nmminer_master = master.ip;
-    }
-
-    if (axeDevices.length > 0) {
-      const rawExisting = (current as Record<string, unknown>).axeos_devices ?? [];
-      const existingAxe = (rawExisting as Array<unknown>).map(d =>
-        typeof d === 'string' ? { ip: d, name: d, type: 'bitaxe' } : d as { ip: string; name: string; type: string }
-      );
-      const existingIps = new Set(existingAxe.map(d => d.ip));
-      const newDevices = axeDevices
-        .filter(d => !existingIps.has(d.ip))
-        .map(d => ({ ip: d.ip, name: d.name || d.ip, type: d.type === 'nerdaxe' ? 'nerdaxe' : 'bitaxe' }));
-      patch.axeos_devices = [...existingAxe, ...newDevices];
-    }
-
     try {
-      const updated = await api.settings.save({ ...current, ...patch } as Parameters<typeof api.settings.save>[0]);
-      setSettings(updated);
-      toast(`Added ${devicesToAdd.length} device${devicesToAdd.length !== 1 ? 's' : ''}`);
+      // Backend sorts each device into the correct list (axeos / nmminer / solo) and dedupes.
+      const res = await api.discovery.add(devicesToAdd);
+      // Refresh settings so the rest of the app sees the new devices.
+      try { setSettings(await api.settings.get()); } catch { /* keep going */ }
+      toast(`Added ${res.count} device${res.count !== 1 ? 's' : ''}`);
       onClose();
     } catch {
       toast('Failed to save devices', 'error');
@@ -142,7 +121,8 @@ export function DiscoveryModal({ onClose }: { onClose: () => void }) {
                       <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2 }}>
                         {d.ip}
                         {d.asic && ` · ${d.asic}`}
-                        {d.hashrate != null && d.hashrate > 0 && ` · ${d.hashrate.toFixed(1)} GH/s`}
+                        {typeof d.hashrate === 'number' && d.hashrate > 0 && ` · ${d.hashrate.toFixed(1)} GH/s`}
+                        {typeof d.hashrate === 'string' && d.hashrate && ` · ${d.hashrate}`}
                         {d.temp != null && d.temp > 0 && ` · ${d.temp}°C`}
                         {d.device_count != null && ` · ${d.device_count} device${d.device_count !== 1 ? 's' : ''}`}
                       </div>

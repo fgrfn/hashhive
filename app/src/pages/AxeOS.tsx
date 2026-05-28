@@ -4,7 +4,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, fmtBestDiff, fmtRssi, fmtShares } from '../api';
+import { api, fmtUptime, fmtBestDiff, fmtRssi, fmtShares, matchesSearch } from '../api';
 import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
 import { toast } from '../store/toast';
@@ -12,7 +12,7 @@ import { useMobile } from '../hooks/useWindowWidth';
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
-  const { axeDevices, wsStatus } = useAppStore();
+  const { axeDevices, wsStatus, globalSearch } = useAppStore();
   const navigate = useNavigate();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [selected, setSelected] = useState(new Set<string>());
@@ -26,6 +26,7 @@ export function AxeOS() {
     const name = d._name || d.hostname || ip;
     if (statusFilter !== 'all' && d.status !== statusFilter) return false;
     if (query && !name.toLowerCase().includes(query.toLowerCase()) && !ip.includes(query)) return false;
+    if (!matchesSearch(d, globalSearch)) return false;
     return true;
   });
 

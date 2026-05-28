@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtUptime, fmtHashrate, fmtBestDiff } from '../api';
+import { fmtUptime, fmtHashrate, fmtBestDiff, matchesSearch } from '../api';
 
 // ─── fmtUptime ───────────────────────────────────────────────────────────────
 
@@ -66,4 +66,18 @@ describe('fmtBestDiff', () => {
   it('passes through pre-formatted string like "1.5G"', () => expect(fmtBestDiff('1.5G')).toBe('1.5G'));
   it('converts pure numeric string to formatted number', () => expect(fmtBestDiff('1000')).toBe('1.0K'));
   it('converts decimal numeric string', () => expect(fmtBestDiff('500.5')).toBe('501'));
+});
+
+// ─── matchesSearch ────────────────────────────────────────────────────────────
+
+describe('matchesSearch', () => {
+  const dev = { ip: '192.168.1.10', name: 'Garage BitAxe', hostname: 'bitaxe-1' };
+  it('matches everything on empty query', () => expect(matchesSearch(dev, '')).toBe(true));
+  it('matches everything on whitespace query', () => expect(matchesSearch(dev, '   ')).toBe(true));
+  it('matches by name (case-insensitive)', () => expect(matchesSearch(dev, 'garage')).toBe(true));
+  it('matches by ip substring', () => expect(matchesSearch(dev, '1.10')).toBe(true));
+  it('matches by hostname', () => expect(matchesSearch(dev, 'bitaxe-1')).toBe(true));
+  it('does not match unrelated query', () => expect(matchesSearch(dev, 'zzz')).toBe(false));
+  it('matches AxeDevice-style _ip/_name fields', () =>
+    expect(matchesSearch({ _ip: '10.0.0.5', _name: 'NerdAxe' }, 'nerd')).toBe(true));
 });

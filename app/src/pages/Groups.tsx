@@ -6,7 +6,7 @@ import { Card, Label, Pill, SkeletonCard, EmptyState, Modal, FormField, btnStyle
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Group } from '../api';
-import { Grid3x3, Plus, ArrowLeft } from 'lucide-react';
+import { Grid3x3, Plus, ArrowLeft, Power, Pause, Play, Globe, X } from 'lucide-react';
 import { toast } from '../store/toast';
 
 const PRESET_COLORS = ['#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
@@ -144,10 +144,41 @@ export function GroupDetail() {
   const navigate = useNavigate();
   const { devices, axeDevices } = useAppStore();
   const [group, setGroup] = useState<Group | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
     api.groups.list().then(gs => setGroup(gs.find(g => g.id === id) || null)).catch(() => {});
   }, [id]);
+
+  const memberIps = (g: Group): string[] => g.devices ?? g.deviceIps ?? [];
+
+  const runAction = async (action: 'pool_switch' | 'restart' | 'pause' | 'resume') => {
+    if (!group) return;
+    if ((action === 'restart' || action === 'pool_switch') &&
+        !window.confirm(`Run "${action.replace('_', ' ')}" on all devices in "${group.name}"?`)) return;
+    setBusy(action);
+    try {
+      const res = await api.groups.action(group.id, { action });
+      const ok = res.results.filter(r => r.status && r.status < 400).length;
+      const failed = res.results.length - ok;
+      toast(`${action.replace('_', ' ')}: ${ok} ok${failed ? `, ${failed} failed` : ''}`, failed ? 'error' : 'success');
+    } catch {
+      toast(`${action.replace('_', ' ')} failed`, 'error');
+    }
+    setBusy(null);
+  };
+
+  const removeDevice = async (ip: string) => {
+    if (!group) return;
+    const next = memberIps(group).filter(x => x !== ip);
+    try {
+      const updated = await api.groups.update(group.id, { devices: next });
+      setGroup({ ...group, ...updated, devices: next, deviceIps: next });
+      toast(`Removed ${ip} from group`);
+    } catch {
+      toast('Failed to remove device', 'error');
+    }
+  };
 
   if (!group) {
     return (
@@ -159,8 +190,10 @@ export function GroupDetail() {
   }
 
   const color = group.color || t.accent;
+  const ips = memberIps(group);
   const allDevices = [...devices.map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: 0, temp: null as number | null })), ...axeDevices.map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'offline', hr: d.hashRate || 0, temp: d.temp ?? null }))];
-  const groupDevices = allDevices.filter(d => (group.deviceIps || []).includes(d.ip));
+  // Show every member IP, even if the live device list hasn't loaded it yet.
+  const groupDevices = ips.map(ip => allDevices.find(d => d.ip === ip) ?? { ip, name: ip, status: 'offline', hr: 0, temp: null as number | null });
 
   return (
     <div>
@@ -178,6 +211,16 @@ export function GroupDetail() {
         </div>
         <button style={{ ...btnStyle(t, 'danger') }} onClick={() => { api.groups.delete(group.id).then(() => navigate('/groups')).catch(() => {}); }}>Delete</button>
       </div>
+      <Card t={t} style={{ marginBottom: 14 }}>
+        <Label t={t} style={{ marginBottom: 10 }}>Group actions</Label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => runAction('pool_switch')} disabled={!!busy || !group.poolId} title={group.poolId ? '' : 'Assign a pool to this group first'} style={{ ...btnStyle(t, 'primary'), opacity: busy || !group.poolId ? 0.6 : 1 }}><Globe size={13} /> Push pool</button>
+          <button onClick={() => runAction('restart')} disabled={!!busy} style={{ ...btnStyle(t), opacity: busy ? 0.6 : 1 }}><Power size={13} /> Restart all</button>
+          <button onClick={() => runAction('pause')} disabled={!!busy} style={{ ...btnStyle(t), opacity: busy ? 0.6 : 1 }}><Pause size={13} /> Pause all</button>
+          <button onClick={() => runAction('resume')} disabled={!!busy} style={{ ...btnStyle(t), opacity: busy ? 0.6 : 1 }}><Play size={13} /> Resume all</button>
+        </div>
+        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 8 }}>Pause/Resume apply to AxeOS devices; Restart applies to AxeOS and NMMiner.</div>
+      </Card>
       <Card t={t} noPad>
         <div style={{ padding: '12px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between' }}>
           <Label t={t}>Devices in this group</Label>
@@ -197,6 +240,7 @@ export function GroupDetail() {
             <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: d.status === 'online' ? t.success : t.danger }}>{d.status}</div>
             <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: d.temp && d.temp > 70 ? t.danger : t.text }}>{d.temp != null ? `${d.temp}°C` : '—'}</div>
             <div style={{ fontFamily: FONT_MONO, fontSize: 12, fontWeight: 600 }}>{d.hr > 0 ? `${d.hr.toFixed(1)} GH/s` : <span style={{ color: t.textMuted }}>—</span>}</div>
+            <button onClick={e => { e.stopPropagation(); removeDevice(d.ip); }} title="Remove from group" style={{ ...btnStyle(t, 'danger'), padding: '5px 8px', justifySelf: 'end' }}><X size={12} /></button>
           </div>
         ))}
       </Card>
