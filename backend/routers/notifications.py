@@ -24,6 +24,77 @@ _WEEKDAY_MAP = {
 }
 
 
+async def dispatch_notification(title: str, message: str, priority: int = 3) -> dict:
+    """Send a simple title+message notification to every enabled channel.
+
+    Reused by the weekly summary, discovery alerts, and any other feature that
+    needs to push a one-off message. Failures per channel are swallowed so one
+    broken integration never blocks the others. Returns {channel: bool} results.
+    """
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    n = config.get("notifications", {})
+    results: dict = {}
+    async with httpx.AsyncClient(timeout=15) as client:
+        if n.get("telegram_enabled") and n.get("telegram_token") and n.get("telegram_chat_id"):
+            try:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{n['telegram_token']}/sendMessage",
+                    json={"chat_id": n["telegram_chat_id"], "text": f"<b>{title}</b>\n{message}", "parse_mode": "HTML"},
+                )
+                results["telegram"] = resp.status_code == 200
+            except Exception:
+                results["telegram"] = False
+
+        if n.get("discord_enabled") and n.get("discord_webhook"):
+            embed = {
+                "title": title,
+                "description": message,
+                "color": 0x7C3AED,
+                "footer": {"text": "HashHive"},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                resp = await client.post(n["discord_webhook"], json={"embeds": [embed]})
+                results["discord"] = resp.status_code in (200, 204)
+            except Exception:
+                results["discord"] = False
+
+        if n.get("gotify_enabled") and n.get("gotify_url") and n.get("gotify_token"):
+            try:
+                resp = await client.post(
+                    f"{n['gotify_url'].rstrip('/')}/message",
+                    headers={"X-Gotify-Key": n["gotify_token"]},
+                    json={"title": title, "message": message, "priority": priority},
+                )
+                results["gotify"] = resp.status_code == 200
+            except Exception:
+                results["gotify"] = False
+
+        if n.get("ntfy_enabled") and n.get("ntfy_url") and n.get("ntfy_topic"):
+            ntfy_url = n["ntfy_url"].rstrip("/")
+            headers = {"Title": title, "Priority": str(priority), "Tags": "honeybee"}
+            if n.get("ntfy_token"):
+                headers["Authorization"] = f"Bearer {n['ntfy_token']}"
+            try:
+                resp = await client.post(f"{ntfy_url}/{n['ntfy_topic']}", content=message, headers=headers)
+                results["ntfy"] = resp.status_code == 200
+            except Exception:
+                results["ntfy"] = False
+
+        if n.get("pushover_enabled") and n.get("pushover_user_key") and n.get("pushover_app_token"):
+            try:
+                resp = await client.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={"token": n["pushover_app_token"], "user": n["pushover_user_key"],
+                          "title": title, "message": message, "priority": priority - 3},
+                )
+                results["pushover"] = resp.status_code == 200
+            except Exception:
+                results["pushover"] = False
+
+    return results
+
+
 async def _send_weekly_summary() -> None:
     """Build and ship the weekly summary via all configured notification channels."""
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)

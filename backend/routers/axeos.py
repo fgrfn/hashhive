@@ -102,18 +102,13 @@ async def patch_axeos_config_one(ip: str, data: dict):
     return {"ip": ip, "status": resp.status_code}
 
 
-@router.post("/api/axeos/action/batch")
-async def axeos_action_batch(data: AxeActionBatchRequest):
-    """Batch action across multiple AxeOS devices. Body: {action, ips: [...]}"""
-    action = data.action
-    ips: list[str] = data.ips
-    valid = {"pause", "resume", "restart", "identify"}
-    if action not in valid:
-        raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    if not ips:
-        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-        ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
-    results = []
+_AXE_ACTIONS = {"pause", "resume", "restart", "identify"}
+
+
+async def axeos_fanout(action: str, ips: list[str]) -> list[dict]:
+    """Fire an AxeOS system action at many devices concurrently. Reused by the
+    batch endpoint, schedules and group actions."""
+    results: list[dict] = []
     limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
     async with httpx.AsyncClient(timeout=15, limits=limits) as client:
         async def _act(ip: str):
@@ -123,6 +118,20 @@ async def axeos_action_batch(data: AxeActionBatchRequest):
             except Exception as exc:
                 results.append({"ip": ip, "error": str(exc)})
         await asyncio.gather(*[_act(ip) for ip in ips])
+    return results
+
+
+@router.post("/api/axeos/action/batch")
+async def axeos_action_batch(data: AxeActionBatchRequest):
+    """Batch action across multiple AxeOS devices. Body: {action, ips: [...]}"""
+    action = data.action
+    ips: list[str] = data.ips
+    if action not in _AXE_ACTIONS:
+        raise HTTPException(status_code=400, detail=f"action must be one of {_AXE_ACTIONS}")
+    if not ips:
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
+    results = await axeos_fanout(action, ips)
     return {"action": action, "results": results}
 
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
-  Activity, Wallet, TrendingUp, Bell, Settings,
+  Activity, Wallet, TrendingUp, Bell, Settings, Radar,
   Sun, Moon, Plus, Search, Menu, X,
   Download, LogOut, type LucideIcon,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
   { id: 'dashboard',     path: '/dashboard',      label: 'Dashboard',        Icon: LayoutDashboard },
   { id: 'nmminer',       path: '/miners/nmminer',  label: 'NMMiner',          Icon: Cpu },
   { id: 'axeos',         path: '/miners/axeos',    label: 'BitAxe / NerdAxe', Icon: Zap },
+  { id: 'discovery',     path: '/discovery',       label: 'Discovery',        Icon: Radar },
   { id: 'groups',        path: '/groups',          label: 'Groups',           Icon: Grid3x3 },
   { id: 'pool',          path: '/pool',            label: 'Pool',             Icon: Globe },
   { id: 'templates',     path: '/templates',       label: 'Templates',        Icon: Copy },
@@ -34,6 +35,7 @@ const TITLE_MAP: Record<string, string> = {
   dashboard: 'Dashboard',
   nmminer: 'NMMiner',
   axeos: 'BitAxe / NerdAxe',
+  discovery: 'Device Discovery',
   groups: 'Groups',
   pool: 'Pool Configuration',
   templates: 'Templates',

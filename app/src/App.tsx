@@ -21,6 +21,7 @@ const Earnings     = lazy(() => import('./pages/Earnings').then(m => ({ default:
 const Wallets      = lazy(() => import('./pages/Wallets').then(m => ({ default: m.Wallets })));
 const Settings     = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const DeviceDetail = lazy(() => import('./pages/DeviceDetail').then(m => ({ default: m.DeviceDetail })));
+const Discovery    = lazy(() => import('./pages/Discovery').then(m => ({ default: m.Discovery })));
 
 type AuthState = 'checking' | 'ok' | 'login';
 
@@ -48,6 +49,7 @@ function AppInner() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/miners/nmminer" element={<NMMiner />} />
             <Route path="/miners/axeos" element={<AxeOS />} />
+            <Route path="/discovery" element={<Discovery />} />
             <Route path="/devices/:ip" element={<DeviceDetail />} />
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/groups/:id" element={<GroupDetail />} />

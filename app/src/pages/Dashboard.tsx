@@ -5,12 +5,14 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, Segmented, SkeletonCard, useDataReady } from '../components/primitives';
 import { AreaChart, MiniChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, type StatSample } from '../api';
+import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, matchesSearch, type StatSample } from '../api';
 import type { Alert } from '../api';
 
 export function Dashboard() {
   const { theme: t } = useThemeStore();
-  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, wsStatus } = useAppStore();
+  const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, wsStatus, globalSearch } = useAppStore();
+  const nmShown = devices.filter(d => matchesSearch(d, globalSearch));
+  const axeShown = axeDevices.filter(d => matchesSearch(d, globalSearch));
   const navigate = useNavigate();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [range, setRange] = useState('24h');
@@ -119,8 +121,8 @@ export function Dashboard() {
 
       {/* Device mini tables */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={devices.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/nmminer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
-        <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={axeDevices.slice(0, 6).map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'online', hr: d.hashRate || 0, temp: d.temp ?? null }))} onViewAll={() => navigate('/miners/axeos')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
+        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={nmShown.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/nmminer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
+        <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={axeShown.slice(0, 6).map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'online', hr: d.hashRate || 0, temp: d.temp ?? null }))} onViewAll={() => navigate('/miners/axeos')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
       </div>
 
       {/* Live log */}

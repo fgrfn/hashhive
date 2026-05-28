@@ -3,7 +3,7 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus } from '../api';
+import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus, matchesSearch } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
 import { Cpu, Edit3, Search, RotateCcw } from 'lucide-react';
 import { toast } from '../store/toast';
@@ -12,7 +12,7 @@ import type { NmAction } from '../api';
 
 export function NMMiner() {
   const { theme: t } = useThemeStore();
-  const { devices, wsStatus } = useAppStore();
+  const { devices, wsStatus, globalSearch } = useAppStore();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [editDevice, setEditDevice] = useState<string | null>(null);
   const [config, setConfig] = useState<NMMinerConfig | null>(null);
@@ -107,6 +107,7 @@ export function NMMiner() {
     const status = getNmStatus(d);
     if (statusFilter !== 'all' && status !== statusFilter) return false;
     if (query && !name.toLowerCase().includes(query.toLowerCase()) && !ip.includes(query)) return false;
+    if (!matchesSearch(d, globalSearch)) return false;
     return true;
   });
 
