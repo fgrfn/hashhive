@@ -221,6 +221,9 @@ export interface Schedule {
   groupId?: string;
   pool_id?: string;
   power?: number;
+  lastRun?: string;
+  nextRun?: string;
+  desc?: string;
 }
 
 export interface EarningsEntry {
