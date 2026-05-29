@@ -43,8 +43,8 @@ def test_append_entry_most_recent_first():
 
 
 def test_append_entry_caps_at_max(monkeypatch):
-    import core
-    monkeypatch.setattr(core, "MAX_ENTRIES_PER_DAY", 3)
+    import core.logs
+    monkeypatch.setattr(core.logs, "MAX_ENTRIES_PER_DAY", 3)
     _clear_today_log()
     for i in range(5):
         _append_entry({"id": f"e{i}", "severity": "info", "message": f"msg{i}", "read": False})
