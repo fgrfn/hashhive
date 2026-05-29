@@ -158,6 +158,16 @@ DEFAULT_CONFIG: dict = {
         "auto_add": False,
         "notify": True,
     },
+    "auto_fan": {
+        "enabled": False,
+        "target_temp": 60,
+        "min_pct": 30,
+        "max_pct": 100,
+        "kp": 4.0,
+        "ki": 0.1,
+        "kd": 1.0,
+        "interval_seconds": 15,
+    },
     "market": {
         "enabled": True,
         "coin_id": "bitcoin",
@@ -192,6 +202,9 @@ class AxeConfigBatchRequest(BaseModel):
     ips: list[str]
     frequency: int | None = None
     coreVoltage: int | None = None
+    fanspeed: int | None = None
+    autofanspeed: int | None = None
+    temptarget: int | None = None
 
 
 class AxeActionBatchRequest(BaseModel):
@@ -362,9 +375,22 @@ def _append_device_samples(devices: list) -> None:
         if not ip:
             continue
         gh = round(float(d.get("hashRate") or d.get("hashrate") or 0), 4)
+        sample = {"ts": now_iso, "gh": gh}
+        temp = d.get("temp")
+        if temp is not None:
+            try:
+                sample["temp"] = round(float(temp), 1)
+            except (TypeError, ValueError):
+                pass
+        pwr = d.get("power")
+        if pwr is not None:
+            try:
+                sample["pwr"] = round(float(pwr), 1)
+            except (TypeError, ValueError):
+                pass
         if ip not in data:
             data[ip] = []
-        data[ip].append({"ts": now_iso, "gh": gh})
+        data[ip].append(sample)
         # Keep last 1440 samples per device
         if len(data[ip]) > 1440:
             data[ip] = data[ip][-1440:]

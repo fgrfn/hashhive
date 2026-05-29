@@ -165,6 +165,27 @@ export function Settings() {
                 </SettingRow>
               ))}
             </Card>
+
+            <SectionHeader t={t} title="Auto-Fan (AxeOS)" desc="Server-side PID fan control to hold a target chip temperature. Overrides on-device auto-fan while enabled." />
+            <Card t={t}>
+              {(() => { const af = localSettings.auto_fan || {}; return (
+                <>
+                  <SettingRow t={t} label="Enable PID auto-fan">
+                    <Toggle t={t} on={!!af.enabled} onChange={v => updToggle({ auto_fan: { ...af, enabled: v } })} />
+                  </SettingRow>
+                  {([
+                    ['target_temp', 'Target temp (°C)', '60'],
+                    ['min_pct', 'Min fan (%)', '30'],
+                    ['max_pct', 'Max fan (%)', '100'],
+                    ['interval_seconds', 'Interval (s)', '15'],
+                  ] as [string, string, string][]).map(([key, label, ph], i, arr) => (
+                    <SettingRow key={key} t={t} label={label} last={i === arr.length - 1}>
+                      <Input t={t} value={String((af as Record<string, number>)[key] ?? '')} onChange={v => upd({ auto_fan: { ...af, [key]: Number(v) } })} mono type="number" style={{ width: 100 }} placeholder={ph} />
+                    </SettingRow>
+                  ))}
+                </>
+              ); })()}
+            </Card>
             <SaveBar t={t} saving={saving} onSave={save} />
           </div>
         )}

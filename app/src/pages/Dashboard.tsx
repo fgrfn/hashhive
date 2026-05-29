@@ -5,7 +5,7 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, Segmented, SkeletonCard, useDataReady } from '../components/primitives';
 import { AreaChart, MiniChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, matchesSearch, type StatSample } from '../api';
+import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, matchesSearch, fmtProb, type StatSample, type ProbabilityResult } from '../api';
 import type { Alert } from '../api';
 
 export function Dashboard() {
@@ -16,6 +16,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [range, setRange] = useState('24h');
+  const [metric, setMetric] = useState<'hashrate' | 'power' | 'efficiency'>('hashrate');
   const [logLines, setLogLines] = useState<Alert[]>([]);
   const [logFilter, setLogFilter] = useState('All');
   const logRef = useRef<HTMLDivElement>(null);
@@ -30,36 +31,46 @@ export function Dashboard() {
 
   const [statSamples, setStatSamples] = useState<StatSample[]>([]);
   const [hrTrend, setHrTrend] = useState<{ pct: number; window: string } | null>(null);
+  const [prob, setProb] = useState<ProbabilityResult | null>(null);
 
   useEffect(() => {
     api.alerts.list(1).then(a => setLogLines(a.slice(-40))).catch(() => {});
+    api.probability().then(setProb).catch(() => setProb(null));
   }, []);
 
   // Fetch real hashrate history; derive chart data and trend from it
   useEffect(() => {
-    const days = range === '30d' ? 30 : range === '7d' ? 7 : 1;
-    api.stats.hashrate(days)
+    const arg = range === '1h' ? { hours: 1 } : range === '6h' ? { hours: 6 }
+      : range === '30d' ? { days: 30 } : range === '7d' ? { days: 7 } : { days: 1 };
+    api.stats.hashrate(arg)
       .then(samples => {
         setStatSamples(samples);
         if (samples.length < 4) { setHrTrend(null); return; }
         const latest = samples[samples.length - 1];
-        const latestHr = latest.total_ghs ?? latest.ghs ?? 0;
+        const latestHr = latest.gh ?? 0;
         if (latestHr <= 0) { setHrTrend(null); return; }
-        const targetTs = (latest.ts ?? Date.now() / 1000) - 3600;
+        const targetTs = Date.parse(latest.ts) - 3600_000;
         let candidate = samples[0];
         for (const s of samples) {
-          if ((s.ts ?? 0) <= targetTs) candidate = s;
+          if (Date.parse(s.ts) <= targetTs) candidate = s;
           else break;
         }
-        const refHr = candidate.total_ghs ?? candidate.ghs ?? 0;
+        const refHr = candidate.gh ?? 0;
         if (refHr <= 0) { setHrTrend(null); return; }
         setHrTrend({ pct: ((latestHr - refHr) / refHr) * 100, window: '1h' });
       })
       .catch(() => { setStatSamples([]); setHrTrend(null); });
   }, [range, devices.length, axeDevices.length]);
 
-  const chartData = statSamples.map(s => s.total_ghs ?? s.ghs ?? 0);
-  const sparkData = statSamples.slice(-30).map(s => s.total_ghs ?? s.ghs ?? 0);
+  // W/TH efficiency = power / (hashrate in TH/s); guard divide-by-zero.
+  const metricValue = (s: StatSample): number => {
+    if (metric === 'power') return s.pwr ?? 0;
+    if (metric === 'efficiency') return s.gh && s.pwr ? s.pwr / (s.gh / 1000) : 0;
+    return s.gh ?? 0;
+  };
+  const chartData = statSamples.map(metricValue);
+  const sparkData = statSamples.slice(-30).map(s => s.gh ?? 0);
+  const metricUnit = metric === 'power' ? 'W' : metric === 'efficiency' ? 'W/TH' : 'GH/s';
 
   const filteredLog = logLines.filter(l => {
     if (logFilter === 'NMMiner') return l.source === 'nmminer';
@@ -96,20 +107,26 @@ export function Dashboard() {
 
       {/* Hero chart */}
       <Card t={t} style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <Label t={t}>Hashrate · {range}</Label>
+            <Label t={t}>{metric === 'power' ? 'Power' : metric === 'efficiency' ? 'Efficiency' : 'Hashrate'} · {range}</Label>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 4 }}>
               {chartData.length > 0
-                ? <>{fmtHashrate(chartData.reduce((a, b) => a + b, 0) / chartData.length)}<span style={{ color: t.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 6 }}>avg</span></>
+                ? <>{metric === 'hashrate'
+                      ? fmtHashrate(chartData.reduce((a, b) => a + b, 0) / chartData.length)
+                      : `${(chartData.reduce((a, b) => a + b, 0) / chartData.length).toFixed(1)} ${metricUnit}`}
+                    <span style={{ color: t.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 6 }}>avg</span></>
                 : <span style={{ color: t.textMuted, fontSize: 14, fontWeight: 400 }}>—</span>
               }
             </div>
           </div>
-          <Segmented t={t} options={['24h', '7d', '30d']} value={range} onChange={setRange} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Segmented t={t} options={['hashrate', 'power', 'efficiency']} value={metric} onChange={v => setMetric(v as typeof metric)} />
+            <Segmented t={t} options={['1h', '6h', '24h', '7d', '30d']} value={range} onChange={setRange} />
+          </div>
         </div>
         {chartData.length > 1
-          ? <AreaChart t={t} data={chartData} accent={t.accent} h={200} unit="GH/s" />
+          ? <AreaChart t={t} data={chartData} accent={t.accent} h={200} unit={metricUnit} />
           : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textMuted, fontSize: 13 }}>No historical data yet — data builds up over time.</div>
         }
         {chartData.length > 1 && (
@@ -118,6 +135,24 @@ export function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Block probability (Poisson) */}
+      {prob && prob.fleet.hashrate_ghs > 0 && (
+        <Card t={t} style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <Label t={t}>Block chance · fleet {fmtHashrate(prob.fleet.hashrate_ghs)}</Label>
+            <span style={{ fontSize: 10, color: t.textDim, fontFamily: FONT_MONO }}>Poisson · stat. estimate</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            {(['1h', '24h', '7d'] as const).map(w => (
+              <div key={w} style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{w}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: t.honey, fontFamily: FONT_MONO, marginTop: 4 }}>{fmtProb(prob.fleet.block[w])}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Device mini tables */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>

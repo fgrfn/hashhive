@@ -86,7 +86,10 @@ export const api = {
     apply:  (ip: string, templateId: string, config: Record<string, unknown>)        => post(`/api/device/${ip}/apply-template`, { template_id: templateId, config }),
   },
   stats: {
-    hashrate: (days: number) => get<StatSample[]>(`/api/stats/hashrate?days=${days}`),
+    hashrate: (opts: { days?: number; hours?: number }) => {
+      const q = opts.hours != null ? `hours=${opts.hours}` : `days=${opts.days ?? 1}`;
+      return get<StatSample[]>(`/api/stats/hashrate?${q}`);
+    },
   },
   groups: {
     list:   ()                               => get<Group[]>('/api/groups'),
@@ -124,6 +127,7 @@ export const api = {
   notifications: {
     test: () => post('/api/notifications/test'),
   },
+  probability: () => get<ProbabilityResult>('/api/probability'),
   discovery: {
     scan: (opts?: { subnet?: string; extra_ips?: string }) => {
       const q = new URLSearchParams();
@@ -167,8 +171,23 @@ export interface DiscoveryScanResult {
   method: string;
   found: DiscoveredDevice[];
 }
+export type ProbWindows = { '1h': number | null; '24h': number | null; '7d': number | null };
+export interface ProbabilityResult {
+  network_difficulty: number | null;
+  windows: string[];
+  fleet: { hashrate_ghs: number; block: ProbWindows };
+  devices: Array<{
+    ip: string;
+    name: string;
+    hashrate_ghs: number;
+    best_diff: number;
+    block: ProbWindows;
+    beat_best_share: ProbWindows;
+  }>;
+}
+
 export interface AxeActionResponse { ip: string; action: string; status: number }
-export interface StatSample { ts: number; total_ghs?: number; ghs?: number }
+export interface StatSample { ts: string; gh: number; pwr?: number; shares?: number }
 export interface DeviceTemplate {
   id: string;
   name: string;
@@ -341,6 +360,7 @@ export interface HealthData {
   hashrate_series?: number[];
   temp_series?: number[];
   power_series?: number[];
+  timestamps?: string[];
 }
 
 export interface AppSettings {
@@ -376,6 +396,7 @@ export interface AppSettings {
   pool_presets?: PoolPreset[];
   electricity_kwh_price?: number;
   discovery?: { auto_scan?: boolean; interval_minutes?: number; auto_add?: boolean; notify?: boolean };
+  auto_fan?: { enabled?: boolean; target_temp?: number; min_pct?: number; max_pct?: number; kp?: number; ki?: number; kd?: number; interval_seconds?: number };
   wallets?: Wallet[];
   schedules?: Schedule[];
   groups?: Group[];
@@ -501,6 +522,13 @@ export function getAxeStatus(d: AxeDevice): 'online' | 'offline' | 'warning' | '
 export function getNmStatus(d: NMMinerDevice): 'online' | 'offline' | 'warning' {
   if (d._online === false) return 'offline';
   return d.status ?? 'online';
+}
+
+/** Format a probability (0..1) as a readable chance: percent, or "1 in N" when tiny. */
+export function fmtProb(p: number | null | undefined): string {
+  if (p == null || !Number.isFinite(p) || p <= 0) return '—';
+  if (p >= 0.0001) return `${(p * 100).toFixed(p >= 0.1 ? 1 : 3)}%`;
+  return `1 in ${Math.round(1 / p).toLocaleString()}`;
 }
 
 /** Case-insensitive match of a global search query against a device's name/hostname/ip.

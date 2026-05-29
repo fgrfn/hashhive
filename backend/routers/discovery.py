@@ -41,22 +41,30 @@ def _local_ip_and_subnet() -> tuple[str, str]:
         return "", ""
 
 
-def _arp_hosts() -> set[str]:
-    """Read /proc/net/arp for reachable LAN hosts."""
-    hosts: set[str] = set()
+def _arp_map() -> dict[str, str]:
+    """Read /proc/net/arp → {ip: mac} for reachable LAN hosts (complete entries only)."""
+    out: dict[str, str] = {}
     try:
         with open("/proc/net/arp") as f:
             for line in f.readlines()[1:]:
                 parts = line.split()
-                if len(parts) >= 3 and parts[2] == "0x2":  # 0x2 = complete/valid
+                # cols: IP, HWtype, Flags, MAC, Mask, Device
+                if len(parts) >= 4 and parts[2] == "0x2":  # 0x2 = complete/valid
+                    mac = parts[3].lower()
                     try:
                         ipaddress.IPv4Address(parts[0])
-                        hosts.add(parts[0])
                     except ValueError:
-                        pass
+                        continue
+                    if mac and mac != "00:00:00:00:00:00":
+                        out[parts[0]] = mac
     except OSError:
         pass
-    return set(hosts)
+    return out
+
+
+def _arp_hosts() -> set[str]:
+    """Reachable LAN host IPs (from the ARP table)."""
+    return set(_arp_map().keys())
 
 
 async def _mdns_hosts(service_types: list[str], timeout: float = 3.0) -> set[str]:
@@ -138,8 +146,12 @@ async def _probe_axeos(ip: str, client: httpx.AsyncClient) -> dict | None:
             return None
         asic = data.get("ASICModel", "")
         dtype = "nerdaxe" if "nerd" in data.get("hostname", "").lower() or "1397" in asic else "bitaxe"
-        return {"ip": ip, "type": dtype, "name": data.get("hostname", ip),
-                "asic": asic, "hashrate": data.get("hashRate", 0), "temp": data.get("temp", 0)}
+        mac = data.get("macAddr") or data.get("macAddress")
+        result = {"ip": ip, "type": dtype, "name": data.get("hostname", ip),
+                  "asic": asic, "hashrate": data.get("hashRate", 0), "temp": data.get("temp", 0)}
+        if mac:
+            result["mac"] = str(mac).lower()
+        return result
     except Exception:
         return None
 
@@ -192,8 +204,9 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
     if not subnet:
         return {"local_ip": "", "found": [], "method": "error", "error": "Could not determine local subnet"}
 
-    # ARP hosts (fast, instant)
-    arp_ips = _arp_hosts()
+    # ARP table (fast, instant) — gives both reachable IPs and their MACs
+    arp = _arp_map()
+    arp_ips = set(arp.keys())
 
     # mDNS (3 second window, in parallel with ARP probe)
     mdns_task = asyncio.create_task(
@@ -230,6 +243,9 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
                     result["discovered_via"] = (
                         "mdns" if ip in mdns_ips else ("arp" if ip in arp_ips else "scan")
                     )
+                    # Pin identity to MAC; prefer the device-reported MAC, else ARP.
+                    if not result.get("mac") and ip in arp:
+                        result["mac"] = arp[ip]
                     found.append(result)
 
     await asyncio.gather(*[_probe(ip) for ip in candidates])
@@ -264,12 +280,19 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
         except Exception:
             continue
         name = d.get("name") or ip
+        mac = d.get("mac")
+
+        def _entry(extra: dict) -> dict:
+            e = {"ip": ip, "name": name, **extra}
+            if mac:
+                e["mac"] = mac
+            return e
 
         if dtype in ("bitaxe", "nerdaxe"):
             lst = config.setdefault("axeos_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
-            lst.append({"ip": ip, "name": name, "type": dtype})
+            lst.append(_entry({"type": dtype}))
             added.append(d)
         elif dtype == "nmminer_master":
             if config.get("nmminer_master") != ip:
@@ -279,21 +302,47 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
             lst = config.setdefault("nmminer_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
-            lst.append({"ip": ip, "name": name})
+            lst.append(_entry({}))
             added.append(d)
         elif dtype == "nerdminer":
             lst = config.setdefault("nerdminer_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
-            lst.append({"ip": ip, "name": name, "type": "nerdminer"})
+            lst.append(_entry({"type": "nerdminer"}))
             added.append(d)
         elif dtype == "sparkminer":
             lst = config.setdefault("sparkminer_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
-            lst.append({"ip": ip, "name": name, "type": "sparkminer"})
+            lst.append(_entry({"type": "sparkminer"}))
             added.append(d)
     return added
+
+
+_DEVICE_LISTS = ("axeos_devices", "nmminer_devices", "nerdminer_devices", "sparkminer_devices")
+
+
+def reconcile_macs(config: dict, mac_to_ip: dict[str, str]) -> list[dict]:
+    """Update stored device IPs when a known MAC now resolves to a different IP.
+
+    Pure (no I/O): mutates ``config`` device lists in place and returns a list of
+    ``{mac, old_ip, new_ip, list}`` change records. Survives DHCP lease changes.
+    """
+    changes: list[dict] = []
+    mac_to_ip = {str(k).lower(): v for k, v in mac_to_ip.items()}
+    for list_name in _DEVICE_LISTS:
+        for dev in config.get(list_name, []):
+            if not isinstance(dev, dict):
+                continue
+            mac = str(dev.get("mac", "")).lower()
+            if not mac or mac not in mac_to_ip:
+                continue
+            new_ip = mac_to_ip[mac]
+            old_ip = dev.get("ip")
+            if new_ip and new_ip != old_ip:
+                dev["ip"] = new_ip
+                changes.append({"mac": mac, "old_ip": old_ip, "new_ip": new_ip, "list": list_name})
+    return changes
 
 
 def _new_devices(found: list[dict], known_ips: dict) -> list[dict]:
@@ -379,16 +428,34 @@ async def _discovery_background_loop() -> None:
                 result = await _run_scan()
                 found = result.get("found", [])
                 new = _new_devices(found, known_ips)
+
+                # Reconcile known devices' IPs against current MACs (DHCP-proof),
+                # and optionally auto-add new devices — both on one fresh config.
+                cfg = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+                mac_to_ip = {d["mac"]: d["ip"] for d in found if d.get("mac") and d.get("ip")}
+                ip_changes = reconcile_macs(cfg, mac_to_ip)
+                added = _add_devices_to_config(cfg, new) if (new and disc.get("auto_add")) else []
+                if ip_changes or added:
+                    save_json(CONFIG_FILE, cfg)
+                for ch in ip_changes:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    _append_entry({
+                        "id": f"discovery:ipchange:{ch['mac']}:{now_iso}",
+                        "device": f"discovery:{ch['new_ip']}",
+                        "kind": "device_ip_changed",
+                        "severity": "info",
+                        "message": f"Device {ch['mac']} IP changed {ch['old_ip']} → {ch['new_ip']}",
+                        "timestamp": now_iso,
+                        "read": False,
+                        "source": "discovery",
+                    })
+
                 if new:
                     await _notify_new_devices(new, bool(disc.get("notify", True)))
-                    if disc.get("auto_add"):
-                        cfg = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-                        added = _add_devices_to_config(cfg, new)
-                        if added:
-                            save_json(CONFIG_FILE, cfg)
+                if new or ip_changes:
                     try:
                         await _ws_manager.broadcast(
-                            json.dumps({"type": "discovery", "new_devices": new})
+                            json.dumps({"type": "discovery", "new_devices": new, "ip_changes": ip_changes})
                         )
                     except Exception:
                         pass
