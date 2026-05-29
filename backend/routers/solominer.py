@@ -13,46 +13,11 @@ from core import (
     _validate_device_ip,
     load_json,
 )
+# SoloMiner device logic lives in the miners/ driver package. Re-exported here
+# so existing importers (dashboard, notifications) keep working.
+from miners.solo import fetch_solo_miner as _fetch_solo_miner  # noqa: F401
 
 router = APIRouter()
-
-
-async def _fetch_solo_miner(client: httpx.AsyncClient, device: dict) -> dict:
-    """Fetch stats from a NerdMiner v2 or SparkMiner device via GET /stats."""
-    ip = device.get("ip", "")
-    name = device.get("name", ip)
-    device_type = device.get("type", "nerdminer")
-    temp_max = device.get("temp_max")
-    try:
-        resp = await client.get(f"http://{ip}/stats")
-        resp.raise_for_status()
-        data = resp.json()
-        data.update({
-            "_ip": ip,
-            "_name": name,
-            "_type": device_type,
-            "_online": True,
-            "_temp_max": temp_max,
-            # Normalize key fields for unified rendering
-            "ip": ip,
-            "hostname": data.get("hostname") or data.get("minerName") or name,
-            "hashRate": data.get("hashRate") or data.get("hashes") or "0KH/s",
-            "temp": data.get("temp") or data.get("temperature") or 0,
-            "walletAddress": data.get("walletAddress") or data.get("wallet") or "",
-            "poolUrl": data.get("poolUrl") or data.get("pool") or "",
-            "poolPort": data.get("poolPort") or data.get("port") or 0,
-            "bestDiff": str(data.get("bestDiff") or data.get("best_diff") or ""),
-            "uptime": data.get("runningTime") or data.get("uptime") or data.get("uptimeSeconds") or 0,
-            "version": data.get("version") or "",
-            "online": True,
-        })
-        return data
-    except Exception:
-        return {
-            "_ip": ip, "_name": name, "_type": device_type,
-            "_online": False, "_temp_max": temp_max,
-            "ip": ip, "hostname": name, "online": False,
-        }
 
 
 @router.get("/api/nerdminer/devices")

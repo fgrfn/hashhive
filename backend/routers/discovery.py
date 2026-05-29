@@ -24,6 +24,7 @@ from core import (
     load_json,
     save_json,
 )
+from miners import probe_all
 
 router = APIRouter()
 
@@ -107,74 +108,6 @@ async def _mdns_hosts(service_types: list[str], timeout: float = 3.0) -> set[str
     return found
 
 
-async def _probe_nmminer(ip: str, client: httpx.AsyncClient) -> dict | None:
-    NM_FIELDS = {"PrimaryPool", "WiFiSSID", "Hostname", "PrimaryAddress"}
-    for path in ("/swarm", "/config"):
-        try:
-            resp = await client.get(f"http://{ip}{path}", timeout=2.0)
-            if resp.status_code != 200:
-                continue
-            data = resp.json()
-            if path == "/swarm":
-                devs = data if isinstance(data, list) else \
-                    data.get("devices", data.get("miners", data.get("workers")))
-                if isinstance(devs, list):
-                    return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
-                            "device_count": len(devs)}
-            elif path == "/config":
-                if isinstance(data, dict):
-                    configs = data.get("configs")
-                    if isinstance(configs, list):
-                        return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
-                                "device_count": len(configs)}
-                    if NM_FIELDS & set(data.keys()):
-                        return {"ip": ip, "type": "lottominer_device",
-                                "name": data.get("Hostname", ip), "device_count": 1}
-        except Exception:
-            pass
-    return None
-
-
-async def _probe_axeos(ip: str, client: httpx.AsyncClient) -> dict | None:
-    AX_FIELDS = {"hashRate", "ASICModel", "stratumURL", "uptimeSeconds"}
-    try:
-        resp = await client.get(f"http://{ip}/api/system/info", timeout=2.0)
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        if not (AX_FIELDS & set(data.keys())):
-            return None
-        asic = data.get("ASICModel", "")
-        dtype = "nerdaxe" if "nerd" in data.get("hostname", "").lower() or "1397" in asic else "bitaxe"
-        mac = data.get("macAddr") or data.get("macAddress")
-        result = {"ip": ip, "type": dtype, "name": data.get("hostname", ip),
-                  "asic": asic, "hashrate": data.get("hashRate", 0), "temp": data.get("temp", 0)}
-        if mac:
-            result["mac"] = str(mac).lower()
-        return result
-    except Exception:
-        return None
-
-
-async def _probe_solo(ip: str, client: httpx.AsyncClient) -> dict | None:
-    """Probe for a NerdMiner v2 / SparkMiner device via GET /stats."""
-    SOLO_FIELDS = {"hashRate", "walletAddress", "poolUrl", "minerName", "runningTime"}
-    try:
-        resp = await client.get(f"http://{ip}/stats", timeout=2.0)
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        if not (SOLO_FIELDS & set(data.keys())):
-            return None
-        dtype = "sparkminer" if "spark" in str(data.get("minerName", "")).lower() else "nerdminer"
-        return {"ip": ip, "type": dtype,
-                "name": data.get("hostname") or data.get("minerName") or ip,
-                "hashrate": data.get("hashRate", "0KH/s"),
-                "temp": data.get("temp", 0), "version": data.get("version", "")}
-    except Exception:
-        return None
-
-
 def _parse_extra_ips(extra_ips: str | None) -> set[str]:
     """Parse a comma-separated list of manually-entered IPs (validated, private only)."""
     out: set[str] = set()
@@ -236,9 +169,7 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
     async def _probe(ip: str):
         async with sem:
             async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
-                result = (await _probe_axeos(ip, client)
-                          or await _probe_nmminer(ip, client)
-                          or await _probe_solo(ip, client))
+                result = await probe_all(ip, client)
                 if result:
                     result["discovered_via"] = (
                         "mdns" if ip in mdns_ips else ("arp" if ip in arp_ips else "scan")
