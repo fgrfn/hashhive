@@ -22,6 +22,7 @@ const Wallets      = lazy(() => import('./pages/Wallets').then(m => ({ default: 
 const Settings     = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const DeviceDetail = lazy(() => import('./pages/DeviceDetail').then(m => ({ default: m.DeviceDetail })));
 const Discovery    = lazy(() => import('./pages/Discovery').then(m => ({ default: m.Discovery })));
+const Analytics    = lazy(() => import('./pages/Analytics').then(m => ({ default: m.Analytics })));
 
 type AuthState = 'checking' | 'ok' | 'login';
 
@@ -59,6 +60,7 @@ function AppInner() {
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/earnings" element={<Earnings />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/wallets" element={<Wallets />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
             <Route path="/settings/:section" element={<Settings />} />

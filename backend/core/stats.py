@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .jsonio import load_json, save_json
 from .logs import _today
-from .paths import KEEP_DAYS, STATS_DIR
+from .paths import KEEP_DAYS, RECORDS_FILE, STATS_DIR
 
 _STATS_SAMPLE_INTERVAL = 60  # seconds between hashrate samples
 _last_stats_sample_ts: float = 0.0
@@ -139,3 +139,42 @@ def _cleanup_old_stats() -> None:
 def _cleanup_old_stats_dir() -> None:
     """Alias kept for backward compatibility."""
     _cleanup_old_stats()
+
+
+def _load_records() -> dict:
+    """All-time best-share records: {ip: {name, type, best_diff, ts}}."""
+    return load_json(RECORDS_FILE, {})
+
+
+def _update_records(all_devices: list) -> None:
+    """Persist a new all-time best share whenever a device beats its record.
+
+    all_devices: list of dicts with _ip/_name/_type and bestDiff/best_diff/bestShare.
+    """
+    records = _load_records()
+    changed = False
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for d in all_devices:
+        ip = d.get("_ip") or d.get("ip", "")
+        if not ip:
+            continue
+        raw = d.get("bestDiff") or d.get("best_diff") or d.get("bestShare") or d.get("best_share")
+        if raw is None:
+            continue
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if val <= 0:
+            continue
+        name = d.get("_name") or d.get("hostname") or d.get("name") or ip
+        dtype = d.get("_type") or d.get("type") or ""
+        prev = records.get(ip)
+        if prev is None or val > float(prev.get("best_diff", 0)):
+            records[ip] = {"name": name, "type": dtype, "best_diff": val, "ts": now_iso}
+            changed = True
+        elif name and prev.get("name") != name:
+            prev["name"] = name  # keep display name fresh
+            changed = True
+    if changed:
+        save_json(RECORDS_FILE, records)

@@ -15,6 +15,7 @@ from .paths import (
     STATS_DIR,
     TEMPLATES_DIR,
     DISCOVERY_STATE_FILE,
+    RECORDS_FILE,
     FRONTEND_DIR,
     _SESSIONS_FILE,
     MAX_ENTRIES_PER_DAY,
@@ -50,6 +51,8 @@ from .stats import (
     _append_hashrate_sample,
     _cleanup_old_stats,
     _cleanup_old_stats_dir,
+    _load_records,
+    _update_records,
 )
 from .auth import (
     _sessions,
@@ -72,7 +75,7 @@ from .autorestart import _check_auto_restart, _check_auto_restart_solo
 
 __all__ = [
     "BASE_DIR", "DATA_DIR", "CONFIG_FILE", "ALERT_HISTORY_FILE", "DEVICE_STATE_FILE",
-    "LOGS_DIR", "STATS_DIR", "TEMPLATES_DIR", "DISCOVERY_STATE_FILE", "FRONTEND_DIR",
+    "LOGS_DIR", "STATS_DIR", "TEMPLATES_DIR", "DISCOVERY_STATE_FILE", "RECORDS_FILE", "FRONTEND_DIR",
     "_SESSIONS_FILE", "MAX_ENTRIES_PER_DAY", "KEEP_DAYS",
     "_resolve_version", "APP_VERSION",
     "_startup_time", "_price_cache", "_low_hr_since", "_solo_zero_hr_since",
@@ -84,7 +87,7 @@ __all__ = [
     "_cleanup_old_logs", "_load_recent",
     "_stats_file", "_dev_stats_file", "_bestdiff_file", "_append_bestdiff_samples",
     "_append_device_samples", "_append_hashrate_sample", "_cleanup_old_stats",
-    "_cleanup_old_stats_dir",
+    "_cleanup_old_stats_dir", "_load_records", "_update_records",
     "_sessions", "_SESSION_TTL", "_login_attempts", "_MAX_ATTEMPTS", "_ATTEMPT_WINDOW",
     "_hash_pw", "_verify_pw", "_session_valid", "_rate_limited", "_record_attempt",
     "_load_sessions", "_persist_sessions", "_bootstrap_auth",

@@ -13,6 +13,7 @@ from core import (
     _append_bestdiff_samples,
     _append_device_samples,
     _append_hashrate_sample,
+    _update_records,
     _check_auto_restart,
     _check_auto_restart_solo,
     _price_cache,
@@ -120,6 +121,7 @@ async def _dashboard_broadcast_loop():
                         + axeos_results
                     )
                     _append_bestdiff_samples(all_bd)
+                    _update_records(all_bd)
                 except Exception:
                     pass
                 # ── Auto-restart check ─────────────────────────────────────

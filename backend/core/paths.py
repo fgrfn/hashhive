@@ -12,6 +12,7 @@ LOGS_DIR = DATA_DIR / "logs"
 STATS_DIR = DATA_DIR / "stats"
 TEMPLATES_DIR = DATA_DIR / "templates"  # one JSON file per device template
 DISCOVERY_STATE_FILE = DATA_DIR / "discovery_state.json"  # known IPs for continuous scan
+RECORDS_FILE = DATA_DIR / "records.json"  # all-time best-share records per device
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 _SESSIONS_FILE = DATA_DIR / "sessions.json"
 
