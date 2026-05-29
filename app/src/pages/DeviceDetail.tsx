@@ -5,8 +5,8 @@ import { useAppStore } from '../store/app';
 import { Card, Label, Pill, StatusPill, Spinner, btnStyle } from '../components/primitives';
 import { AreaChart } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api, getHashrate, fmtUptime, fmtHashrate, fmtBestDiff } from '../api';
-import type { NMMinerDevice, AxeDevice, HealthData } from '../api';
+import { api, getHashrate, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb } from '../api';
+import type { NMMinerDevice, AxeDevice, HealthData, ProbabilityResult } from '../api';
 import { ArrowLeft, Cpu, Activity, FileText, Terminal, Zap, Settings, RefreshCw, Play, Pause, AlertTriangle } from 'lucide-react';
 
 const TABS = [
@@ -26,13 +26,16 @@ export function DeviceDetail() {
   const [tab, setTab] = useState('overview');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [prob, setProb] = useState<ProbabilityResult | null>(null);
 
   const nmDevice = devices.find(d => d.ip === ip);
   const axeDevice = axeDevices.find(d => d._ip === ip);
   const isAxe = !!axeDevice && !nmDevice;
+  const devProb = prob?.devices.find(d => d.ip === ip) ?? null;
 
   useEffect(() => {
     if (ip) api.health(ip).then(setHealth).catch(() => {});
+    api.probability().then(setProb).catch(() => setProb(null));
   }, [ip]);
 
   if (!nmDevice && !axeDevice) {
@@ -49,7 +52,7 @@ export function DeviceDetail() {
   const hr = nmDevice ? getHashrate(nmDevice) : (axeDevice!.hashRate || 0);
   const temp = nmDevice ? (nmDevice.chipTemp ?? nmDevice.temp ?? null) : (axeDevice!.temp ?? null);
   const uptime = nmDevice ? (nmDevice.uptime ?? null) : (axeDevice!.uptimeSeconds != null ? axeDevice!.uptimeSeconds : null);
-  const deviceType = isAxe ? (axeDevice!._type || 'bitaxe') : 'nmminer';
+  const deviceType = isAxe ? (axeDevice!._type || 'bitaxe') : 'lottominer';
 
   return (
     <div>
@@ -111,7 +114,7 @@ export function DeviceDetail() {
         ))}
       </div>
 
-      {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} />}
+      {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} prob={devProb} />}
       {tab === 'charts' && <ChartsTab t={t} ip={ip!} health={health} />}
       {tab === 'logs' && <LogsTab t={t} ip={ip!} />}
       {tab === 'console' && <ConsoleTab t={t} ip={ip!} />}
@@ -134,7 +137,7 @@ function StatGrid({ t, stats }: { t: Theme; stats: [string, string, string?][] }
   );
 }
 
-function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
+function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, prob }: {
   t: Theme;
   nmDevice?: NMMinerDevice;
   axeDevice?: AxeDevice;
@@ -142,6 +145,7 @@ function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
   temp: number | null;
   uptime: number | string | null;
   health: HealthData | null;
+  prob: ProbabilityResult['devices'][number] | null;
 }) {
   const tempColor = temp != null ? (temp > 80 ? t.danger : temp > 70 ? t.warning : t.success) : t.text;
 
@@ -177,6 +181,22 @@ function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health }: {
   return (
     <div>
       <StatGrid t={t} stats={stats} />
+
+      {prob && prob.hashrate_ghs > 0 && (
+        <Card t={t} style={{ marginTop: 14 }}>
+          <Label t={t} style={{ marginBottom: 10 }}>Solo odds · Poisson estimate (24h)</Label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Beat best share</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: t.accent, fontFamily: FONT_MONO, marginTop: 4 }}>{fmtProb(prob.beat_best_share['24h'])}</div>
+            </div>
+            <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Find a block</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: t.honey, fontFamily: FONT_MONO, marginTop: 4 }}>{fmtProb(prob.block['24h'])}</div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {health && health.hashrate_series && health.hashrate_series.length > 0 && (
         <Card t={t} style={{ marginTop: 14 }}>
@@ -242,7 +262,13 @@ function ChartsTab({ t, health }: { t: Theme; ip?: string; health: HealthData | 
           <AreaChart t={t} data={health.temp_series} accent={t.danger} h={160} unit="°C" />
         </Card>
       )}
-      {(!health.hashrate_series || health.hashrate_series.length === 0) && (!health.temp_series || health.temp_series.length === 0) && (
+      {health.power_series && health.power_series.length > 0 && (
+        <Card t={t}>
+          <Label t={t} style={{ marginBottom: 10 }}>Power (W)</Label>
+          <AreaChart t={t} data={health.power_series} accent={t.honey} h={160} unit="W" />
+        </Card>
+      )}
+      {(!health.hashrate_series || health.hashrate_series.length === 0) && (!health.temp_series || health.temp_series.length === 0) && (!health.power_series || health.power_series.length === 0) && (
         <div style={{ color: t.textMuted, fontSize: 13, padding: '24px 0' }}>No historical data available yet.</div>
       )}
     </div>

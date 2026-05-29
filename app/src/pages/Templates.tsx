@@ -64,7 +64,7 @@ export function Templates() {
 }
 
 function TemplateCard({ t, template: tmpl, onPush, onEdit, onDelete }: { t: Theme; template: Template; onPush: () => void; onEdit: () => void; onDelete: () => void }) {
-  const typeColor = tmpl.type === 'nmminer' ? t.accent : tmpl.type === 'axeos' ? t.success : t.honey;
+  const typeColor = tmpl.type === 'lottominer' ? t.accent : tmpl.type === 'axeos' ? t.success : t.honey;
 
   return (
     <Card t={t}>
@@ -76,7 +76,7 @@ function TemplateCard({ t, template: tmpl, onPush, onEdit, onDelete }: { t: Them
           <div style={{ fontWeight: 700, fontSize: 15 }}>{tmpl.name}</div>
           {tmpl.description && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{tmpl.description}</div>}
         </div>
-        <Pill t={t} sev={tmpl.type === 'nmminer' ? 'info' : tmpl.type === 'axeos' ? 'success' : 'warning'}>{tmpl.type}</Pill>
+        <Pill t={t} sev={tmpl.type === 'lottominer' ? 'info' : tmpl.type === 'axeos' ? 'success' : 'warning'}>{tmpl.type}</Pill>
       </div>
 
       <div style={{ padding: '10px 12px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 12, fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted }}>
@@ -107,8 +107,8 @@ function PushModal({ t, template, onClose }: { t: Theme; template: Template; onC
   const [progress, setProgress] = useState<Record<string, 'pending' | 'ok' | 'error'>>({});
 
   const allDevices = [
-    ...(template.type !== 'axeos' ? devices.map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', type: 'nmminer' as const })) : []),
-    ...(template.type !== 'nmminer' ? axeDevices.map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', type: 'axeos' as const })) : []),
+    ...(template.type !== 'axeos' ? devices.map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', type: 'lottominer' as const })) : []),
+    ...(template.type !== 'lottominer' ? axeDevices.map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', type: 'axeos' as const })) : []),
   ];
 
   const toggleAll = () => {
@@ -173,7 +173,7 @@ function PushModal({ t, template, onClose }: { t: Theme; template: Template; onC
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{d.name}</div>
                   <div style={{ fontSize: 10, fontFamily: FONT_MONO, color: t.textMuted }}>{d.ip}</div>
                 </div>
-                <Pill t={t} sev={d.type === 'nmminer' ? 'info' : 'success'}>{d.type}</Pill>
+                <Pill t={t} sev={d.type === 'lottominer' ? 'info' : 'success'}>{d.type}</Pill>
               </div>
             );
           })}
@@ -202,7 +202,7 @@ interface ConfigRow { k: string; v: string }
 
 function TemplateModal({ t, existing, onClose, onSaved }: { t: Theme; existing?: Template; onClose: () => void; onSaved: (tmpl: Template) => void }) {
   const [name, setName] = useState(existing?.name ?? '');
-  const [type, setType] = useState<Template['type']>(existing?.type ?? 'nmminer');
+  const [type, setType] = useState<Template['type']>(existing?.type ?? 'lottominer');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [rows, setRows] = useState<ConfigRow[]>(
     existing ? Object.entries(existing.config).map(([k, v]) => ({ k, v: String(v) })) : [],
@@ -248,7 +248,7 @@ function TemplateModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
         <div>
           <Label t={t} style={{ marginBottom: 8 }}>Device type</Label>
           <div style={{ display: 'flex', gap: 6 }}>
-            {([['nmminer', 'NMMiner'], ['axeos', 'AxeOS'], ['solominer', 'SoloMiner'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
+            {([['lottominer', 'Lottominer'], ['axeos', 'AxeOS'], ['solominer', 'SoloMiner'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
               <button key={v} onClick={() => setType(v)} style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: `1px solid ${type === v ? t.accent : t.border}`, background: type === v ? t.accentGlow : 'transparent', color: type === v ? t.accent : t.textMuted, cursor: 'pointer' }}>
                 {label}
               </button>

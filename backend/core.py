@@ -82,8 +82,8 @@ _last_bestdiff_sample_ts: float = 0.0
 # ── Default config ─────────────────────────────────────────────────────────────
 
 DEFAULT_CONFIG: dict = {
-    "nmminer_master": "",
-    "nmminer_devices": [],
+    "lottominer_master": "",
+    "lottominer_devices": [],
     "nerdminer_devices": [],
     "sparkminer_devices": [],
     "axeos_devices": [],
@@ -158,6 +158,16 @@ DEFAULT_CONFIG: dict = {
         "auto_add": False,
         "notify": True,
     },
+    "auto_fan": {
+        "enabled": False,
+        "target_temp": 60,
+        "min_pct": 30,
+        "max_pct": 100,
+        "kp": 4.0,
+        "ki": 0.1,
+        "kd": 1.0,
+        "interval_seconds": 15,
+    },
     "market": {
         "enabled": True,
         "coin_id": "bitcoin",
@@ -192,6 +202,9 @@ class AxeConfigBatchRequest(BaseModel):
     ips: list[str]
     frequency: int | None = None
     coreVoltage: int | None = None
+    fanspeed: int | None = None
+    autofanspeed: int | None = None
+    temptarget: int | None = None
 
 
 class AxeActionBatchRequest(BaseModel):
@@ -362,9 +375,22 @@ def _append_device_samples(devices: list) -> None:
         if not ip:
             continue
         gh = round(float(d.get("hashRate") or d.get("hashrate") or 0), 4)
+        sample = {"ts": now_iso, "gh": gh}
+        temp = d.get("temp")
+        if temp is not None:
+            try:
+                sample["temp"] = round(float(temp), 1)
+            except (TypeError, ValueError):
+                pass
+        pwr = d.get("power")
+        if pwr is not None:
+            try:
+                sample["pwr"] = round(float(pwr), 1)
+            except (TypeError, ValueError):
+                pass
         if ip not in data:
             data[ip] = []
-        data[ip].append({"ts": now_iso, "gh": gh})
+        data[ip].append(sample)
         # Keep last 1440 samples per device
         if len(data[ip]) > 1440:
             data[ip] = data[ip][-1440:]
@@ -414,6 +440,36 @@ def _cleanup_old_stats_dir() -> None:
 
 
 # ── Legacy migration ───────────────────────────────────────────────────────────
+
+def _migrate_config() -> None:
+    """Rename legacy NMMiner config keys to the generalized 'lottominer' keys.
+
+    NMMiner support was generalized into a 'Lottominer' category; older configs
+    used nmminer_master / nmminer_devices. Migrate them in place once on start so
+    existing deployments keep their devices.
+    """
+    if not CONFIG_FILE.exists():
+        return
+    try:
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        changed = False
+        if "nmminer_master" in config and "lottominer_master" not in config:
+            config["lottominer_master"] = config.pop("nmminer_master")
+            changed = True
+        elif "nmminer_master" in config:
+            config.pop("nmminer_master")
+            changed = True
+        if "nmminer_devices" in config and "lottominer_devices" not in config:
+            config["lottominer_devices"] = config.pop("nmminer_devices")
+            changed = True
+        elif "nmminer_devices" in config:
+            config.pop("nmminer_devices")
+            changed = True
+        if changed:
+            save_json(CONFIG_FILE, config)
+    except Exception:
+        pass
+
 
 def _migrate_legacy() -> None:
     """Move old alert_history.json into daily log files on first start."""
@@ -643,6 +699,6 @@ async def _check_auto_restart_solo(
                     "message": f"Auto-restarted {name} ({ip}): hashrate=0 for >{ar.get('zero_hr_minutes',10)} min",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "read": False,
-                    "source": "nmminer",
+                    "source": "lottominer",
                 })
                 _solo_zero_hr_since.pop(ip, None)

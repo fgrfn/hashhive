@@ -27,7 +27,7 @@ def _seed():
     config = {
         **DEFAULT_CONFIG,
         "axeos_devices": [{"ip": "192.168.1.10", "name": "a", "type": "bitaxe"}],
-        "nmminer_devices": [{"ip": "192.168.1.20", "name": "n"}],
+        "lottominer_devices": [{"ip": "192.168.1.20", "name": "n"}],
         "groups": [{"id": "g1", "name": "Rack", "devices": ["192.168.1.10", "192.168.1.20"], "poolId": "p1"}],
         "pool_presets": [{"id": "p1", "url": "stratum+tcp://pool:3333", "wallet": "bc1xyz"}],
     }
@@ -37,8 +37,8 @@ def _seed():
 def test_split_by_type():
     config = {
         "axeos_devices": [{"ip": "192.168.1.10"}],
-        "nmminer_devices": [{"ip": "192.168.1.20"}],
-        "nmminer_master": "192.168.1.1",
+        "lottominer_devices": [{"ip": "192.168.1.20"}],
+        "lottominer_master": "192.168.1.1",
     }
     axe, nm = groups._split_by_type(["192.168.1.10", "192.168.1.20", "192.168.1.1"], config)
     assert axe == ["192.168.1.10"]
@@ -48,7 +48,7 @@ def test_split_by_type():
 def test_group_restart_dispatches_per_type():
     _seed()
     with patch.object(groups, "axeos_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.10", "status": 200}])) as axe, \
-         patch.object(groups, "nmminer_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.20", "status": 200}])) as nm:
+         patch.object(groups, "lottominer_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.20", "status": 200}])) as nm:
         res = asyncio.run(groups.group_action("g1", _FakeReq({"action": "restart"})))
     axe.assert_awaited_once_with("restart", ["192.168.1.10"])
     nm.assert_awaited_once_with("restart", ["192.168.1.20"])

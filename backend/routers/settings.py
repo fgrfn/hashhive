@@ -93,7 +93,7 @@ async def patch_device_settings(data: PatchDeviceRequest):
             updated = True
             break
     if not updated:
-        for d in config.get("nmminer_devices", []):
+        for d in config.get("lottominer_devices", []):
             if d.get("ip") == ip:
                 if data.temp_max is not None:
                     d["temp_max"] = data.temp_max

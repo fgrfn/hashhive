@@ -82,8 +82,8 @@ async def push_pool_to_device(ip: str, pool: dict):
     _validate_device_ip(ip)
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
 
-    nm_master = config.get("nmminer_master", "")
-    nm_devices = config.get("nmminer_devices", [])
+    nm_master = config.get("lottominer_master", "")
+    nm_devices = config.get("lottominer_devices", [])
     axe_devices = config.get("axeos_devices", [])
 
     is_axe = any(d.get("ip") == ip for d in axe_devices)
@@ -132,4 +132,4 @@ async def push_pool_to_device(ip: str, pool: dict):
                 payload["SecondaryAddress"] = w2
                 payload["SecondaryPassword"] = password2
             resp = await client.post(f"http://{target}/broadcast-config", json=payload)
-            return {"ip": ip, "type": "nmminer", "status": resp.status_code}
+            return {"ip": ip, "type": "lottominer", "status": resp.status_code}

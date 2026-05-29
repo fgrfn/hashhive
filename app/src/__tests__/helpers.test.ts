@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtUptime, fmtHashrate, fmtBestDiff, matchesSearch } from '../api';
+import { fmtUptime, fmtHashrate, fmtBestDiff, matchesSearch, fmtProb } from '../api';
 
 // ─── fmtUptime ───────────────────────────────────────────────────────────────
 
@@ -80,4 +80,17 @@ describe('matchesSearch', () => {
   it('does not match unrelated query', () => expect(matchesSearch(dev, 'zzz')).toBe(false));
   it('matches AxeDevice-style _ip/_name fields', () =>
     expect(matchesSearch({ _ip: '10.0.0.5', _name: 'NerdAxe' }, 'nerd')).toBe(true));
+});
+
+// ─── fmtProb ──────────────────────────────────────────────────────────────────
+
+describe('fmtProb', () => {
+  it('returns — for null/undefined/zero', () => {
+    expect(fmtProb(null)).toBe('—');
+    expect(fmtProb(undefined)).toBe('—');
+    expect(fmtProb(0)).toBe('—');
+  });
+  it('formats a large probability as percent', () => expect(fmtProb(0.25)).toBe('25.0%'));
+  it('formats a small-but-visible probability with more decimals', () => expect(fmtProb(0.001)).toBe('0.100%'));
+  it('formats a tiny probability as 1 in N', () => expect(fmtProb(0.00001)).toBe('1 in 100,000'));
 });

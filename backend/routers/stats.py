@@ -28,13 +28,13 @@ _RELEASES_TTL = 300  # 5 min cache
 async def health():
     uptime = (datetime.now(timezone.utc) - _startup_time).total_seconds()
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    nm_count = len(config.get("nmminer_devices", []))
+    nm_count = len(config.get("lottominer_devices", []))
     ax_count = len(config.get("axeos_devices", []))
     return {
         "status": "ok",
         "version": APP_VERSION,
         "uptime_seconds": round(uptime),
-        "devices": {"nmminer": nm_count, "axeos": ax_count},
+        "devices": {"lottominer": nm_count, "axeos": ax_count},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -94,13 +94,60 @@ async def get_latest_release():
 
 
 @router.get("/api/stats/hashrate")
-async def get_hashrate_stats(days: int = Query(default=1, ge=1, le=30)):
-    """Return hashrate samples for the last N days (oldest first for charting)."""
+async def get_hashrate_stats(
+    days: int = Query(default=1, ge=1, le=30),
+    hours: int | None = Query(default=None, ge=1, le=24),
+):
+    """Return hashrate samples (oldest first for charting).
+
+    Pass `hours` for sub-day ranges (1h/6h), otherwise the last `days` days.
+    """
     result: list = []
+    now_utc = datetime.now(timezone.utc)
+    if hours is not None:
+        cutoff = now_utc - timedelta(hours=hours)
+        # Today's file is enough for <=24h, but cross a day boundary just in case.
+        for i in (1, 0):
+            date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
+            for s in load_json(_stats_file(date_str), []):
+                try:
+                    if datetime.fromisoformat(s["ts"]) >= cutoff:
+                        result.append(s)
+                except Exception:
+                    pass
+        result.sort(key=lambda s: s.get("ts", ""))
+        return result
     for i in range(days - 1, -1, -1):
-        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
         result.extend(load_json(_stats_file(date_str), []))
     return result
+
+
+@router.get("/api/health/{ip}")
+async def device_health(ip: str, hours: int = Query(default=24, ge=1, le=720)):
+    """Per-device historical series (hashrate/temp/power) for the charts tab."""
+    _validate_device_ip(ip)
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(hours=hours)
+    days_needed = min(hours // 24 + 2, 31)
+    samples: list = []
+    for i in range(days_needed - 1, -1, -1):
+        date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
+        data: dict = load_json(_dev_stats_file(date_str), {})
+        for s in data.get(ip, []):
+            try:
+                if datetime.fromisoformat(s["ts"]) >= cutoff:
+                    samples.append(s)
+            except Exception:
+                pass
+    samples.sort(key=lambda s: s.get("ts", ""))
+    return {
+        "ip": ip,
+        "hashrate_series": [s.get("gh", 0) for s in samples],
+        "temp_series": [s["temp"] for s in samples if s.get("temp") is not None],
+        "power_series": [s["pwr"] for s in samples if s.get("pwr") is not None],
+        "timestamps": [s.get("ts") for s in samples],
+    }
 
 
 @router.get("/api/stats/device")

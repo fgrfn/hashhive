@@ -24,7 +24,7 @@ from core import (
 
 router = APIRouter()
 
-_ALLOWED_TYPES = {"nmminer", "axeos", "both", "solominer"}
+_ALLOWED_TYPES = {"lottominer", "axeos", "both", "solominer"}
 
 
 def _template_path(template_id: str):
@@ -45,9 +45,9 @@ def _load_all_templates() -> list[dict]:
 
 
 def _normalize(data: dict, template_id: str, created_at: str) -> dict:
-    t = str(data.get("type", "nmminer"))
+    t = str(data.get("type", "lottominer"))
     if t not in _ALLOWED_TYPES:
-        t = "nmminer"
+        t = "lottominer"
     cfg = data.get("config", {})
     if not isinstance(cfg, dict):
         cfg = {}
@@ -101,10 +101,10 @@ def _device_type_for_ip(ip: str, config: dict) -> str:
     """Resolve which miner family an IP belongs to from the saved config."""
     if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("axeos_devices", [])):
         return "axeos"
-    if ip == config.get("nmminer_master") or any(
-        (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("nmminer_devices", [])
+    if ip == config.get("lottominer_master") or any(
+        (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("lottominer_devices", [])
     ):
-        return "nmminer"
+        return "lottominer"
     if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("nerdminer_devices", [])):
         return "solominer"
     if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("sparkminer_devices", [])):
@@ -134,7 +134,7 @@ async def apply_template(ip: str, request: Request):
         try:
             if dtype == "axeos":
                 resp = await client.patch(f"http://{ip}/api/system", json=cfg)
-            elif dtype == "nmminer":
+            elif dtype == "lottominer":
                 resp = await client.post(f"http://{ip}/broadcast-config", json={**cfg, "ip": ip})
             elif dtype == "solominer":
                 resp = await client.post(f"http://{ip}/settings", json=cfg)

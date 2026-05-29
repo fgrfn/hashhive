@@ -15,7 +15,7 @@ from core import (
     save_json,
 )
 from routers.axeos import axeos_fanout
-from routers.nmminer import nmminer_fanout
+from routers.lottominer import lottominer_fanout
 from routers.pools import push_pool_to_device
 
 router = APIRouter()
@@ -78,10 +78,10 @@ def _ip_of(d) -> str:
 
 
 def _split_by_type(ips: list[str], config: dict) -> tuple[list[str], list[str]]:
-    """Split a list of device IPs into (axeos_ips, nmminer_ips) using the config."""
+    """Split a list of device IPs into (axeos_ips, lottominer_ips) using the config."""
     axe = {_ip_of(d) for d in config.get("axeos_devices", [])}
-    nm = {_ip_of(d) for d in config.get("nmminer_devices", [])}
-    master = config.get("nmminer_master", "")
+    nm = {_ip_of(d) for d in config.get("lottominer_devices", [])}
+    master = config.get("lottominer_master", "")
     if master:
         nm.add(master)
     axe_ips = [ip for ip in ips if ip in axe]
@@ -123,7 +123,7 @@ async def group_action(group_id: str, request: Request):
         if axe_ips:
             results += await axeos_fanout(action, axe_ips)
         if nm_ips and action == "restart":
-            results += await nmminer_fanout("restart", nm_ips)
+            results += await lottominer_fanout("restart", nm_ips)
     else:
         raise HTTPException(status_code=400, detail="Unsupported action")
 

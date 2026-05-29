@@ -13,7 +13,7 @@ from core import (
     load_json,
 )
 from routers.axeos import _fetch_axeos_device
-from routers.nmminer import _fetch_nmminer_safe
+from routers.lottominer import _fetch_lottominer_safe
 from routers.dashboard import _parse_nm_shares
 
 router = APIRouter()
@@ -120,14 +120,14 @@ async def _send_weekly_summary() -> None:
     shares_accepted: int = 0
     shares_rejected: int = 0
     try:
-        master = config.get("nmminer_master", "")
-        nm_devices = config.get("nmminer_devices", [])
+        master = config.get("lottominer_master", "")
+        nm_devices = config.get("lottominer_devices", [])
         axeos_devices = config.get("axeos_devices", [])
         has_nmminer = bool(master or nm_devices)
         async with httpx.AsyncClient(timeout=10) as client:
             coros = []
             if has_nmminer:
-                coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+                coros.append(_fetch_lottominer_safe(client, master, nm_devices))
             coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
             results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
         nmminer_devices = []
@@ -158,7 +158,7 @@ async def _send_weekly_summary() -> None:
     share_acc_pct = f"{shares_accepted / shares_total * 100:.1f}%" if shares_total > 0 else "–"
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    nm_count = len(config.get("nmminer_devices", []))
+    nm_count = len(config.get("lottominer_devices", []))
     ax_count = len(config.get("axeos_devices", []))
 
     # ── Telegram ─────────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ async def _send_weekly_summary() -> None:
             "📊 <b>HashHive Weekly Summary</b>",
             f"<i>{now}</i>",
             "",
-            f"📦 Devices: {nm_count} NMMiner · {ax_count} AxeOS",
+            f"📦 Devices: {nm_count} Lottominer · {ax_count} AxeOS",
             f"📋 Total events (7 days): {total}",
             f"✅ Shares accepted: {shares_accepted:,}",
             f"❌ Shares rejected: {shares_rejected:,}",
@@ -199,7 +199,7 @@ async def _send_weekly_summary() -> None:
             "title": "📊 HashHive Weekly Summary",
             "color": 0x7C3AED,
             "fields": [
-                {"name": "Devices", "value": f"{nm_count} NMMiner · {ax_count} AxeOS", "inline": True},
+                {"name": "Devices", "value": f"{nm_count} Lottominer · {ax_count} AxeOS", "inline": True},
                 {"name": "Total Events (7 days)", "value": str(total), "inline": True},
                 {"name": "Shares Accepted", "value": f"{shares_accepted:,}", "inline": True},
                 {"name": "Shares Rejected", "value": f"{shares_rejected:,}", "inline": True},

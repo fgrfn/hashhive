@@ -30,6 +30,7 @@ from core import (
     _cleanup_old_logs,
     _cleanup_old_stats,
     _load_sessions,
+    _migrate_config,
     _migrate_legacy,
     _read_day,
     _session_valid,
@@ -89,14 +90,15 @@ from core import (  # noqa: F401
 )
 
 from routers.axeos import _fetch_axeos_device
-from routers.nmminer import _fetch_nmminer_safe
+from routers.lottominer import _fetch_lottominer_safe
 from routers.dashboard import _dashboard_broadcast_loop
 from routers.notifications import _weekly_summary_loop
 from routers.discovery import _discovery_background_loop
+from routers.autofan import _autofan_loop
 
 import routers.auth as _auth_router
 import routers.settings as _settings_router
-import routers.nmminer as _nmminer_router
+import routers.lottominer as _lottominer_router
 import routers.axeos as _axeos_router
 import routers.solominer as _solominer_router
 import routers.dashboard as _dashboard_router
@@ -110,6 +112,7 @@ import routers.stats as _stats_router
 import routers.discovery as _discovery_router
 import routers.pools as _pools_router
 import routers.templates as _templates_router
+import routers.probability as _probability_router
 
 
 @asynccontextmanager
@@ -120,6 +123,7 @@ async def lifespan(app: FastAPI):
     TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     load_json(CONFIG_FILE, DEFAULT_CONFIG)
     load_json(DEVICE_STATE_FILE, {})
+    _migrate_config()
     _migrate_legacy()
     _cleanup_old_logs()
     _cleanup_old_stats()
@@ -128,6 +132,7 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(_dashboard_broadcast_loop())
     ws_task = asyncio.create_task(_weekly_summary_loop())
     disc_task = asyncio.create_task(_discovery_background_loop())
+    fan_task = asyncio.create_task(_autofan_loop())
     _append_entry({
         "id": f"system:startup:{datetime.now(timezone.utc).isoformat()}",
         "device": "system",
@@ -142,7 +147,8 @@ async def lifespan(app: FastAPI):
     task.cancel()
     ws_task.cancel()
     disc_task.cancel()
-    for t in (task, ws_task, disc_task):
+    fan_task.cancel()
+    for t in (task, ws_task, disc_task, fan_task):
         try:
             await t
         except asyncio.CancelledError:
@@ -162,7 +168,7 @@ app.add_middleware(
 
 app.include_router(_auth_router.router)
 app.include_router(_settings_router.router)
-app.include_router(_nmminer_router.router)
+app.include_router(_lottominer_router.router)
 app.include_router(_axeos_router.router)
 app.include_router(_solominer_router.router)
 app.include_router(_dashboard_router.router)
@@ -176,6 +182,7 @@ app.include_router(_stats_router.router)
 app.include_router(_discovery_router.router)
 app.include_router(_pools_router.router)
 app.include_router(_templates_router.router)
+app.include_router(_probability_router.router)
 
 # ── Static assets ──────────────────────────────────────────────────────────────
 
@@ -291,14 +298,14 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         # Send current data immediately on connect so the client doesn't wait
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-        master = config.get("nmminer_master", "")
-        nm_devices = config.get("nmminer_devices", [])
+        master = config.get("lottominer_master", "")
+        nm_devices = config.get("lottominer_devices", [])
         axeos_devices = config.get("axeos_devices", [])
         has_nmminer = bool(master or nm_devices)
         async with httpx.AsyncClient(timeout=10) as client:
             coros = []
             if has_nmminer:
-                coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+                coros.append(_fetch_lottominer_safe(client, master, nm_devices))
             coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
             results = await asyncio.gather(*coros) if coros else []
         nmminer_data = results[0] if (has_nmminer and results) else {"devices": []}
@@ -308,7 +315,7 @@ async def websocket_endpoint(ws: WebSocket):
         unread = sum(1 for a in today_entries if not a.get("read", False))
         await ws.send_text(json.dumps({
             "type": "dashboard",
-            "nmminer": nmminer_data,
+            "lottominer": nmminer_data,
             "axeos": axeos_data,
             "unread_alerts": unread,
             "config": config,

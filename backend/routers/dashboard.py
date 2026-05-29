@@ -22,7 +22,7 @@ from core import (
     load_json,
 )
 from routers.axeos import _fetch_axeos_device
-from routers.nmminer import _fetch_nmminer_safe
+from routers.lottominer import _fetch_lottominer_safe
 from routers.solominer import _fetch_solo_miner
 
 router = APIRouter()
@@ -59,8 +59,8 @@ async def _dashboard_broadcast_loop():
             config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
             interval = max(5, int(config.get("refresh_interval", 30)))
             if _ws_manager.count > 0:
-                master = config.get("nmminer_master", "")
-                nm_devices = config.get("nmminer_devices", [])
+                master = config.get("lottominer_master", "")
+                nm_devices = config.get("lottominer_devices", [])
                 nerdminer_devices = config.get("nerdminer_devices", [])
                 sparkminer_devices = config.get("sparkminer_devices", [])
                 axeos_devices = config.get("axeos_devices", [])
@@ -68,7 +68,7 @@ async def _dashboard_broadcast_loop():
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
-                        coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+                        coros.append(_fetch_lottominer_safe(client, master, nm_devices))
                     coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
                     coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
                     coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
@@ -133,7 +133,7 @@ async def _dashboard_broadcast_loop():
                     pass
                 payload = json.dumps({
                     "type": "dashboard",
-                    "nmminer": nmminer_data,
+                    "lottominer": nmminer_data,
                     "nerdminer": {"devices": nerdminer_results},
                     "sparkminer": {"devices": sparkminer_results},
                     "axeos": axeos_data,
@@ -150,8 +150,8 @@ async def _dashboard_broadcast_loop():
 @router.get("/api/dashboard")
 async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
-    nm_devices = config.get("nmminer_devices", [])
+    master = config.get("lottominer_master", "")
+    nm_devices = config.get("lottominer_devices", [])
     nerdminer_devices = config.get("nerdminer_devices", [])
     sparkminer_devices = config.get("sparkminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
@@ -160,7 +160,7 @@ async def get_dashboard():
     async with httpx.AsyncClient(timeout=10) as client:
         coros: list = []
         if has_nmminer:
-            coros.append(_fetch_nmminer_safe(client, master, nm_devices))
+            coros.append(_fetch_lottominer_safe(client, master, nm_devices))
         coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
         coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
@@ -195,7 +195,7 @@ async def get_dashboard():
     device_state = load_json(DEVICE_STATE_FILE, {})
     for d in nmminer_data.get("devices", []):
         if not d.get("online", True):
-            key = f"nmminer:{d.get('ip', '')}"
+            key = f"lottominer:{d.get('ip', '')}"
             d["_offline_since"] = device_state.get(key, {}).get("offline_since")
     for d in nerdminer_results + sparkminer_results:
         if not d.get("_online", True):
@@ -210,7 +210,7 @@ async def get_dashboard():
     unread = sum(1 for a in today_entries if not a.get("read", False))
 
     return {
-        "nmminer": nmminer_data,
+        "lottominer": nmminer_data,
         "nerdminer": {"devices": nerdminer_results},
         "sparkminer": {"devices": sparkminer_results},
         "axeos": axeos_data,
