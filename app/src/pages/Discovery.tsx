@@ -11,8 +11,8 @@ import { toast } from '../store/toast';
 const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   bitaxe: 'BitAxe',
   nerdaxe: 'NerdAxe',
-  nmminer_master: 'NMMiner Master',
-  nmminer_device: 'NMMiner Device',
+  lottominer_master: 'Lottominer Master',
+  lottominer_device: 'Lottominer Device',
   nerdminer: 'NerdMiner',
   sparkminer: 'SparkMiner',
 };

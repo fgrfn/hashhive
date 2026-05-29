@@ -57,12 +57,16 @@ export const api = {
     restore:     (data: Record<string, unknown>)                               => post<{ status: string }>('/api/settings/restore', data),
     patchDevice: (data: { ip: string; name?: string; temp_max?: number })      => patch('/api/settings/device', data),
   },
-  nmminer: {
-    swarm:            ()                                         => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/nmminer/swarm'),
-    deviceConfig:     (ip: string)                              => get<NMMinerConfig>(`/api/nmminer/device-config?ip=${ip}`),
-    saveDeviceConfig: (cfg: NMMinerConfig)                      => post('/api/nmminer/device-config', cfg),
-    broadcastConfig:  (cfg: Record<string, unknown>)            => post('/api/nmminer/broadcast-config', cfg),
-    batchAction:      (ips: string[], action: NmAction)         => post('/api/nmminer/action/batch', { ips, action }),
+  lottominer: {
+    swarm:            ()                                         => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/lottominer/swarm'),
+    deviceConfig:     (ip: string)                              => get<NMMinerConfig>(`/api/lottominer/device-config?ip=${ip}`),
+    saveDeviceConfig: (cfg: NMMinerConfig)                      => post('/api/lottominer/device-config', cfg),
+    broadcastConfig:  (cfg: Record<string, unknown>)            => post('/api/lottominer/broadcast-config', cfg),
+    batchAction:      (ips: string[], action: NmAction)         => post('/api/lottominer/action/batch', { ips, action }),
+  },
+  solo: {
+    nerdminer:  () => get<{ devices: SoloDevice[] }>('/api/nerdminer/devices'),
+    sparkminer: () => get<{ devices: SoloDevice[] }>('/api/sparkminer/devices'),
   },
   axeos: {
     devices:     ()                                               => get<AxeDevice[]>('/api/axeos/devices'),
@@ -146,7 +150,7 @@ export interface OkResponse { ok?: boolean; status?: string }
 
 export interface DiscoveredDevice {
   ip: string;
-  type: 'bitaxe' | 'nerdaxe' | 'nmminer_master' | 'nmminer_device' | 'nerdminer' | 'sparkminer';
+  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device' | 'nerdminer' | 'sparkminer';
   name: string;
   discovered_via: 'arp' | 'mdns' | 'scan';
   asic?: string;
@@ -186,12 +190,29 @@ export interface ProbabilityResult {
   }>;
 }
 
+export interface SoloDevice {
+  _ip?: string;
+  _name?: string;
+  _type?: string;
+  _online?: boolean;
+  ip?: string;
+  hostname?: string;
+  hashRate?: number | string;
+  temp?: number;
+  walletAddress?: string;
+  poolUrl?: string;
+  bestDiff?: string;
+  uptime?: number | string;
+  version?: string;
+  online?: boolean;
+}
+
 export interface AxeActionResponse { ip: string; action: string; status: number }
 export interface StatSample { ts: string; gh: number; pwr?: number; shares?: number }
 export interface DeviceTemplate {
   id: string;
   name: string;
-  type: 'nmminer' | 'axeos' | 'both' | 'solominer';
+  type: 'lottominer' | 'axeos' | 'both' | 'solominer';
   description?: string;
   config: Record<string, unknown>;
   created_at?: string;
@@ -200,7 +221,7 @@ export interface DeviceTemplate {
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
 export interface DashboardData {
-  nmminer: { devices: NMMinerDevice[]; _error?: string };
+  lottominer: { devices: NMMinerDevice[]; _error?: string };
   axeos:   { devices: AxeDevice[] };
   unread_alerts: number;
   config: AppSettings;
@@ -364,8 +385,10 @@ export interface HealthData {
 }
 
 export interface AppSettings {
-  nmminer_master?: string;
-  nmminer_devices?: Array<{ ip: string; name?: string }>;
+  lottominer_master?: string;
+  lottominer_devices?: Array<{ ip: string; name?: string }>;
+  nerdminer_devices?: Array<{ ip: string; name?: string; type?: string }>;
+  sparkminer_devices?: Array<{ ip: string; name?: string; type?: string }>;
   axeos_devices?: Array<{ ip: string; name: string; type: string }>;
   refresh_interval?: number;
   offline_grace_minutes?: number;

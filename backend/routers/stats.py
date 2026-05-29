@@ -28,13 +28,13 @@ _RELEASES_TTL = 300  # 5 min cache
 async def health():
     uptime = (datetime.now(timezone.utc) - _startup_time).total_seconds()
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    nm_count = len(config.get("nmminer_devices", []))
+    nm_count = len(config.get("lottominer_devices", []))
     ax_count = len(config.get("axeos_devices", []))
     return {
         "status": "ok",
         "version": APP_VERSION,
         "uptime_seconds": round(uptime),
-        "devices": {"nmminer": nm_count, "axeos": ax_count},
+        "devices": {"lottominer": nm_count, "axeos": ax_count},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

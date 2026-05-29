@@ -52,7 +52,7 @@ export function DeviceDetail() {
   const hr = nmDevice ? getHashrate(nmDevice) : (axeDevice!.hashRate || 0);
   const temp = nmDevice ? (nmDevice.chipTemp ?? nmDevice.temp ?? null) : (axeDevice!.temp ?? null);
   const uptime = nmDevice ? (nmDevice.uptime ?? null) : (axeDevice!.uptimeSeconds != null ? axeDevice!.uptimeSeconds : null);
-  const deviceType = isAxe ? (axeDevice!._type || 'bitaxe') : 'nmminer';
+  const deviceType = isAxe ? (axeDevice!._type || 'bitaxe') : 'lottominer';
 
   return (
     <div>

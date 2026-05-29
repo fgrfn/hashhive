@@ -20,10 +20,10 @@ from routers.discovery import (  # noqa: E402
 def _empty_config() -> dict:
     return {
         "axeos_devices": [],
-        "nmminer_devices": [],
+        "lottominer_devices": [],
         "nerdminer_devices": [],
         "sparkminer_devices": [],
-        "nmminer_master": "",
+        "lottominer_master": "",
     }
 
 
@@ -32,15 +32,15 @@ def test_add_sorts_devices_by_type():
     added = _add_devices_to_config(config, [
         {"ip": "192.168.1.10", "type": "bitaxe", "name": "axe1"},
         {"ip": "192.168.1.11", "type": "nerdaxe", "name": "axe2"},
-        {"ip": "192.168.1.12", "type": "nmminer_master", "name": "master"},
-        {"ip": "192.168.1.13", "type": "nmminer_device", "name": "nmdev"},
+        {"ip": "192.168.1.12", "type": "lottominer_master", "name": "master"},
+        {"ip": "192.168.1.13", "type": "lottominer_device", "name": "nmdev"},
         {"ip": "192.168.1.14", "type": "nerdminer", "name": "nerd"},
         {"ip": "192.168.1.15", "type": "sparkminer", "name": "spark"},
     ])
     assert len(added) == 6
     assert {d["ip"] for d in config["axeos_devices"]} == {"192.168.1.10", "192.168.1.11"}
-    assert config["nmminer_master"] == "192.168.1.12"
-    assert config["nmminer_devices"][0]["ip"] == "192.168.1.13"
+    assert config["lottominer_master"] == "192.168.1.12"
+    assert config["lottominer_devices"][0]["ip"] == "192.168.1.13"
     assert config["nerdminer_devices"][0]["type"] == "nerdminer"
     assert config["sparkminer_devices"][0]["type"] == "sparkminer"
 
@@ -82,10 +82,10 @@ def test_reconcile_macs_updates_changed_ip():
 
 
 def test_reconcile_macs_no_change_same_ip():
-    config = {"nmminer_devices": [{"ip": "192.168.1.20", "mac": "11:22:33:44:55:66"}]}
+    config = {"lottominer_devices": [{"ip": "192.168.1.20", "mac": "11:22:33:44:55:66"}]}
     changes = reconcile_macs(config, {"11:22:33:44:55:66": "192.168.1.20"})
     assert changes == []
-    assert config["nmminer_devices"][0]["ip"] == "192.168.1.20"
+    assert config["lottominer_devices"][0]["ip"] == "192.168.1.20"
 
 
 def test_reconcile_macs_ignores_unknown_mac_and_macless():

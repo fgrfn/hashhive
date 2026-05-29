@@ -18,7 +18,7 @@ function useWindowWidthLocal() {
 
 const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIcon; badge?: boolean }> = [
   { id: 'dashboard',     path: '/dashboard',      label: 'Dashboard',        Icon: LayoutDashboard },
-  { id: 'nmminer',       path: '/miners/nmminer',  label: 'NMMiner',          Icon: Cpu },
+  { id: 'lottominer',    path: '/miners/lottominer', label: 'Lottominer',     Icon: Cpu },
   { id: 'axeos',         path: '/miners/axeos',    label: 'BitAxe / NerdAxe', Icon: Zap },
   { id: 'discovery',     path: '/discovery',       label: 'Discovery',        Icon: Radar },
   { id: 'groups',        path: '/groups',          label: 'Groups',           Icon: Grid3x3 },
@@ -33,7 +33,7 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
 
 const TITLE_MAP: Record<string, string> = {
   dashboard: 'Dashboard',
-  nmminer: 'NMMiner',
+  lottominer: 'Lottominer',
   axeos: 'BitAxe / NerdAxe',
   discovery: 'Device Discovery',
   groups: 'Groups',
@@ -48,7 +48,7 @@ const TITLE_MAP: Record<string, string> = {
 };
 
 function activeId(pathname: string): string {
-  if (pathname.startsWith('/miners/nmminer')) return 'nmminer';
+  if (pathname.startsWith('/miners/lottominer')) return 'lottominer';
   if (pathname.startsWith('/miners/axeos'))   return 'axeos';
   if (pathname.startsWith('/devices/'))       return 'axeos';
   if (pathname.startsWith('/groups/'))        return 'groups';
@@ -99,7 +99,7 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
         <div style={{ flex: 1, overflow: 'auto', padding: '14px 16px 80px' }}>{children}</div>
 
         <nav style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: t.surface, borderTop: `1px solid ${t.border}`, display: 'flex', padding: '8px 4px 10px', justifyContent: 'space-around', zIndex: 50 }}>
-          {NAV_ITEMS.filter(n => ['dashboard','nmminer','axeos','earnings','alerts'].includes(n.id)).map(({ id, path, label, Icon, badge }) => {
+          {NAV_ITEMS.filter(n => ['dashboard','lottominer','axeos','earnings','alerts'].includes(n.id)).map(({ id, path, label, Icon, badge }) => {
             const on = active === id;
             return (
               <button key={id} onClick={() => go(path)} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 8px', cursor: 'pointer', color: on ? t.accent : t.textMuted, position: 'relative' }}>

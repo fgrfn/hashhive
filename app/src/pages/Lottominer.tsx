@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus, matchesSearch } from '../api';
-import type { NMMinerConfig, NMMinerDevice } from '../api';
-import { Cpu, Edit3, Search, RotateCcw } from 'lucide-react';
+import type { NMMinerConfig, NMMinerDevice, SoloDevice } from '../api';
+import { Edit3, Search, RotateCcw } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
 import type { NmAction } from '../api';
 
-export function NMMiner() {
+export function Lottominer() {
   const { theme: t } = useThemeStore();
   const { devices, wsStatus, globalSearch } = useAppStore();
   const loading = useDataReady(wsStatus !== 'connecting');
@@ -24,7 +24,7 @@ export function NMMiner() {
   const openEdit = async (ip: string) => {
     setEditDevice(ip);
     try {
-      const cfg = await api.nmminer.deviceConfig(ip);
+      const cfg = await api.lottominer.deviceConfig(ip);
       setConfig(cfg);
     } catch {
       setConfig({ ip, PrimaryPool: '', PrimaryAddress: '', PrimaryPassword: 'x' });
@@ -35,7 +35,7 @@ export function NMMiner() {
     if (!config) return;
     setSaving(true);
     try {
-      await api.nmminer.saveDeviceConfig({
+      await api.lottominer.saveDeviceConfig({
         ...config,
         SaveUptime: config.SaveUptime ? 1 : 0,
         LedEnable: config.LedEnable ? 1 : 0,
@@ -58,7 +58,7 @@ export function NMMiner() {
   const doBulkAction = async (action: NmAction) => {
     const ips = Array.from(selected);
     try {
-      await api.nmminer.batchAction(ips, action);
+      await api.lottominer.batchAction(ips, action);
       toast(`${action} sent to ${ips.length} device${ips.length !== 1 ? 's' : ''}`);
     } catch {
       toast(`Batch ${action} failed`, 'error');
@@ -91,16 +91,6 @@ export function NMMiner() {
     );
   }
 
-  if (devices.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: 60, color: t.textMuted }}>
-        <Cpu size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-        <div style={{ fontSize: 16, fontWeight: 600, color: t.text, marginBottom: 6 }}>No NMMiner devices</div>
-        <div style={{ fontSize: 13 }}>Configure your NMMiner master IP in Settings to see devices here.</div>
-      </div>
-    );
-  }
-
   const filtered = devices.filter(d => {
     const ip = d.ip || '';
     const name = d.name ?? d.hostname ?? ip;
@@ -116,6 +106,7 @@ export function NMMiner() {
 
   return (
     <>
+      <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 10, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.06em' }}>NMMiner</div>
       {/* Filter bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -226,6 +217,15 @@ export function NMMiner() {
       </div>
       )}
 
+      {devices.length === 0 && (
+        <div style={{ padding: '20px', color: t.textMuted, fontSize: 13, textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: 10 }}>
+          No NMMiner devices. Add a master/device in Settings or via Discovery.
+        </div>
+      )}
+
+      <SoloFleet t={t} title="NerdMiner" fetcher={() => api.solo.nerdminer()} />
+      <SoloFleet t={t} title="SparkMiner" fetcher={() => api.solo.sparkminer()} />
+
       {editDevice && config && (
         <Modal t={t} title={`Configure ${config.Hostname || editDevice}`} onClose={() => setEditDevice(null)} width={560}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -330,6 +330,58 @@ function Kv({ t, label, value, color }: { t: Theme; label: string; value: string
     <div>
       <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
       <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text }}>{value}</div>
+    </div>
+  );
+}
+
+function SoloFleet({ t, title, fetcher }: { t: Theme; title: string; fetcher: () => Promise<{ devices: SoloDevice[] }> }) {
+  const { globalSearch } = useAppStore();
+  const [devices, setDevices] = useState<SoloDevice[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetcher().then(r => { if (alive) { setDevices(r.devices || []); setLoaded(true); } }).catch(() => { if (alive) setLoaded(true); });
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [fetcher]);
+
+  const shown = devices.filter(d => matchesSearch(d, globalSearch));
+  if (loaded && devices.length === 0) return null;  // hide empty families to keep the page clean
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 10, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+      <div style={{ overflowX: 'auto' }}>
+        <Card t={t} noPad style={{ minWidth: 720 }}>
+          <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 90px 110px 70px 100px 80px', gap: 12 }}>
+              {['IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Best Diff', 'Uptime'].map(c => <Label key={c} t={t}>{c}</Label>)}
+            </div>
+          </div>
+          {shown.map((d, i) => {
+            const ip = d._ip || d.ip || '';
+            const name = d._name || d.hostname || ip;
+            const online = d._online ?? d.online ?? false;
+            const hr = typeof d.hashRate === 'number' ? fmtHashrate(d.hashRate) : (d.hashRate || '—');
+            return (
+              <div key={ip || i} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 90px 110px 70px 100px 80px', gap: 12, padding: '12px 18px', borderBottom: i === shown.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{ip}</div>
+                <div style={{ fontWeight: 500 }}>{name}</div>
+                <StatusPill t={t} status={online ? 'online' : 'offline'} />
+                <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>{hr}</div>
+                <div style={{ fontFamily: FONT_MONO, color: d.temp == null ? t.textMuted : d.temp > 70 ? t.danger : t.success }}>{d.temp != null && d.temp > 0 ? `${d.temp}°C` : '—'}</div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.honey }}>{fmtBestDiff(d.bestDiff)}</div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{fmtUptime(d.uptime)}</div>
+              </div>
+            );
+          })}
+          {shown.length === 0 && (
+            <div style={{ padding: '16px 18px', color: t.textMuted, fontSize: 12 }}>No devices match.</div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

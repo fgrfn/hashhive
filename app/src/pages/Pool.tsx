@@ -224,7 +224,7 @@ function MinerAssignments() {
   }, []);
 
   const allDevices = [
-    ...devices.map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', type: 'nmminer' as const, status: d.status || 'online' })),
+    ...devices.map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', type: 'lottominer' as const, status: d.status || 'online' })),
     ...axeDevices.map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', type: 'axeos' as const, status: d.status || 'offline' })),
   ];
 
@@ -255,7 +255,7 @@ function MinerAssignments() {
               <div style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</div>
               <div style={{ fontSize: 10, fontFamily: FONT_MONO, color: t.textMuted }}>{d.ip}</div>
             </div>
-            <Pill t={t} sev={d.type === 'nmminer' ? 'info' : 'success'}>{d.type}</Pill>
+            <Pill t={t} sev={d.type === 'lottominer' ? 'info' : 'success'}>{d.type}</Pill>
             <select
               value={assignments[d.ip] || ''}
               onChange={e => setAssignments(prev => ({ ...prev, [d.ip]: e.target.value }))}

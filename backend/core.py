@@ -82,8 +82,8 @@ _last_bestdiff_sample_ts: float = 0.0
 # ── Default config ─────────────────────────────────────────────────────────────
 
 DEFAULT_CONFIG: dict = {
-    "nmminer_master": "",
-    "nmminer_devices": [],
+    "lottominer_master": "",
+    "lottominer_devices": [],
     "nerdminer_devices": [],
     "sparkminer_devices": [],
     "axeos_devices": [],
@@ -441,6 +441,36 @@ def _cleanup_old_stats_dir() -> None:
 
 # ── Legacy migration ───────────────────────────────────────────────────────────
 
+def _migrate_config() -> None:
+    """Rename legacy NMMiner config keys to the generalized 'lottominer' keys.
+
+    NMMiner support was generalized into a 'Lottominer' category; older configs
+    used nmminer_master / nmminer_devices. Migrate them in place once on start so
+    existing deployments keep their devices.
+    """
+    if not CONFIG_FILE.exists():
+        return
+    try:
+        config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+        changed = False
+        if "nmminer_master" in config and "lottominer_master" not in config:
+            config["lottominer_master"] = config.pop("nmminer_master")
+            changed = True
+        elif "nmminer_master" in config:
+            config.pop("nmminer_master")
+            changed = True
+        if "nmminer_devices" in config and "lottominer_devices" not in config:
+            config["lottominer_devices"] = config.pop("nmminer_devices")
+            changed = True
+        elif "nmminer_devices" in config:
+            config.pop("nmminer_devices")
+            changed = True
+        if changed:
+            save_json(CONFIG_FILE, config)
+    except Exception:
+        pass
+
+
 def _migrate_legacy() -> None:
     """Move old alert_history.json into daily log files on first start."""
     if not ALERT_HISTORY_FILE.exists():
@@ -669,6 +699,6 @@ async def _check_auto_restart_solo(
                     "message": f"Auto-restarted {name} ({ip}): hashrate=0 for >{ar.get('zero_hr_minutes',10)} min",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "read": False,
-                    "source": "nmminer",
+                    "source": "lottominer",
                 })
                 _solo_zero_hr_since.pop(ip, None)

@@ -73,7 +73,7 @@ export function Dashboard() {
   const metricUnit = metric === 'power' ? 'W' : metric === 'efficiency' ? 'W/TH' : 'GH/s';
 
   const filteredLog = logLines.filter(l => {
-    if (logFilter === 'NMMiner') return l.source === 'nmminer';
+    if (logFilter === 'Lottominer') return l.source === 'lottominer';
     if (logFilter === 'BitAxe')  return l.source === 'axeos';
     if (logFilter === 'System')  return l.source === 'system';
     return true;
@@ -156,7 +156,7 @@ export function Dashboard() {
 
       {/* Device mini tables */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <DeviceMini t={t} title="NMMiner Swarm" accent={t.accent} rows={nmShown.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/nmminer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
+        <DeviceMini t={t} title="Lottominer" accent={t.accent} rows={nmShown.slice(0, 6).map(d => ({ ip: d.ip || '', name: d.name || d.hostname || d.ip || '', status: d.status || 'online', hr: d.GHs5s ?? d.GHs5 ?? d.GHsav ?? 0, temp: d.chipTemp ?? d.temp ?? null }))} onViewAll={() => navigate('/miners/lottominer')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
         <DeviceMini t={t} title="BitAxe / NerdAxe Fleet" accent={t.info} rows={axeShown.slice(0, 6).map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '', status: d.status || 'online', hr: d.hashRate || 0, temp: d.temp ?? null }))} onViewAll={() => navigate('/miners/axeos')} onDevice={(d) => navigate(`/devices/${d.ip}`)} />
       </div>
 
@@ -170,7 +170,7 @@ export function Dashboard() {
               live
             </div>
           </div>
-          <Segmented t={t} options={['All', 'NMMiner', 'BitAxe', 'System']} value={logFilter} onChange={setLogFilter} />
+          <Segmented t={t} options={['All', 'Lottominer', 'BitAxe', 'System']} value={logFilter} onChange={setLogFilter} />
         </div>
         <div ref={logRef} style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', fontFamily: FONT_MONO, fontSize: 12, maxHeight: 220, overflow: 'auto' }}>
           {filteredLog.length === 0 ? (
@@ -181,8 +181,8 @@ export function Dashboard() {
               <span style={{
                 fontSize: 10, padding: '0 6px', borderRadius: 3, fontWeight: 600,
                 textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
-                background: l.source === 'nmminer' ? t.accentGlow : l.source === 'axeos' ? t.info + '22' : t.success + '22',
-                color: l.source === 'nmminer' ? t.accent : l.source === 'axeos' ? t.info : t.success,
+                background: l.source === 'lottominer' ? t.accentGlow : l.source === 'axeos' ? t.info + '22' : t.success + '22',
+                color: l.source === 'lottominer' ? t.accent : l.source === 'axeos' ? t.info : t.success,
               }}>
                 {l.source || 'sys'}
               </span>

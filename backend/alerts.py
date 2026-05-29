@@ -162,14 +162,14 @@ async def check_alerts(
     current_state: dict = {}
     new_alerts: list[dict] = []
 
-    # ── NMMiner devices ──────────────────────────────────────────────────────
+    # ── Lottominer devices ──────────────────────────────────────────────────────
     raw_nm = nmminer_data if isinstance(nmminer_data, list) else nmminer_data.get("devices", [])
     if isinstance(raw_nm, list):
         for device in raw_nm:
             ip: str = device.get("ip", "") or device.get("_ip", "")
             if not ip:
                 continue
-            key = f"nmminer:{ip}"
+            key = f"lottominer:{ip}"
             is_online: bool = device.get("online", True)
             temp: float = float(device.get("temp", 0) or device.get("temperature", 0) or 0)
             hashrate: float = float(device.get("GHs5s", 0) or device.get("hashrate", 0) or 0)
@@ -201,14 +201,14 @@ async def check_alerts(
                     try:
                         elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(offline_since)).total_seconds()
                         if elapsed >= grace_seconds and _type_enabled("offline"):
-                            new_alerts.append(_make_alert(key, "offline", "critical", f"NMMiner {ip} is offline"))
+                            new_alerts.append(_make_alert(key, "offline", "critical", f"Lottominer {ip} is offline"))
                             current_state[key]["offline_alerted"] = True
                     except Exception:
                         pass
             elif not was_online and is_online:
                 # Came back online
                 if prev.get("offline_alerted", False) and _type_enabled("online"):
-                    new_alerts.append(_make_alert(key, "online", "info", f"NMMiner {ip} is back online"))
+                    new_alerts.append(_make_alert(key, "online", "info", f"Lottominer {ip} is back online"))
 
             if is_online:
                 dev_temp_max = device.get("_temp_max")
@@ -216,21 +216,21 @@ async def check_alerts(
                 if temp > effective_temp_max and _should_alert(prev, "temp_high", cooldown_seconds) and _type_enabled("temp_high"):
                     new_alerts.append(
                         _make_alert(key, "temp_high", "critical",
-                                    f"NMMiner {ip}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C")
+                                    f"Lottominer {ip}: temperature {temp:.1f}°C > {effective_temp_max:.0f}°C")
                     )
                     _mark_alerted(current_state[key], "temp_high")
                 if hashrate_min > 0 and hashrate < hashrate_min and _should_alert(prev, "hashrate_low", cooldown_seconds) and _type_enabled("hashrate_low"):
                     new_alerts.append(
                         _make_alert(key, "hashrate_low", "warning",
-                                    f"NMMiner {ip}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
+                                    f"Lottominer {ip}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
                     )
                     _mark_alerted(current_state[key], "hashrate_low")
                 prev_pool = prev.get("pool", "")
                 if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
-                    new_alerts.append(_make_alert(key, "pool_lost", "critical", f"NMMiner {ip}: pool connection lost"))
+                    new_alerts.append(_make_alert(key, "pool_lost", "critical", f"Lottominer {ip}: pool connection lost"))
                     _mark_alerted(current_state[key], "pool_lost")
                 elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
-                    new_alerts.append(_make_alert(key, "pool_connected", "info", f"NMMiner {ip}: pool connected"))
+                    new_alerts.append(_make_alert(key, "pool_connected", "info", f"Lottominer {ip}: pool connected"))
                     _mark_alerted(current_state[key], "pool_connected")
                 # ── RSSI ──────────────────────────────────────────────────────
                 rssi = device.get("rssi")
@@ -240,7 +240,7 @@ async def check_alerts(
                         current_state[key]["rssi"] = rssi_val
                         if rssi_val < rssi_min and _should_alert(prev, "rssi_low", cooldown_seconds) and _type_enabled("rssi_low"):
                             new_alerts.append(_make_alert(key, "rssi_low", "warning",
-                                                          f"NMMiner {ip}: weak WiFi signal {rssi_val} dBm (min {rssi_min} dBm)"))
+                                                          f"Lottominer {ip}: weak WiFi signal {rssi_val} dBm (min {rssi_min} dBm)"))
                             _mark_alerted(current_state[key], "rssi_low")
                     except (TypeError, ValueError):
                         pass

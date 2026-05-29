@@ -1,4 +1,9 @@
-"""NMMiner router."""
+"""Lottominer router — generalized ESP-based lottery miners (formerly NMMiner).
+
+Handles the NMMiner-style firmware (master/swarm + per-device config). NerdMiner
+and SparkMiner are handled in solominer.py; the frontend Lottominer page unifies
+all three families.
+"""
 
 import asyncio
 from datetime import datetime, timezone
@@ -18,7 +23,7 @@ from core import (
 router = APIRouter()
 
 
-async def _fetch_nmminer_safe(
+async def _fetch_lottominer_safe(
     client: httpx.AsyncClient,
     master: str,
     nm_devices: list | None = None,
@@ -150,22 +155,22 @@ async def _fetch_nmminer_safe(
         await asyncio.gather(*[_fetch_one(d["ip"]) for d in nm_devices if d.get("ip")])
         return {"devices": all_devs}
 
-    return {"devices": [], "_error": "no NMMiner configured"}
+    return {"devices": [], "_error": "no Lottominer configured"}
 
 
-@router.get("/api/nmminer/swarm")
-async def get_nmminer_swarm():
+@router.get("/api/lottominer/swarm")
+async def get_lottominer_swarm():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
-    nm_devices = config.get("nmminer_devices", [])
+    master = config.get("lottominer_master", "")
+    nm_devices = config.get("lottominer_devices", [])
     async with httpx.AsyncClient(timeout=10) as client:
-        return await _fetch_nmminer_safe(client, master, nm_devices)
+        return await _fetch_lottominer_safe(client, master, nm_devices)
 
 
-@router.get("/api/nmminer/config")
-async def get_nmminer_config():
+@router.get("/api/lottominer/config")
+async def get_lottominer_config():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
+    master = config.get("lottominer_master", "")
     if master:
         async with httpx.AsyncClient(timeout=10) as client:
             try:
@@ -174,7 +179,7 @@ async def get_nmminer_config():
                 return resp.json()
             except Exception:
                 pass  # fall through to per-device queries
-    devices = config.get("nmminer_devices", [])
+    devices = config.get("lottominer_devices", [])
     if not devices:
         return {"configs": []}
     configs = []
@@ -196,9 +201,9 @@ async def get_nmminer_config():
     return {"configs": configs}
 
 
-@router.get("/api/nmminer/scan")
-async def scan_nmminer_devices():
-    """Scan the local /24 subnet for NMMiner devices (no master IP required)."""
+@router.get("/api/lottominer/scan")
+async def scan_lottominer_devices():
+    """Scan the local /24 subnet for Lottominer (NMMiner-style) devices."""
     import socket as _socket
     try:
         s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
@@ -268,15 +273,15 @@ async def scan_nmminer_devices():
     return {"subnet": f"{subnet}.0/24", "local_ip": local_ip, "found": found}
 
 
-_NM_ACTION_MAP = {
+_LOTTO_ACTION_MAP = {
     "restart": "/reboot",
 }
 
 
-async def nmminer_fanout(action: str, ips: list[str]) -> list[dict]:
-    """Fire an NMMiner action at many devices concurrently. Reused by the batch
+async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
+    """Fire a Lottominer action at many devices concurrently. Reused by the batch
     endpoint, schedules and group actions."""
-    path = _NM_ACTION_MAP[action]
+    path = _LOTTO_ACTION_MAP[action]
     results: list[dict] = []
 
     async def _act(ip: str):
@@ -287,14 +292,14 @@ async def nmminer_fanout(action: str, ips: list[str]) -> list[dict]:
                 results.append({"ip": ip, "status": resp.status_code})
                 now = datetime.now(timezone.utc).isoformat()
                 _append_entry({
-                    "id": f"nmminer:{ip}:{action}:{now}",
-                    "device": f"nmminer:{ip}",
+                    "id": f"lottominer:{ip}:{action}:{now}",
+                    "device": f"lottominer:{ip}",
                     "kind": f"device_{action}",
                     "severity": "info",
-                    "message": f"NMMiner {ip}: {action} triggered",
+                    "message": f"Lottominer {ip}: {action} triggered",
                     "timestamp": now,
                     "read": True,
-                    "source": "nmminer",
+                    "source": "lottominer",
                 })
         except Exception as exc:
             results.append({"ip": ip, "status": 0, "error": str(exc)})
@@ -303,22 +308,22 @@ async def nmminer_fanout(action: str, ips: list[str]) -> list[dict]:
     return results
 
 
-@router.post("/api/nmminer/action/batch")
-async def nmminer_action_batch(data: NmActionBatchRequest):
-    """Batch action across multiple NMMiner devices. Body: {action, ips: [...]}"""
-    valid = set(_NM_ACTION_MAP)
+@router.post("/api/lottominer/action/batch")
+async def lottominer_action_batch(data: NmActionBatchRequest):
+    """Batch action across multiple Lottominer devices. Body: {action, ips: [...]}"""
+    valid = set(_LOTTO_ACTION_MAP)
     if data.action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    results = await nmminer_fanout(data.action, data.ips)
+    results = await lottominer_fanout(data.action, data.ips)
     return {"action": data.action, "results": results}
 
 
-@router.post("/api/nmminer/broadcast-config")
-async def broadcast_nmminer_config(data: dict):
+@router.post("/api/lottominer/broadcast-config")
+async def broadcast_lottominer_config(data: dict):
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("nmminer_master", "")
+    master = config.get("lottominer_master", "")
     if not master:
-        raise HTTPException(status_code=400, detail="No NMMiner master configured")
+        raise HTTPException(status_code=400, detail="No Lottominer master configured")
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             resp = await client.post(f"http://{master}/broadcast-config", json=data)
@@ -328,8 +333,8 @@ async def broadcast_nmminer_config(data: dict):
             raise HTTPException(status_code=502, detail=str(exc))
 
 
-@router.get("/api/nmminer/device-config")
-async def get_nmminer_device_config(ip: str):
+@router.get("/api/lottominer/device-config")
+async def get_lottominer_device_config(ip: str):
     _validate_device_ip(ip)
     async with httpx.AsyncClient(timeout=10) as client:
         try:
@@ -348,8 +353,8 @@ async def get_nmminer_device_config(ip: str):
             raise HTTPException(status_code=502, detail=str(exc))
 
 
-@router.post("/api/nmminer/device-config")
-async def post_nmminer_device_config(data: dict):
+@router.post("/api/lottominer/device-config")
+async def post_lottominer_device_config(data: dict):
     device_ip = data.get("ip")
     if not device_ip:
         raise HTTPException(status_code=400, detail="ip field required in body")
@@ -360,14 +365,14 @@ async def post_nmminer_device_config(data: dict):
             hostname = data.get("Hostname") or device_ip
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({
-                "id": f"nmminer:{device_ip}:config_saved:{now}",
-                "device": f"nmminer:{device_ip}",
+                "id": f"lottominer:{device_ip}:config_saved:{now}",
+                "device": f"lottominer:{device_ip}",
                 "kind": "config_saved",
                 "severity": "info",
-                "message": f"NMMiner {hostname} config saved",
+                "message": f"Lottominer {hostname} config saved",
                 "timestamp": now,
                 "read": True,
-                "source": "nmminer",
+                "source": "lottominer",
             })
             return {"status": resp.status_code, "detail": resp.text[:200]}
         except Exception as exc:

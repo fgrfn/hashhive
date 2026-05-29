@@ -119,16 +119,16 @@ async def _probe_nmminer(ip: str, client: httpx.AsyncClient) -> dict | None:
                 devs = data if isinstance(data, list) else \
                     data.get("devices", data.get("miners", data.get("workers")))
                 if isinstance(devs, list):
-                    return {"ip": ip, "type": "nmminer_master", "name": f"NMMiner master ({ip})",
+                    return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
                             "device_count": len(devs)}
             elif path == "/config":
                 if isinstance(data, dict):
                     configs = data.get("configs")
                     if isinstance(configs, list):
-                        return {"ip": ip, "type": "nmminer_master", "name": f"NMMiner master ({ip})",
+                        return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
                                 "device_count": len(configs)}
                     if NM_FIELDS & set(data.keys()):
-                        return {"ip": ip, "type": "nmminer_device",
+                        return {"ip": ip, "type": "lottominer_device",
                                 "name": data.get("Hostname", ip), "device_count": 1}
         except Exception:
             pass
@@ -294,12 +294,12 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
                 continue
             lst.append(_entry({"type": dtype}))
             added.append(d)
-        elif dtype == "nmminer_master":
-            if config.get("nmminer_master") != ip:
-                config["nmminer_master"] = ip
+        elif dtype == "lottominer_master":
+            if config.get("lottominer_master") != ip:
+                config["lottominer_master"] = ip
                 added.append(d)
-        elif dtype == "nmminer_device":
-            lst = config.setdefault("nmminer_devices", [])
+        elif dtype == "lottominer_device":
+            lst = config.setdefault("lottominer_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
             lst.append(_entry({}))
@@ -319,7 +319,7 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
     return added
 
 
-_DEVICE_LISTS = ("axeos_devices", "nmminer_devices", "nerdminer_devices", "sparkminer_devices")
+_DEVICE_LISTS = ("axeos_devices", "lottominer_devices", "nerdminer_devices", "sparkminer_devices")
 
 
 def reconcile_macs(config: dict, mac_to_ip: dict[str, str]) -> list[dict]:

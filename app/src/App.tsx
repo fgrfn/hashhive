@@ -9,7 +9,7 @@ import { useThemeStore } from './store/theme';
 import { api } from './api';
 
 const Dashboard    = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const NMMiner      = lazy(() => import('./pages/NMMiner').then(m => ({ default: m.NMMiner })));
+const Lottominer   = lazy(() => import('./pages/Lottominer').then(m => ({ default: m.Lottominer })));
 const AxeOS        = lazy(() => import('./pages/AxeOS').then(m => ({ default: m.AxeOS })));
 const GroupsPage   = lazy(() => import('./pages/Groups').then(m => ({ default: m.GroupsPage })));
 const GroupDetail  = lazy(() => import('./pages/Groups').then(m => ({ default: m.GroupDetail })));
@@ -47,7 +47,8 @@ function AppInner() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/miners/nmminer" element={<NMMiner />} />
+            <Route path="/miners/lottominer" element={<Lottominer />} />
+            <Route path="/miners/nmminer" element={<Navigate to="/miners/lottominer" replace />} />
             <Route path="/miners/axeos" element={<AxeOS />} />
             <Route path="/discovery" element={<Discovery />} />
             <Route path="/devices/:ip" element={<DeviceDetail />} />

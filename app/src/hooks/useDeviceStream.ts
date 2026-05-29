@@ -39,15 +39,15 @@ export function useDeviceStream() {
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.nmminer?.devices) store.setDevices(data.nmminer.devices);
+        if (data.lottominer?.devices) store.setDevices(data.lottominer.devices);
         if (data.axeos?.devices) {
           store.setAxeDevices(data.axeos.devices.map((d: AxeDevice) => ({ ...d, status: getAxeStatus(d) })));
         }
         if (typeof data.unread_alerts === 'number') store.setUnreadAlerts(data.unread_alerts);
         if (data.config) store.setSettings(data.config);
-        const nmOnline  = (data.nmminer?.devices  || []).filter((d: { _online?: boolean }) => d._online !== false).length;
+        const nmOnline  = (data.lottominer?.devices  || []).filter((d: { _online?: boolean }) => d._online !== false).length;
         const axeOnline = (data.axeos?.devices    || []).filter((d: { _online?: boolean }) => d._online !== false).length;
-        const nmTotal   = (data.nmminer?.devices  || []).length;
+        const nmTotal   = (data.lottominer?.devices  || []).length;
         const axeTotal  = (data.axeos?.devices    || []).length;
         store.setDeviceCounts(nmTotal + axeTotal, nmOnline + axeOnline);
       } catch { /* malformed WS frame — ignore */ }
@@ -68,7 +68,7 @@ export function useDeviceStream() {
     connect();
 
     api.dashboard().then(data => {
-      if (data.nmminer?.devices) store.setDevices(data.nmminer.devices);
+      if (data.lottominer?.devices) store.setDevices(data.lottominer.devices);
       if (data.axeos?.devices) store.setAxeDevices(data.axeos.devices.map(d => ({ ...d, status: getAxeStatus(d) })));
       if (typeof data.unread_alerts === 'number') store.setUnreadAlerts(data.unread_alerts);
       if (data.config) store.setSettings(data.config);

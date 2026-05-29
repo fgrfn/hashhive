@@ -91,27 +91,27 @@ export function Settings() {
           <div>
             <SectionHeader t={t} title="General" desc="Basic preferences for your HashHive instance." />
             <Card t={t} style={{ marginBottom: 14 }}>
-              <SettingRow t={t} label="Auto-Discover Devices" desc="Scan your local network to find NMMiner and BitAxe/NerdAxe devices automatically." last>
+              <SettingRow t={t} label="Auto-Discover Devices" desc="Scan your local network to find Lottominer (NMMiner/NerdMiner/SparkMiner) and BitAxe/NerdAxe devices automatically." last>
                 <button onClick={() => setDiscoveryOpen(true)} style={{ ...btnStyle(t, 'primary'), fontSize: 12 }}>
                   <Radar size={13} /> Discover
                 </button>
               </SettingRow>
             </Card>
             <Card t={t}>
-              <SettingRow t={t} label="NMMiner Master IP" desc="IP address of your NMMiner swarm master.">
-                <Input t={t} value={localSettings.nmminer_master || ''} onChange={v => upd({ nmminer_master: v })} placeholder="192.168.1.100" mono style={{ width: 200 }} />
+              <SettingRow t={t} label="Lottominer Master IP" desc="IP address of your NMMiner-style swarm master.">
+                <Input t={t} value={localSettings.lottominer_master || ''} onChange={v => upd({ lottominer_master: v })} placeholder="192.168.1.100" mono style={{ width: 200 }} />
               </SettingRow>
               <div style={{ padding: '14px 0 8px' }}>
-                <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Individual NMMiner Devices</div>
+                <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Individual Lottominer Devices</div>
                 <div style={{ fontSize: 12, color: t.textDim, marginBottom: 10 }}>Devices not behind a master — monitored directly by IP.</div>
-                {(localSettings.nmminer_devices || []).map((d, i) => (
+                {(localSettings.lottominer_devices || []).map((d, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <Input t={t} value={d.ip} onChange={v => { const devs = [...(localSettings.nmminer_devices || [])]; devs[i] = { ...devs[i], ip: v }; upd({ nmminer_devices: devs }); }} placeholder="IP address" mono />
-                    <Input t={t} value={d.name || ''} onChange={v => { const devs = [...(localSettings.nmminer_devices || [])]; devs[i] = { ...devs[i], name: v }; upd({ nmminer_devices: devs }); }} placeholder="Name (optional)" />
-                    <button onClick={() => upd({ nmminer_devices: (localSettings.nmminer_devices || []).filter((_, j) => j !== i) })} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}>✕</button>
+                    <Input t={t} value={d.ip} onChange={v => { const devs = [...(localSettings.lottominer_devices || [])]; devs[i] = { ...devs[i], ip: v }; upd({ lottominer_devices: devs }); }} placeholder="IP address" mono />
+                    <Input t={t} value={d.name || ''} onChange={v => { const devs = [...(localSettings.lottominer_devices || [])]; devs[i] = { ...devs[i], name: v }; upd({ lottominer_devices: devs }); }} placeholder="Name (optional)" />
+                    <button onClick={() => upd({ lottominer_devices: (localSettings.lottominer_devices || []).filter((_, j) => j !== i) })} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}>✕</button>
                   </div>
                 ))}
-                <button onClick={() => upd({ nmminer_devices: [...(localSettings.nmminer_devices || []), { ip: '', name: '' }] })} style={{ ...btnStyle(t), fontSize: 12 }}>+ Add device</button>
+                <button onClick={() => upd({ lottominer_devices: [...(localSettings.lottominer_devices || []), { ip: '', name: '' }] })} style={{ ...btnStyle(t), fontSize: 12 }}>+ Add device</button>
               </div>
               <SettingRow t={t} label="Polling interval" desc="How often devices are queried (seconds).">
                 <Input t={t} value={String(localSettings.refresh_interval || 30)} onChange={v => upd({ refresh_interval: Number(v) })} mono type="number" style={{ width: 80 }} />
