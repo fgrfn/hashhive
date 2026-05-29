@@ -87,10 +87,10 @@ def test_rate_limit_resets_after_window():
 
 def test_bootstrap_auth_sets_password(tmp_path, monkeypatch):
     monkeypatch.setenv("HASHHIVE_PASSWORD", "bootstrapme")
-    import core
-    monkeypatch.setattr(core, "CONFIG_FILE", tmp_path / "config.json")
+    import core.auth
+    monkeypatch.setattr(core.auth, "CONFIG_FILE", tmp_path / "config.json")
     _bootstrap_auth()
-    cfg = load_json(core.CONFIG_FILE, DEFAULT_CONFIG)
+    cfg = load_json(core.auth.CONFIG_FILE, DEFAULT_CONFIG)
     assert cfg["auth"]["enabled"] is True
     assert _verify_pw("bootstrapme", cfg["auth"]["password_hash"])
 
@@ -101,8 +101,8 @@ def test_bootstrap_auth_overrides_existing(tmp_path, monkeypatch):
     existing = {"auth": {"enabled": True, "password_hash": _hash_pw("oldpassword")}}
     cfg_file.write_text(json.dumps(existing))
     monkeypatch.setenv("HASHHIVE_PASSWORD", "newpassword")
-    import core
-    monkeypatch.setattr(core, "CONFIG_FILE", cfg_file)
+    import core.auth
+    monkeypatch.setattr(core.auth, "CONFIG_FILE", cfg_file)
     _bootstrap_auth()
     cfg = load_json(cfg_file, DEFAULT_CONFIG)
     assert _verify_pw("newpassword", cfg["auth"]["password_hash"])
@@ -111,7 +111,7 @@ def test_bootstrap_auth_overrides_existing(tmp_path, monkeypatch):
 
 def test_bootstrap_auth_noop_when_no_env(tmp_path, monkeypatch):
     monkeypatch.delenv("HASHHIVE_PASSWORD", raising=False)
-    import core
-    monkeypatch.setattr(core, "CONFIG_FILE", tmp_path / "config.json")
+    import core.auth
+    monkeypatch.setattr(core.auth, "CONFIG_FILE", tmp_path / "config.json")
     _bootstrap_auth()
     assert not (tmp_path / "config.json").exists()
