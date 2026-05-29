@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
@@ -12,6 +13,7 @@ import type { NmAction } from '../api';
 
 export function Lottominer() {
   const { theme: t } = useThemeStore();
+  const navigate = useNavigate();
   const { devices, wsStatus, globalSearch } = useAppStore();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [editDevice, setEditDevice] = useState<string | null>(null);
@@ -219,7 +221,8 @@ export function Lottominer() {
 
       {devices.length === 0 && (
         <div style={{ padding: '20px', color: t.textMuted, fontSize: 13, textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: 10 }}>
-          No NMMiner devices. Add a master/device in Settings or via Discovery.
+          <div style={{ marginBottom: 12 }}>No NMMiner devices yet.</div>
+          <button onClick={() => navigate('/discovery')} style={{ ...btnStyle(t, 'primary'), fontSize: 13 }}>+ Add devices</button>
         </div>
       )}
 

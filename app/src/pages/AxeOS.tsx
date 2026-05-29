@@ -75,7 +75,8 @@ export function AxeOS() {
       <div style={{ textAlign: 'center', padding: 60, color: t.textMuted }}>
         <Zap size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
         <div style={{ fontSize: 16, fontWeight: 600, color: t.text, marginBottom: 6 }}>No BitAxe / NerdAxe devices</div>
-        <div style={{ fontSize: 13 }}>Add your devices in Settings → General → AxeOS Devices.</div>
+        <div style={{ fontSize: 13, marginBottom: 14 }}>Discover them on your network or add one by IP.</div>
+        <button onClick={() => navigate('/discovery')} style={{ ...btnStyle(t, 'primary'), fontSize: 13 }}>+ Add devices</button>
       </div>
     );
   }

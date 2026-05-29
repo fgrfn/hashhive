@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Globe, Eye, Bell, Thermometer, Download, HelpCircle, Lock, Radar } from 'lucide-react';
+import { Settings as SettingsIcon, Eye, Bell, Thermometer, Download, HelpCircle, Lock } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Toggle, Input, Select, FormField, Segmented, btnStyle, HiveMark } from '../components/primitives';
+import { Card, Label, Toggle, Input, FormField, Segmented, btnStyle, HiveMark } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api } from '../api';
 import type { AppSettings } from '../api';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
-import { DiscoveryModal } from '../components/DiscoveryModal';
 import { BackupSection, SectionHeader, SettingRow, SecuritySection, SaveBar } from '../components/settings/SettingsParts';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
-  { id: 'network',       label: 'Network & Discovery', Icon: Globe },
   { id: 'display',       label: 'Display',             Icon: Eye },
   { id: 'notifications', label: 'Notifications',       Icon: Bell },
   { id: 'thresholds',    label: 'Thresholds',          Icon: Thermometer },
@@ -69,7 +67,6 @@ export function Settings() {
   };
 
   const mobile = useMobile();
-  const [discoveryOpen, setDiscoveryOpen] = useState(false);
 
   return (
     <>
@@ -91,29 +88,7 @@ export function Settings() {
         {section === 'general' && (
           <div>
             <SectionHeader t={t} title="General" desc="Basic preferences for your HashHive instance." />
-            <Card t={t} style={{ marginBottom: 14 }}>
-              <SettingRow t={t} label="Auto-Discover Devices" desc="Scan your local network to find Lottominer (NMMiner/NerdMiner/SparkMiner) and BitAxe/NerdAxe devices automatically." last>
-                <button onClick={() => setDiscoveryOpen(true)} style={{ ...btnStyle(t, 'primary'), fontSize: 12 }}>
-                  <Radar size={13} /> Discover
-                </button>
-              </SettingRow>
-            </Card>
             <Card t={t}>
-              <SettingRow t={t} label="Lottominer Master IP" desc="IP address of your NMMiner-style swarm master.">
-                <Input t={t} value={localSettings.lottominer_master || ''} onChange={v => upd({ lottominer_master: v })} placeholder="192.168.1.100" mono style={{ width: 200 }} />
-              </SettingRow>
-              <div style={{ padding: '14px 0 8px' }}>
-                <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Individual Lottominer Devices</div>
-                <div style={{ fontSize: 12, color: t.textDim, marginBottom: 10 }}>Devices not behind a master — monitored directly by IP.</div>
-                {(localSettings.lottominer_devices || []).map((d, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <Input t={t} value={d.ip} onChange={v => { const devs = [...(localSettings.lottominer_devices || [])]; devs[i] = { ...devs[i], ip: v }; upd({ lottominer_devices: devs }); }} placeholder="IP address" mono />
-                    <Input t={t} value={d.name || ''} onChange={v => { const devs = [...(localSettings.lottominer_devices || [])]; devs[i] = { ...devs[i], name: v }; upd({ lottominer_devices: devs }); }} placeholder="Name (optional)" />
-                    <button onClick={() => upd({ lottominer_devices: (localSettings.lottominer_devices || []).filter((_, j) => j !== i) })} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}>✕</button>
-                  </div>
-                ))}
-                <button onClick={() => upd({ lottominer_devices: [...(localSettings.lottominer_devices || []), { ip: '', name: '' }] })} style={{ ...btnStyle(t), fontSize: 12 }}>+ Add device</button>
-              </div>
               <SettingRow t={t} label="Polling interval" desc="How often devices are queried (seconds).">
                 <Input t={t} value={String(localSettings.refresh_interval || 30)} onChange={v => upd({ refresh_interval: Number(v) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
@@ -256,27 +231,8 @@ export function Settings() {
           </div>
         )}
 
-        {section === 'network' && (
-          <div>
-            <SectionHeader t={t} title="Network & Discovery" desc="Configure AxeOS device list." />
-            <Card t={t}>
-              <Label t={t} style={{ marginBottom: 10 }}>AxeOS Devices</Label>
-              {(localSettings.axeos_devices || []).map((d, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                  <Input t={t} value={d.ip} onChange={v => { const devs = [...(localSettings.axeos_devices || [])]; devs[i] = { ...devs[i], ip: v }; upd({ axeos_devices: devs }); }} placeholder="IP" mono />
-                  <Input t={t} value={d.name} onChange={v => { const devs = [...(localSettings.axeos_devices || [])]; devs[i] = { ...devs[i], name: v }; upd({ axeos_devices: devs }); }} placeholder="Name" mono={false} />
-                  <Select t={t} value={d.type} options={[['bitaxe', 'BitAxe'], ['nerdaxe', 'NerdAxe']]} onChange={v => { const devs = [...(localSettings.axeos_devices || [])]; devs[i] = { ...devs[i], type: v }; upd({ axeos_devices: devs }); }} />
-                  <button onClick={() => upd({ axeos_devices: localSettings.axeos_devices?.filter((_, j) => j !== i) })} style={{ ...btnStyle(t, 'danger'), padding: '6px 8px' }}>✕</button>
-                </div>
-              ))}
-              <button onClick={() => upd({ axeos_devices: [...(localSettings.axeos_devices || []), { ip: '', name: '', type: 'bitaxe' }] })} style={{ ...btnStyle(t), fontSize: 12 }}>+ Add device</button>
-            </Card>
-            <SaveBar t={t} saving={saving} onSave={save} />
-          </div>
-        )}
       </div>
     </div>
-    {discoveryOpen && <DiscoveryModal onClose={() => setDiscoveryOpen(false)} />}
     </>
   );
 }

@@ -20,7 +20,7 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
   { id: 'dashboard',     path: '/dashboard',      label: 'Dashboard',        Icon: LayoutDashboard },
   { id: 'lottominer',    path: '/miners/lottominer', label: 'Lottominer',     Icon: Cpu },
   { id: 'axeos',         path: '/miners/axeos',    label: 'BitAxe / NerdAxe', Icon: Zap },
-  { id: 'discovery',     path: '/discovery',       label: 'Discovery',        Icon: Radar },
+  { id: 'discovery',     path: '/discovery',       label: 'Add devices',      Icon: Radar },
   { id: 'groups',        path: '/groups',          label: 'Groups',           Icon: Grid3x3 },
   { id: 'pool',          path: '/pool',            label: 'Pool',             Icon: Globe },
   { id: 'templates',     path: '/templates',       label: 'Templates',        Icon: Copy },
@@ -35,7 +35,7 @@ const TITLE_MAP: Record<string, string> = {
   dashboard: 'Dashboard',
   lottominer: 'Lottominer',
   axeos: 'BitAxe / NerdAxe',
-  discovery: 'Device Discovery',
+  discovery: 'Add devices',
   groups: 'Groups',
   pool: 'Pool Configuration',
   templates: 'Templates',
@@ -184,15 +184,7 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
           t={t} active={active} dark={dark} onToggleDark={toggleDark}
           globalSearch={globalSearch} setGlobalSearch={setGlobalSearch}
           compact={isTablet} btcPrice={btcPrice} btcChange={btcChange}
-          onAddDevice={() => {
-            if (location.pathname.startsWith('/miners/nmminer')) {
-              navigate('/settings/general');
-            } else if (location.pathname.startsWith('/miners/axeos')) {
-              navigate('/settings/network');
-            } else {
-              navigate('/settings/general');
-            }
-          }}
+          onAddDevice={() => navigate('/discovery')}
         />
         {(wsStatus === 'disconnected' || wsStatus === 'reconnecting') && (
           <div style={{ background: wsStatus === 'reconnecting' ? t.warning + '22' : t.danger + '22', borderBottom: `1px solid ${wsStatus === 'reconnecting' ? t.warning : t.danger}44`, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: wsStatus === 'reconnecting' ? t.warning : t.danger, fontFamily: FONT_MONO }}>
