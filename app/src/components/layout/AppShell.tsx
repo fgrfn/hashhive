@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
-  Activity, Wallet, TrendingUp, Bell, Settings, Radar, BarChart3,
+  Activity, Wallet, TrendingUp, Bell, Settings, BarChart3,
   Sun, Moon, Plus, Search, Menu, X,
   Download, LogOut, type LucideIcon,
 } from 'lucide-react';
@@ -20,7 +20,6 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
   { id: 'dashboard',     path: '/dashboard',      label: 'Dashboard',        Icon: LayoutDashboard },
   { id: 'lottominer',    path: '/miners/lottominer', label: 'Lottominer',     Icon: Cpu },
   { id: 'axeos',         path: '/miners/axeos',    label: 'BitAxe / NerdAxe', Icon: Zap },
-  { id: 'discovery',     path: '/discovery',       label: 'Add devices',      Icon: Radar },
   { id: 'groups',        path: '/groups',          label: 'Groups',           Icon: Grid3x3 },
   { id: 'pool',          path: '/pool',            label: 'Pool',             Icon: Globe },
   { id: 'templates',     path: '/templates',       label: 'Templates',        Icon: Copy },
