@@ -44,6 +44,13 @@ export interface ProbabilityResult {
   }>;
 }
 
+export interface AnalyticsResult {
+  fleet: { hashrate_ghs: number; network_difficulty: number | null; best_share: number };
+  beat_best: { record: number; expected_seconds: number | null; windows: ProbWindows };
+  block: { expected_seconds: number | null; windows: ProbWindows };
+  leaderboard: Array<{ ip: string; name: string; type: string; best_diff: number; ts: string | null }>;
+}
+
 export interface SoloDevice {
   _ip?: string;
   _name?: string;

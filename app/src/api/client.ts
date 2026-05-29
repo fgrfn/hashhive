@@ -4,7 +4,7 @@ import type {
   DashboardData, AppSettings, NMMinerDevice, NMMinerConfig, AxeDevice,
   AxeActionResponse, AxeAction, NmAction, DeviceTemplate, SoloDevice, StatSample,
   Group, GroupActionResult, Alert, HealthData, EarningsEntry, PoolPreset, Wallet,
-  Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult,
+  Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult, AnalyticsResult,
 } from './types';
 
 export const api = {
@@ -95,6 +95,7 @@ export const api = {
     test: () => post('/api/notifications/test'),
   },
   probability: () => get<ProbabilityResult>('/api/probability'),
+  analytics: () => get<AnalyticsResult>('/api/analytics'),
   discovery: {
     scan: (opts?: { subnet?: string; extra_ips?: string }) => {
       const q = new URLSearchParams();

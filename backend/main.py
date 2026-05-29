@@ -115,6 +115,7 @@ import routers.discovery as _discovery_router
 import routers.pools as _pools_router
 import routers.templates as _templates_router
 import routers.probability as _probability_router
+import routers.analytics as _analytics_router
 
 
 @asynccontextmanager
@@ -187,6 +188,7 @@ app.include_router(_discovery_router.router)
 app.include_router(_pools_router.router)
 app.include_router(_templates_router.router)
 app.include_router(_probability_router.router)
+app.include_router(_analytics_router.router)
 
 # ── Static assets ──────────────────────────────────────────────────────────────
 

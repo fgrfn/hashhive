@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
-  Activity, Wallet, TrendingUp, Bell, Settings, Radar,
+  Activity, Wallet, TrendingUp, Bell, Settings, Radar, BarChart3,
   Sun, Moon, Plus, Search, Menu, X,
   Download, LogOut, type LucideIcon,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
   { id: 'schedules',     path: '/schedules',       label: 'Schedules',        Icon: Activity },
   { id: 'wallets',       path: '/wallets',         label: 'Wallets',          Icon: Wallet },
   { id: 'earnings',      path: '/earnings',        label: 'Earnings',         Icon: TrendingUp },
+  { id: 'analytics',     path: '/analytics',       label: 'Analytics',        Icon: BarChart3 },
   { id: 'alerts',        path: '/alerts',          label: 'Alerts',           Icon: Bell, badge: true },
   { id: 'settings',      path: '/settings',        label: 'Settings',         Icon: Settings },
 ];
@@ -42,6 +43,7 @@ const TITLE_MAP: Record<string, string> = {
   schedules: 'Schedules',
   wallets: 'Wallets',
   earnings: 'Earnings',
+  analytics: 'Analytics',
   alerts: 'Alerts & Notifications',
   settings: 'Settings',
   device: 'Device Detail',
