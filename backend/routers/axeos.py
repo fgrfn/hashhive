@@ -15,25 +15,16 @@ from core import (
     _validate_device_ip,
     load_json,
 )
+# AxeOS device logic lives in the miners/ driver package. Re-exported here so
+# existing importers (dashboard, notifications, autofan, groups) keep working.
+from miners.axeos import (  # noqa: F401
+    CONFIG_FIELDS as _CONFIG_FIELDS,
+    AXE_ACTIONS as _AXE_ACTIONS,
+    axeos_fanout,
+    fetch_axeos_device as _fetch_axeos_device,
+)
 
 router = APIRouter()
-
-
-async def _fetch_axeos_device(client: httpx.AsyncClient, device) -> dict:
-    if isinstance(device, str):
-        device = {"ip": device, "name": device, "type": "bitaxe"}
-    ip = device.get("ip", "")
-    name = device.get("name", ip)
-    device_type = device.get("type", "bitaxe")
-    temp_max = device.get("temp_max")  # per-device override, may be None
-    try:
-        resp = await client.get(f"http://{ip}/api/system/info")
-        resp.raise_for_status()
-        data = resp.json()
-        data.update({"_ip": ip, "_name": name, "_type": device_type, "_online": True, "_temp_max": temp_max})
-        return data
-    except Exception:
-        return {"_ip": ip, "_name": name, "_type": device_type, "_online": False, "_temp_max": temp_max}
 
 
 @router.get("/api/axeos/devices")
@@ -78,12 +69,6 @@ async def get_axeos_info(ip: str):
 async def get_axeos_config_one(ip: str):
     """Return only the writeable config fields for a single AxeOS device."""
     _validate_device_ip(ip)
-    _CONFIG_FIELDS = {
-        "stratumURL", "stratumUser", "stratumPassword", "stratumPort",
-        "fallbackStratumURL", "fallbackStratumUser", "fallbackStratumPassword", "fallbackStratumPort",
-        "frequency", "coreVoltage", "fanspeed", "autofanspeed", "temptarget",
-        "hostname", "ssid",
-    }
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(f"http://{ip}/api/system/info")
@@ -100,25 +85,6 @@ async def patch_axeos_config_one(ip: str, data: dict):
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.patch(f"http://{ip}/api/system", json=data)
     return {"ip": ip, "status": resp.status_code}
-
-
-_AXE_ACTIONS = {"pause", "resume", "restart", "identify"}
-
-
-async def axeos_fanout(action: str, ips: list[str]) -> list[dict]:
-    """Fire an AxeOS system action at many devices concurrently. Reused by the
-    batch endpoint, schedules and group actions."""
-    results: list[dict] = []
-    limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
-    async with httpx.AsyncClient(timeout=15, limits=limits) as client:
-        async def _act(ip: str):
-            try:
-                resp = await client.post(f"http://{ip}/api/system/{action}")
-                results.append({"ip": ip, "status": resp.status_code})
-            except Exception as exc:
-                results.append({"ip": ip, "error": str(exc)})
-        await asyncio.gather(*[_act(ip) for ip in ips])
-    return results
 
 
 @router.post("/api/axeos/action/batch")
