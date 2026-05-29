@@ -109,6 +109,8 @@ import routers.schedules as _schedules_router
 import routers.wallets as _wallets_router
 import routers.earnings as _earnings_router
 import routers.stats as _stats_router
+import routers.health as _health_router
+import routers.updates as _updates_router
 import routers.discovery as _discovery_router
 import routers.pools as _pools_router
 import routers.templates as _templates_router
@@ -179,6 +181,8 @@ app.include_router(_schedules_router.router)
 app.include_router(_wallets_router.router)
 app.include_router(_earnings_router.router)
 app.include_router(_stats_router.router)
+app.include_router(_health_router.router)
+app.include_router(_updates_router.router)
 app.include_router(_discovery_router.router)
 app.include_router(_pools_router.router)
 app.include_router(_templates_router.router)

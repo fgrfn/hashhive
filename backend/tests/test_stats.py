@@ -12,7 +12,8 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core import STATS_DIR, _dev_stats_file, _stats_file, save_json  # noqa: E402
-from routers.stats import device_health, get_hashrate_stats  # noqa: E402
+from routers.health import device_health  # noqa: E402
+from routers.stats import get_hashrate_stats  # noqa: E402
 
 STATS_DIR.mkdir(parents=True, exist_ok=True)
 
