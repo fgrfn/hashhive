@@ -88,7 +88,6 @@ async def scan_lottominer_devices():
     parts = local_ip.split(".")
     subnet = ".".join(parts[:3])
 
-    NM_FIELDS = {"PrimaryPool", "WiFiSSID", "Hostname", "PrimaryAddress"}
     found: list[dict] = []
     sem = asyncio.Semaphore(60)
 
@@ -96,49 +95,22 @@ async def scan_lottominer_devices():
     async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
         async def _probe(ip: str):
             async with sem:
-                for path in ("/swarm", "/config"):
-                    try:
-                        resp = await client.get(f"http://{ip}{path}")
-                        if resp.status_code != 200:
-                            continue
-                        data = resp.json()
-                        if path == "/swarm":
-                            devs = data if isinstance(data, list) else \
-                                   data.get("devices", data.get("miners", data.get("workers", None)))
-                            if isinstance(devs, list):
-                                found.append({
-                                    "ip": ip,
-                                    "role": "master",
-                                    "device_count": len(devs),
-                                    "devices": [
-                                        {"ip": d.get("ip", ip), "name": d.get("hostname") or d.get("name") or d.get("ip", ip)}
-                                        for d in devs if isinstance(d, dict)
-                                    ],
-                                })
-                                return
-                        elif path == "/config":
-                            configs = data.get("configs") if isinstance(data, dict) else None
-                            if isinstance(configs, list):
-                                found.append({
-                                    "ip": ip,
-                                    "role": "master",
-                                    "device_count": len(configs),
-                                    "devices": [
-                                        {"ip": e.get("ip", ip), "name": (e.get("config") or {}).get("Hostname") or e.get("ip", ip)}
-                                        for e in configs if isinstance(e, dict)
-                                    ],
-                                })
-                                return
-                            if isinstance(data, dict) and NM_FIELDS & set(data.keys()):
-                                found.append({
-                                    "ip": ip,
-                                    "role": "device",
-                                    "device_count": 1,
-                                    "devices": [{"ip": ip, "name": data.get("Hostname", ip)}],
-                                })
-                                return
-                    except Exception:
-                        pass
+                try:
+                    resp = await client.get(f"http://{ip}/probe")
+                    if resp.status_code != 200:
+                        return
+                    data = resp.json()
+                    if not isinstance(data, dict):
+                        return
+                    if str(data.get("model", "")).lower() == "nmminer" or ("hr" in data and "ver" in data):
+                        found.append({
+                            "ip": ip,
+                            "role": "device",
+                            "device_count": 1,
+                            "devices": [{"ip": ip, "name": data.get("hostname") or f"NMMiner ({ip})"}],
+                        })
+                except Exception:
+                    pass
 
         await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
 
@@ -172,22 +144,28 @@ async def broadcast_lottominer_config(data: dict):
 
 @router.get("/api/lottominer/device-config")
 async def get_lottominer_device_config(ip: str):
+    """Read NMMiner mining + network settings into a single config object."""
     _validate_device_ip(ip)
     async with httpx.AsyncClient(timeout=10) as client:
         try:
-            resp = await client.get(f"http://{ip}/config")
-            resp.raise_for_status()
-            data = resp.json()
-            if isinstance(data, dict) and "configs" in data:
-                for entry in data["configs"]:
-                    if entry.get("ip") == ip:
-                        return entry.get("config", entry)
-                if data["configs"]:
-                    first = data["configs"][0]
-                    return first.get("config", first)
-            return data
+            mining = await client.get(f"http://{ip}/api/setting/mining")
+            mining.raise_for_status()
+            cfg = dict(mining.json()) if isinstance(mining.json(), dict) else {}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
+        try:
+            net = await client.get(f"http://{ip}/api/setting/network")
+            if net.status_code == 200 and isinstance(net.json(), dict):
+                cfg.update({k: v for k, v in net.json().items() if k in ("Hostname", "WiFiSSID")})
+        except Exception:
+            pass
+        cfg["ip"] = ip
+        return cfg
+
+
+_MINING_KEYS = {"PrimaryPool", "PrimaryAddress", "PrimaryPassword",
+                "SecondaryPool", "SecondaryAddress", "SecondaryPassword"}
+_NETWORK_KEYS = {"Hostname", "WiFiSSID", "WiFiPWD"}
 
 
 @router.post("/api/lottominer/device-config")
@@ -196,9 +174,14 @@ async def post_lottominer_device_config(data: dict):
     if not device_ip:
         raise HTTPException(status_code=400, detail="ip field required in body")
     _validate_device_ip(device_ip)
+    mining = {k: v for k, v in data.items() if k in _MINING_KEYS}
+    network = {k: v for k, v in data.items() if k in _NETWORK_KEYS}
     async with httpx.AsyncClient(timeout=15) as client:
         try:
-            resp = await client.post(f"http://{device_ip}/broadcast-config", json=data)
+            if mining:
+                await client.post(f"http://{device_ip}/api/setting/mining", json=mining)
+            if network:
+                await client.post(f"http://{device_ip}/api/setting/network", json=network)
             hostname = data.get("Hostname") or device_ip
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({
@@ -211,6 +194,7 @@ async def post_lottominer_device_config(data: dict):
                 "read": True,
                 "source": "lottominer",
             })
-            return {"status": resp.status_code, "detail": resp.text[:200]}
+            return {"status": 200}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
+
