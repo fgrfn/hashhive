@@ -97,10 +97,9 @@ async def _get_axe_hostname(client: httpx.AsyncClient, ip: str) -> str:
 
 async def _get_nm_hostname(client: httpx.AsyncClient, ip: str) -> str:
     try:
-        r = await client.get(f"http://{ip}/config", timeout=5.0)
+        r = await client.get(f"http://{ip}/api/setting/network", timeout=5.0)
         data = r.json()
-        actual = data.get("config", data)
-        return actual.get("Hostname") or actual.get("hostname") or ip
+        return data.get("Hostname") or data.get("hostname") or ip
     except Exception:
         return ip
 
@@ -147,7 +146,7 @@ async def push_pool_to_device(ip: str, pool: dict):
             return {"ip": ip, "type": "axeos", "status": resp.status_code}
 
         else:
-            target = nm_master if nm_master else ip
+            # NMMiner: POST mining settings to the device itself (no master/swarm).
             hostname = await _get_nm_hostname(client, ip)
             worker = f"{wallet}.{hostname}" if wallet else pool.get("worker", "")
             payload = {
@@ -160,5 +159,5 @@ async def push_pool_to_device(ip: str, pool: dict):
                 payload["SecondaryPool"] = url2
                 payload["SecondaryAddress"] = w2
                 payload["SecondaryPassword"] = password2
-            resp = await client.post(f"http://{target}/broadcast-config", json=payload)
+            resp = await client.post(f"http://{ip}/api/setting/mining", json=payload)
             return {"ip": ip, "type": "lottominer", "status": resp.status_code}

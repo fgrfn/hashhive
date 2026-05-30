@@ -1,7 +1,13 @@
-"""Lottominer (NMMiner-style ESP32 master/swarm) driver + helpers.
+"""Lottominer (NMMiner) driver + helpers — uses the real NMMiner HTTP API.
 
-Moved out of routers/lottominer.py. The router keeps the HTTP endpoints and
-imports these helpers.
+NMMiner exposes:
+  GET  /probe                  -> {model:"NMMiner", hostname, ver, hr, sbd, ebd, ut, ...}
+  GET  /api/system/info        -> {identity, miner, stratum, temps, storage}
+  GET/POST /api/setting/mining -> Primary/Secondary pool+address+password
+  GET/POST /api/setting/network-> Hostname, WiFiSSID
+  POST /api/system/restart
+(There is no /swarm, /config or /reboot — those were assumed incorrectly before.)
+Docs: https://github.com/NMminer1024/NMMiner/blob/main/docs/api-reference.md
 """
 
 import asyncio
@@ -14,11 +20,43 @@ from core import _append_entry, _validate_device_ip
 from .base import MinerDriver
 
 LOTTO_ACTION_MAP = {
-    "restart": "/reboot",
+    "restart": "/api/system/restart",
 }
 
-# Fields that identify an NMMiner-style device config during a scan/probe.
-_NM_PROBE_FIELDS = {"PrimaryPool", "WiFiSSID", "Hostname", "PrimaryAddress"}
+
+def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
+    """Map a NMMiner /api/system/info snapshot to the unified device dict."""
+    identity = data.get("identity", {}) if isinstance(data, dict) else {}
+    miner = data.get("miner", {}) if isinstance(data, dict) else {}
+    stratum = data.get("stratum", {}) if isinstance(data, dict) else {}
+    temps = data.get("temps", {}) if isinstance(data, dict) else {}
+    hr = miner.get("hashRate")  # GH/s
+    temp = temps.get("asic")
+    if temp is None:
+        temp = temps.get("vcore")
+    return {
+        "_ip": ip, "_name": name, "_type": "lottominer", "_online": True, "_temp_max": temp_max,
+        "ip": ip,
+        "name": name,
+        "hostname": identity.get("hostName") or name,
+        "GHs": hr, "GHs5s": hr, "hashrate": hr,
+        "temp": temp,
+        "pool": stratum.get("url", ""),
+        "stratumURL": stratum.get("url", ""),
+        "worker": stratum.get("user", ""),
+        "stratumUser": stratum.get("user", ""),
+        "uptime": miner.get("uptimeSeconds"),
+        "bestDiff": miner.get("bestDiffEver"),
+        "bestShare": miner.get("bestDiffEver"),
+        "lastDiff": miner.get("lastDiff"),
+        "version": identity.get("fwVersion", ""),
+        "shares_ok": miner.get("sAccepted"),
+        "shares_err": miner.get("sRejected"),
+        "rssi": identity.get("rssi"),
+        "wifi_rssi": identity.get("rssi"),
+        "online": True,
+        "status": "online",
+    }
 
 
 async def fetch_lottominer_safe(
@@ -26,134 +64,36 @@ async def fetch_lottominer_safe(
     master: str,
     nm_devices: list | None = None,
 ) -> dict:
-    def _normalize(data) -> dict | None:
-        if isinstance(data, list):
-            return {"devices": data}
-        if isinstance(data, dict):
-            if "devices" in data and isinstance(data["devices"], list):
-                return data
-            for key in ("miners", "workers", "peers", "swarm", "data"):
-                if key in data and isinstance(data[key], list):
-                    return {"devices": data[key]}
-            values = list(data.values())
-            if values and isinstance(values[0], dict) and any(
-                k in values[0] for k in ("ip", "hashrate", "GHs", "temp", "pool")
-            ):
-                return {"devices": [{"ip": k, **v} for k, v in data.items() if isinstance(v, dict)]}
-        return None
-
-    # Try master first (one request for all devices)
+    """Poll each configured NMMiner via GET /api/system/info (devices are standalone)."""
+    seen: set[str] = set()
+    targets: list[dict] = []
     if master:
+        targets.append({"ip": master, "name": master})
+        seen.add(master)
+    for d in (nm_devices or []):
+        ip = d.get("ip") if isinstance(d, dict) else d
+        if ip and ip not in seen:
+            seen.add(ip)
+            targets.append({"ip": ip, "name": (d.get("name") if isinstance(d, dict) else "") or ip,
+                            "temp_max": d.get("temp_max") if isinstance(d, dict) else None})
+    if not targets:
+        return {"devices": [], "_error": "no Lottominer configured"}
+
+    results: list[dict] = []
+
+    async def _one(dev: dict):
+        ip = dev["ip"]
         try:
-            resp = await client.get(f"http://{master}/swarm")
-            resp.raise_for_status()
-            result = _normalize(resp.json())
-            if result is not None:
-                # Also fetch master config to get PrimaryPool / PrimaryAddress (wallet)
-                try:
-                    cfg_resp = await client.get(f"http://{master}/config")
-                    cfg_resp.raise_for_status()
-                    master_cfg = cfg_resp.json()
-                    if isinstance(master_cfg, dict):
-                        cfg_list = master_cfg.get("configs") if "configs" in master_cfg else None
-                        if isinstance(cfg_list, list) and cfg_list:
-                            cfg_by_ip_map: dict = {}
-                            cfg_by_host_map: dict = {}
-                            for c in cfg_list:
-                                entry_ip = c.get("ip", "")
-                                actual = c.get("config", c) if isinstance(c, dict) else c
-                                if entry_ip:
-                                    cfg_by_ip_map[entry_ip] = (entry_ip, actual)
-                                host = (actual.get("Hostname") or actual.get("hostname") or "")
-                                if host:
-                                    cfg_by_host_map[host] = (entry_ip, actual)
-
-                            for dev in result.get("devices", []):
-                                dev_ip = dev.get("ip", "")
-                                dev_host = dev.get("hostname") or dev.get("name") or ""
-                                if dev_ip and dev_ip in cfg_by_ip_map:
-                                    entry_ip, actual = cfg_by_ip_map[dev_ip]
-                                elif dev_host and dev_host in cfg_by_host_map:
-                                    entry_ip, actual = cfg_by_host_map[dev_host]
-                                    if not dev_ip and entry_ip:
-                                        dev["ip"] = entry_ip
-                                else:
-                                    c0 = cfg_list[0]
-                                    entry_ip = c0.get("ip", "")
-                                    actual = c0.get("config", c0) if isinstance(c0, dict) else c0
-                                pool = actual.get("PrimaryPool") or actual.get("pool") or ""
-                                addr = actual.get("PrimaryAddress") or actual.get("user") or ""
-                                if pool and not dev.get("PrimaryPool"):
-                                    dev["PrimaryPool"] = pool
-                                if addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
-                                    dev["PrimaryAddress"] = addr
-                        else:
-                            actual_top = master_cfg.get("config", master_cfg)
-                            primary_pool = actual_top.get("PrimaryPool") or actual_top.get("pool") or ""
-                            primary_addr = actual_top.get("PrimaryAddress") or actual_top.get("user") or ""
-                            for dev in result.get("devices", []):
-                                if primary_pool and not dev.get("PrimaryPool"):
-                                    dev["PrimaryPool"] = primary_pool
-                                if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
-                                    dev["PrimaryAddress"] = primary_addr
-                except Exception:
-                    pass  # config fetch is best-effort; swarm data still usable
-                # Enrich with per-device config overrides by IP
-                if nm_devices:
-                    cfg_by_ip = {d["ip"]: d for d in nm_devices if d.get("ip")}
-                    for dev in result.get("devices", []):
-                        ip = dev.get("ip", "")
-                        if ip in cfg_by_ip:
-                            dev["_temp_max"] = cfg_by_ip[ip].get("temp_max")
-                return result
+            r = await client.get(f"http://{ip}/api/system/info")
+            r.raise_for_status()
+            results.append(_normalize_info(ip, dev.get("name", ip), dev.get("temp_max"), r.json()))
         except Exception:
-            pass  # fall through to per-device queries
+            results.append({"_ip": ip, "_name": dev.get("name", ip), "_type": "lottominer",
+                            "_online": False, "_temp_max": dev.get("temp_max"),
+                            "ip": ip, "hostname": dev.get("name", ip), "online": False, "status": "offline"})
 
-    # Fallback: query each known device individually
-    if nm_devices:
-        all_devs: list = []
-        cfg_by_ip = {d["ip"]: d for d in nm_devices if d.get("ip")}
-
-        async def _fetch_one(ip: str):
-            try:
-                r = await client.get(f"http://{ip}/swarm")
-                r.raise_for_status()
-                data = r.json()
-                devs = data if isinstance(data, list) else data.get("devices", [data])
-                devs = devs if isinstance(devs, list) else [devs]
-                primary_pool = ""
-                primary_addr = ""
-                try:
-                    cr = await client.get(f"http://{ip}/config")
-                    cr.raise_for_status()
-                    cfg = cr.json()
-                    if isinstance(cfg, dict):
-                        cfg_items = cfg.get("configs")
-                        if isinstance(cfg_items, list) and cfg_items:
-                            match = next((c for c in cfg_items if c.get("ip") == ip), cfg_items[0])
-                        else:
-                            match = cfg
-                        actual = match.get("config", match) if isinstance(match, dict) else match
-                        primary_pool = actual.get("PrimaryPool") or actual.get("pool") or ""
-                        primary_addr = actual.get("PrimaryAddress") or actual.get("user") or ""
-                except Exception:
-                    pass
-                for dev in devs:
-                    if not dev.get("ip"):
-                        dev["ip"] = ip
-                    dev["_temp_max"] = cfg_by_ip.get(ip, {}).get("temp_max")
-                    if primary_pool and not dev.get("PrimaryPool"):
-                        dev["PrimaryPool"] = primary_pool
-                    if primary_addr and not dev.get("PrimaryAddress") and not dev.get("worker") and not dev.get("user"):
-                        dev["PrimaryAddress"] = primary_addr
-                all_devs.extend(devs)
-            except Exception:
-                all_devs.append({"ip": ip, "online": False, "_temp_max": cfg_by_ip.get(ip, {}).get("temp_max")})
-
-        await asyncio.gather(*[_fetch_one(d["ip"]) for d in nm_devices if d.get("ip")])
-        return {"devices": all_devs}
-
-    return {"devices": [], "_error": "no Lottominer configured"}
+    await asyncio.gather(*[_one(d) for d in targets])
+    return {"devices": results}
 
 
 async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
@@ -187,31 +127,28 @@ async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
 
 
 async def probe_lottominer(ip: str, client: httpx.AsyncClient) -> dict | None:
-    """Discovery probe: detect an NMMiner-style master or standalone device."""
-    for path in ("/swarm", "/config"):
-        try:
-            resp = await client.get(f"http://{ip}{path}", timeout=2.0)
-            if resp.status_code != 200:
-                continue
-            data = resp.json()
-            if path == "/swarm":
-                devs = data if isinstance(data, list) else \
-                    data.get("devices", data.get("miners", data.get("workers")))
-                if isinstance(devs, list):
-                    return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
-                            "device_count": len(devs)}
-            elif path == "/config":
-                if isinstance(data, dict):
-                    configs = data.get("configs")
-                    if isinstance(configs, list):
-                        return {"ip": ip, "type": "lottominer_master", "name": f"Lottominer master ({ip})",
-                                "device_count": len(configs)}
-                    if _NM_PROBE_FIELDS & set(data.keys()):
-                        return {"ip": ip, "type": "lottominer_device",
-                                "name": data.get("Hostname", ip), "device_count": 1}
-        except Exception:
-            pass
-    return None
+    """Discovery probe: detect a NMMiner via its /probe endpoint (model == NMMiner)."""
+    try:
+        resp = await client.get(f"http://{ip}/probe", timeout=2.0)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        if not isinstance(data, dict):
+            return None
+        is_nm = str(data.get("model", "")).lower() == "nmminer" or (
+            "hr" in data and "ver" in data
+        )
+        if not is_nm:
+            return None
+        return {
+            "ip": ip,
+            "type": "lottominer_device",
+            "name": data.get("hostname") or f"NMMiner ({ip})",
+            "device_count": 1,
+            "version": data.get("ver", ""),
+        }
+    except Exception:
+        return None
 
 
 class LottominerDriver(MinerDriver):
