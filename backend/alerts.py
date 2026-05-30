@@ -21,18 +21,32 @@ _NET_DIFF_TTL = 600  # refresh every 10 minutes
 
 
 async def _get_network_difficulty() -> float | None:
-    """Fetch current Bitcoin network difficulty from mempool.space, cached for 10 min."""
+    """Fetch the current Bitcoin network difficulty (cached 10 min).
+
+    Tries mempool.space first, then blockchain.info as a fallback so the value
+    still populates if one source is blocked/unreachable.
+    """
     now = datetime.now(timezone.utc).timestamp()
     cached_at = _NET_DIFF_CACHE["fetched_at"]
     if cached_at and (now - cached_at) < _NET_DIFF_TTL and _NET_DIFF_CACHE["difficulty"]:
         return _NET_DIFF_CACHE["difficulty"]
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get("https://mempool.space/api/v1/difficulty-adjustment")
+            try:
+                resp = await client.get("https://mempool.space/api/v1/difficulty-adjustment")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    diff = float(data.get("currentDifficulty") or data.get("difficulty") or 0)
+                    if diff > 0:
+                        _NET_DIFF_CACHE["difficulty"] = diff
+                        _NET_DIFF_CACHE["fetched_at"] = now
+                        return diff
+            except Exception:
+                pass
+            # Fallback: blockchain.info returns the raw difficulty as plain text.
+            resp = await client.get("https://blockchain.info/q/getdifficulty")
             if resp.status_code == 200:
-                data = resp.json()
-                # currentDifficulty is the raw difficulty value
-                diff = float(data.get("currentDifficulty") or data.get("difficulty") or 0)
+                diff = float(resp.text.strip())
                 if diff > 0:
                     _NET_DIFF_CACHE["difficulty"] = diff
                     _NET_DIFF_CACHE["fetched_at"] = now

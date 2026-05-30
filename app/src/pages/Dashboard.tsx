@@ -8,6 +8,18 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, matchesSearch, fmtProb, type StatSample, type ProbabilityResult } from '../api';
 import type { Alert } from '../api';
 
+/** Time-only for today's entries; "MMM D, HH:MM:SS" for older ones (so logs from
+ *  previous days aren't mistaken for today). */
+function fmtLogTime(ts: string): string {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString()
+    : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString()}`;
+}
+
 export function Dashboard() {
   const { theme: t } = useThemeStore();
   const { devices, axeDevices, unreadAlerts, devicesOnline, devicesTotal, wsStatus, globalSearch } = useAppStore();
@@ -177,7 +189,7 @@ export function Dashboard() {
             <div style={{ color: t.textDim, padding: '8px 0' }}>No log entries yet.</div>
           ) : filteredLog.map((l, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 0', lineHeight: 1.6, alignItems: 'flex-start' }}>
-              <span style={{ color: t.textDim, fontSize: 11, flexShrink: 0 }}>{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : l.when || ''}</span>
+              <span style={{ color: t.textDim, fontSize: 11, flexShrink: 0 }}>{l.timestamp ? fmtLogTime(l.timestamp) : l.when || ''}</span>
               <span style={{
                 fontSize: 10, padding: '0 6px', borderRadius: 3, fontWeight: 600,
                 textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
