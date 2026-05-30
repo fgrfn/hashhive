@@ -15,7 +15,7 @@ export function Pool() {
   return (
     <div>
       <div style={{ display: 'flex', borderBottom: `1px solid ${t.border}`, marginBottom: 16 }}>
-        {[['library', 'Pool library'], ['assignments', 'Miner assignments']].map(([id, label]) => (
+        {[['library', 'Pool library'], ['assignments', 'Miner assignments'], ['status', 'Pool status']].map(([id, label]) => (
           <div key={id} onClick={() => setTab(id)} style={{ padding: '12px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: tab === id ? t.accent : t.textMuted, borderBottom: tab === id ? `2px solid ${t.accent}` : '2px solid transparent', marginBottom: -1 }}>
             {label}
           </div>
@@ -23,6 +23,7 @@ export function Pool() {
       </div>
       {tab === 'library' && <PoolLibrary />}
       {tab === 'assignments' && <MinerAssignments />}
+      {tab === 'status' && <PoolStatus />}
     </div>
   );
 }
@@ -275,5 +276,74 @@ function MinerAssignments() {
         ))}
       </Card>
     </div>
+  );
+}
+
+interface PoolStat { url: string; devices: number; online: number; accepted: number; rejected: number; }
+
+function PoolStatus() {
+  const { theme: t } = useThemeStore();
+  const { devices, axeDevices } = useAppStore();
+  const [pings, setPings] = useState<Record<string, number | null>>({});
+
+  // Aggregate per active pool URL across all configured miners.
+  const stats: PoolStat[] = (() => {
+    const map = new Map<string, PoolStat>();
+    const add = (url: string, online: boolean, acc: number, rej: number) => {
+      const key = (url || '').trim();
+      if (!key) return;
+      const s = map.get(key) || { url: key, devices: 0, online: 0, accepted: 0, rejected: 0 };
+      s.devices += 1;
+      if (online) { s.online += 1; s.accepted += acc; s.rejected += rej; }
+      map.set(key, s);
+    };
+    for (const d of axeDevices) {
+      const url = (d.isUsingFallbackStratum ? d.fallbackStratumURL : d.stratumURL) || d.stratumURL || '';
+      add(url, !!d._online, d.sharesAccepted || 0, d.sharesRejected || 0);
+    }
+    for (const d of devices) {
+      add(d.pool || d.stratumURL || '', d._online !== false, d.shares_ok || 0, d.shares_err || 0);
+    }
+    return [...map.values()].sort((a, b) => b.devices - a.devices);
+  })();
+
+  useEffect(() => {
+    let alive = true;
+    stats.forEach(s => {
+      api.pools.ping(s.url).then(r => { if (alive) setPings(p => ({ ...p, [s.url]: r.latency_ms })); }).catch(() => {});
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.map(s => s.url).join(',')]);
+
+  if (stats.length === 0) {
+    return <Card t={t}><div style={{ color: t.textMuted, fontSize: 13, padding: '8px 0' }}>No pool data yet — connect miners to a pool to see live status here.</div></Card>;
+  }
+
+  return (
+    <Card t={t} noPad>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 90px 90px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
+        {['Pool', 'Devices', 'Accepted', 'Rejected', 'Accept %', 'Ping'].map((c, i) => (
+          <Label key={c} t={t} style={{ textAlign: i === 0 ? 'left' : 'right' }}>{c}</Label>
+        ))}
+      </div>
+      {stats.map((s, i) => {
+        const total = s.accepted + s.rejected;
+        const pct = total > 0 ? (s.accepted / total) * 100 : null;
+        const ping = pings[s.url];
+        return (
+          <div key={s.url} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 90px 90px', gap: 10, padding: '12px 16px', borderBottom: i === stats.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: s.online === s.devices ? t.success : s.online > 0 ? t.warning : t.danger }}>{s.online}/{s.devices}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: t.success }}>{s.accepted.toLocaleString()}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: s.rejected > 0 ? t.danger : t.textMuted }}>{s.rejected.toLocaleString()}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO }}>{pct != null ? `${pct.toFixed(1)}%` : '—'}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: ping == null ? t.danger : ping < 100 ? t.success : ping < 300 ? t.warning : t.danger }}>
+              {ping === undefined ? '…' : ping == null ? 'down' : `${ping} ms`}
+            </div>
+          </div>
+        );
+      })}
+    </Card>
   );
 }

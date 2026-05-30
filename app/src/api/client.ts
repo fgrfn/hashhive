@@ -78,6 +78,7 @@ export const api = {
     update:       (id: string, p: Partial<PoolPreset>) => put<PoolPreset>(`/api/pools/${id}`, p),
     delete:       (id: string)                         => del(`/api/pools/${id}`),
     pushToDevice: (ip: string, pool: Partial<PoolPreset>) => post(`/api/pools/push/${ip}`, pool),
+    ping:         (target: string)                     => get<{ target: string; latency_ms: number | null }>(`/api/pools/ping?target=${encodeURIComponent(target)}`),
   },
   wallets: {
     list:   ()                                => get<Wallet[]>('/api/wallets'),

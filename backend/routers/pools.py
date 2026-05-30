@@ -1,14 +1,43 @@
 """Pool-preset CRUD + push-to-device."""
 
+import asyncio
+import time
 import uuid
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from core import CONFIG_FILE, DEFAULT_CONFIG, _validate_device_ip, load_json, save_json
 
 router = APIRouter()
+
+
+@router.get("/api/pools/ping")
+async def ping_pool(target: str = Query(..., description="host:port or stratum+tcp://host:port")):
+    """Measure TCP connect latency to a stratum pool endpoint."""
+    host_port = target.split("://")[-1].strip().strip("/").split("/")[0]
+    if ":" not in host_port:
+        raise HTTPException(status_code=400, detail="target must be host:port")
+    host, _, port_s = host_port.rpartition(":")
+    try:
+        port = int(port_s)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid port")
+    if not host or not (1 <= port <= 65535):
+        raise HTTPException(status_code=400, detail="invalid target")
+    start = time.perf_counter()
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=4)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return {"target": f"{host}:{port}", "latency_ms": round((time.perf_counter() - start) * 1000, 1)}
+    except Exception:
+        return {"target": f"{host}:{port}", "latency_ms": None}
+
 
 
 def _presets(config: dict) -> list[dict]:
