@@ -196,6 +196,9 @@ export function Settings() {
                 );
               })}
             </div>
+
+            <DiscordDashboardCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
+
             <SaveBar t={t} saving={saving} onSave={save} />
           </div>
         )}
@@ -234,5 +237,57 @@ export function Settings() {
       </div>
     </div>
     </>
+  );
+}
+
+function DiscordDashboardCard({ t, localSettings, upd, updToggle }: {
+  t: import('../tokens').Theme;
+  localSettings: AppSettings;
+  upd: (patch: Partial<AppSettings>) => void;
+  updToggle: (patch: Partial<AppSettings>) => void;
+}) {
+  const dd = localSettings.discord_dashboard || {};
+  const enabled = !!dd.enabled;
+  const [testing, setTesting] = useState(false);
+  // Falls back to the Discord alert webhook when no dedicated one is set.
+  const hasWebhook = !!(dd.webhook || localSettings.notifications?.discord_webhook);
+
+  const runTest = async () => {
+    setTesting(true);
+    try {
+      await api.notifications.testDiscordDashboard();
+      toast('Discord dashboard updated');
+    } catch {
+      toast('Failed to update Discord dashboard', 'error');
+    }
+    setTesting(false);
+  };
+
+  return (
+    <Card t={t} style={{ marginTop: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.accent }}>Live Discord Dashboard</div>
+          <div style={{ fontSize: 12, color: t.textMuted, marginTop: 3 }}>
+            A single fleet-summary embed that updates itself in place via webhook.
+          </div>
+        </div>
+        <Toggle t={t} on={enabled} onChange={v => updToggle({ discord_dashboard: { ...dd, enabled: v } })} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <FormField t={t} label="Webhook URL (optional — uses the Discord alert webhook if blank)"
+          value={String(dd.webhook || '')} onChange={v => upd({ discord_dashboard: { ...dd, webhook: v } })} mono
+          placeholder="https://discord.com/api/webhooks/…" />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <FormField t={t} label="Update interval (seconds, min 30)" type="number"
+          value={String(dd.interval_seconds ?? 60)}
+          onChange={v => upd({ discord_dashboard: { ...dd, interval_seconds: Math.max(30, Number(v) || 60) } })} mono />
+      </div>
+      <button onClick={runTest} disabled={!hasWebhook || testing}
+        style={{ ...btnStyle(t), fontSize: 11, opacity: hasWebhook && !testing ? 1 : 0.5 }}>
+        {testing ? 'Sending…' : 'Send now'}
+      </button>
+    </Card>
   );
 }

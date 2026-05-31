@@ -99,6 +99,7 @@ export const api = {
   },
   notifications: {
     test: () => post('/api/notifications/test'),
+    testDiscordDashboard: () => post('/api/discord-dashboard/test'),
   },
   probability: () => get<ProbabilityResult>('/api/probability'),
   analytics: () => get<AnalyticsResult>('/api/analytics'),

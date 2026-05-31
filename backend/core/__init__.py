@@ -16,6 +16,7 @@ from .paths import (
     TEMPLATES_DIR,
     DISCOVERY_STATE_FILE,
     RECORDS_FILE,
+    DISCORD_DASHBOARD_STATE_FILE,
     FRONTEND_DIR,
     _SESSIONS_FILE,
     MAX_ENTRIES_PER_DAY,
@@ -75,7 +76,8 @@ from .autorestart import _check_auto_restart, _check_auto_restart_solo
 
 __all__ = [
     "BASE_DIR", "DATA_DIR", "CONFIG_FILE", "ALERT_HISTORY_FILE", "DEVICE_STATE_FILE",
-    "LOGS_DIR", "STATS_DIR", "TEMPLATES_DIR", "DISCOVERY_STATE_FILE", "RECORDS_FILE", "FRONTEND_DIR",
+    "LOGS_DIR", "STATS_DIR", "TEMPLATES_DIR", "DISCOVERY_STATE_FILE", "RECORDS_FILE",
+    "DISCORD_DASHBOARD_STATE_FILE", "FRONTEND_DIR",
     "_SESSIONS_FILE", "MAX_ENTRIES_PER_DAY", "KEEP_DAYS",
     "_resolve_version", "APP_VERSION",
     "_startup_time", "_price_cache", "_low_hr_since", "_solo_zero_hr_since",

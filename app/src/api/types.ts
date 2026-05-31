@@ -304,6 +304,7 @@ export interface AppSettings {
   };
   alert_types?: Record<string, boolean>;
   weekly_summary?: { enabled: boolean; day: string; time: string };
+  discord_dashboard?: { enabled?: boolean; webhook?: string; interval_seconds?: number };
   pool_presets?: PoolPreset[];
   electricity_kwh_price?: number;
   discovery?: { auto_scan?: boolean; interval_minutes?: number; auto_add?: boolean; notify?: boolean };
