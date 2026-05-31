@@ -7,6 +7,7 @@ from pathlib import Path
 
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
+(Path(_tmpdir) / "logs").mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -66,3 +67,42 @@ def test_migrate_config_renames_legacy_nmminer_keys():
     assert "nmminer_devices" not in cfg
     assert cfg["lottominer_master"] == "192.168.1.5"
     assert cfg["lottominer_devices"][0]["ip"] == "192.168.1.6"
+
+
+def test_load_json_returns_copy_not_default_reference(tmp_path):
+    """Mutating the result of load_json (file missing) must not corrupt the
+    shared default object."""
+    p = tmp_path / "missing.json"
+    default = {"items": [1, 2, 3]}
+    result = load_json(p, default)
+    result["items"].append(99)
+    assert default["items"] == [1, 2, 3]  # original untouched
+
+
+def test_purge_resets_selected_categories_only(tmp_path):
+    import asyncio
+    from routers.settings import purge_data
+    save_json(CONFIG_FILE, {
+        **DEFAULT_CONFIG,
+        "axeos_devices": [{"ip": "10.0.0.1"}],
+        "pool_presets": [{"id": "p1"}],
+        "wallets": [{"id": "w1"}],
+    })
+    asyncio.run(purge_data({"categories": ["devices", "pools"]}))
+    cfg = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    assert cfg["axeos_devices"] == []
+    assert cfg["pool_presets"] == []
+    assert cfg["wallets"] == [{"id": "w1"}]   # not selected → kept
+    assert DEFAULT_CONFIG["axeos_devices"] == []  # shared default never mutated
+
+
+def test_purge_rejects_unknown_and_empty():
+    import asyncio
+    from fastapi import HTTPException
+    from routers.settings import purge_data
+    for bad in ([], ["nonsense"]):
+        try:
+            asyncio.run(purge_data({"categories": bad}))
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 400

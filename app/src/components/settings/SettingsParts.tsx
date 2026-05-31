@@ -1,12 +1,12 @@
 // Shared Settings building blocks (extracted from pages/Settings.tsx).
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/app';
 import { Card, Label, Toggle, Input, Spinner, btnStyle } from '../primitives';
 import { FONT_MONO, type Theme } from '../../tokens';
 import { api } from '../../api';
 import type { AppSettings } from '../../api';
 import { toast } from '../../store/toast';
-import { Download, Upload, Check } from 'lucide-react';
+import { Download, Upload, Check, Trash2, AlertTriangle } from 'lucide-react';
 
 export function BackupSection({ t }: { t: Theme }) {
   const { setSettings } = useAppStore();
@@ -94,7 +94,83 @@ export function BackupSection({ t }: { t: Theme }) {
           </a>
         </Card>
       </div>
+
+      <PurgeCard t={t} />
     </div>
+  );
+}
+
+function PurgeCard({ t }: { t: Theme }) {
+  const { setSettings } = useAppStore();
+  const [cats, setCats] = useState<Array<{ id: string; label: string }>>([]);
+  const [selected, setSelected] = useState(new Set<string>());
+  const [confirming, setConfirming] = useState(false);
+  const [purging, setPurging] = useState(false);
+
+  useEffect(() => {
+    api.settings.purgeCategories().then(setCats).catch(() => {});
+  }, []);
+
+  const toggle = (id: string) => setSelected(prev => {
+    const s = new Set(prev);
+    if (s.has(id)) s.delete(id); else s.add(id);
+    return s;
+  });
+
+  const purge = async () => {
+    setPurging(true);
+    try {
+      await api.settings.purge(Array.from(selected));
+      setSettings(await api.settings.get());
+      toast('Selected data purged');
+      setSelected(new Set());
+      setConfirming(false);
+    } catch {
+      toast('Purge failed', 'error');
+    }
+    setPurging(false);
+  };
+
+  return (
+    <Card t={t} style={{ marginTop: 14, borderColor: `${t.danger}55` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <Trash2 size={15} color={t.danger} />
+        <Label t={t} style={{ margin: 0, color: t.danger }}>Purge data</Label>
+      </div>
+      <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 14 }}>
+        Reset selected data to empty. This cannot be undone — export a backup first if unsure.
+        Auth and general preferences are never affected.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, marginBottom: 14 }}>
+        {cats.map(c => {
+          const on = selected.has(c.id);
+          return (
+            <label key={c.id} onClick={() => toggle(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, border: `1px solid ${on ? t.danger : t.border}`, background: on ? `${t.danger}18` : t.surface }}>
+              <input type="checkbox" checked={on} onChange={() => toggle(c.id)} onClick={e => e.stopPropagation()} style={{ accentColor: t.danger }} />
+              {c.label}
+            </label>
+          );
+        })}
+      </div>
+      {!confirming ? (
+        <button onClick={() => setConfirming(true)} disabled={selected.size === 0}
+          style={{ ...btnStyle(t), color: selected.size ? t.danger : t.textMuted, borderColor: selected.size ? `${t.danger}88` : t.border, opacity: selected.size ? 1 : 0.5 }}>
+          <Trash2 size={13} /> Purge {selected.size || ''} {selected.size === 1 ? 'category' : 'categories'}
+        </button>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', background: `${t.danger}18`, border: `1px solid ${t.danger}55`, borderRadius: 8 }}>
+          <AlertTriangle size={15} color={t.danger} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, flex: 1 }}>
+            Permanently clear: <strong>{cats.filter(c => selected.has(c.id)).map(c => c.label).join(', ')}</strong>?
+          </span>
+          <button onClick={() => setConfirming(false)} style={btnStyle(t)}>Cancel</button>
+          <button onClick={purge} disabled={purging}
+            style={{ ...btnStyle(t), background: t.danger, color: '#fff', borderColor: t.danger, opacity: purging ? 0.7 : 1 }}>
+            {purging ? 'Purging…' : 'Yes, purge'}
+          </button>
+        </div>
+      )}
+    </Card>
   );
 }
 

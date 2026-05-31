@@ -20,6 +20,8 @@ export const api = {
     save:        (data: Partial<AppSettings>)                                  => post<AppSettings>('/api/settings', data),
     restore:     (data: Record<string, unknown>)                               => post<{ status: string }>('/api/settings/restore', data),
     patchDevice: (data: { ip: string; name?: string; temp_max?: number })      => patch('/api/settings/device', data),
+    purgeCategories: ()                       => get<Array<{ id: string; label: string }>>('/api/settings/purge-categories'),
+    purge:           (categories: string[])   => post<{ status: string; purged: string[] }>('/api/settings/purge', { categories }),
   },
   lottominer: {
     swarm:            ()                                         => get<{ devices: NMMinerDevice[]; _error?: string }>('/api/lottominer/swarm'),
