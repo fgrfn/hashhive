@@ -12,6 +12,7 @@ rest of the backend (and the test suite) never needs it installed.
 """
 
 import asyncio
+from datetime import datetime, timezone
 
 import httpx
 
@@ -172,76 +173,88 @@ def _match(devices: list[dict], query: str) -> list[dict]:
     return [d for d in devices if q in str(d.get("name", "")).lower() or q in str(d.get("ip", "")).lower()]
 
 
-def _line(d: dict, body: str) -> str:
+_EMBED_COLOR = 0x7C3AED  # HashHive purple — matches the alert/dashboard embeds
+
+
+def _embed(title: str, fields: list[dict], description: str = "") -> dict:
+    """Build a Discord embed dict in the HashHive house style (purple, 🐝,
+    timestamped footer). Returned as plain JSON so the logic stays test-friendly."""
+    out: dict = {
+        "title": f"🐝  {title}",
+        "color": _EMBED_COLOR,
+        "footer": {"text": "HashHive"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if description:
+        out["description"] = description
+    if fields:
+        out["fields"] = fields[:25]  # Discord cap
+    return out
+
+
+def _dev_field(d: dict, value: str) -> dict:
     dot = "🟢" if d.get("online") else "🔴"
-    return f"{dot} **{d.get('name')}** — {body}"
+    return {"name": f"{dot}  {d.get('name')}", "value": value or "—", "inline": True}
 
 
-def _cmd_status(devices: list[dict]) -> str:
+def _cmd_status(devices: list[dict]) -> dict:
     if not devices:
-        return "No devices configured."
+        return _embed("Fleet status", [], "No devices configured.")
     online = sum(1 for d in devices if d.get("online"))
     total_gh = sum(d.get("hashrate", 0) for d in devices if d.get("online"))
-    lines = [f"**Fleet:** {online}/{len(devices)} online · {_fmt_hashrate(total_gh)}", ""]
+    fields = []
     for d in devices:
         if d.get("online"):
-            lines.append(_line(d, f"{_fmt_hashrate(d.get('hashrate', 0))}"
-                                 + (f" · {d['temp']:.0f}°C" if d.get("temp") else "")))
+            val = _fmt_hashrate(d.get("hashrate", 0)) + (f" · {d['temp']:.0f}°C" if d.get("temp") else "")
         else:
-            lines.append(_line(d, "offline"))
-    return "\n".join(lines)
+            val = "offline"
+        fields.append(_dev_field(d, val))
+    desc = f"**{online}/{len(devices)}** online · {_fmt_hashrate(total_gh)}"
+    return _embed("Fleet status", fields, desc)
 
 
-def _per_device(devices: list[dict], render, empty: str) -> str:
+def _per_device(title: str, devices: list[dict], render) -> dict:
     if not devices:
-        return empty
-    return "\n".join(_line(d, render(d)) for d in devices)
+        return _embed(title, [], "No matching devices.")
+    return _embed(title, [_dev_field(d, render(d)) for d in devices])
 
 
-_HELP = (
-    "**HashHive bot — commands**\n"
-    "`status` — fleet overview\n"
-    "`hashrate [name]` — hashrate per device\n"
-    "`temp [name]` — chip temperature\n"
-    "`power [name]` — power draw (AxeOS)\n"
-    "`fans [name]` — fan speed (AxeOS)\n"
-    "`uptime [name]` — uptime\n"
-    "`best [name]` — best difficulty\n"
-    "`wifi [name]` — WiFi signal (RSSI)\n"
-    "`stratum [name]` — pool + worker\n"
-    "`version [name]` — firmware version\n"
-    "`help` — this message"
-)
+_HELP_FIELDS = [
+    {"name": "Fleet", "value": "`status`", "inline": False},
+    {"name": "Performance", "value": "`hashrate` · `temp` · `power` · `fans`", "inline": False},
+    {"name": "Info", "value": "`uptime` · `best` · `wifi` · `stratum` · `version`", "inline": False},
+    {"name": "Tip", "value": "Add a device name to filter, e.g. `temp gamma`", "inline": False},
+]
 
 
-def handle_command(cmd: str, args: str, devices: list[dict]) -> str | None:
-    """Map a command + args to reply text. Returns None for unknown commands
-    (so the bot can stay silent on unrelated messages)."""
+def handle_command(cmd: str, args: str, devices: list[dict]) -> dict | None:
+    """Map a command + args to a Discord embed dict. Returns None for unknown
+    commands (so the bot can stay silent on unrelated messages)."""
     cmd = cmd.lower().lstrip("!/")
     sel = _match(devices, args)
 
     if cmd in ("help", "commands", "h"):
-        return _HELP
+        return _embed("Bot commands", _HELP_FIELDS)
     if cmd in ("status", "fleet"):
         return _cmd_status(devices)
     if cmd in ("hashrate", "hr"):
-        return _per_device(sel, lambda d: _fmt_hashrate(d.get("hashrate", 0)) if d.get("online") else "offline", "No matching devices.")
+        return _per_device("Hashrate", sel, lambda d: _fmt_hashrate(d.get("hashrate", 0)) if d.get("online") else "offline")
     if cmd in ("temp", "temperature"):
-        return _per_device(sel, lambda d: f"{d['temp']:.0f}°C" if d.get("temp") else "—", "No matching devices.")
+        return _per_device("Chip temperature", sel, lambda d: f"{d['temp']:.0f}°C" if d.get("temp") else "—")
     if cmd == "power":
-        return _per_device(sel, lambda d: f"{d['power']:.1f} W" if d.get("power") else "—", "No matching devices.")
+        return _per_device("Power draw", sel, lambda d: f"{d['power']:.1f} W" if d.get("power") else "—")
     if cmd in ("fans", "fan"):
-        return _per_device(sel, lambda d: (f"{d['fan']}%" if d.get("fan") is not None else "—"), "No matching devices.")
+        return _per_device("Fan speed", sel, lambda d: (f"{d['fan']}%" if d.get("fan") is not None else "—"))
     if cmd == "uptime":
-        return _per_device(sel, lambda d: _fmt_uptime(d.get("uptime")), "No matching devices.")
+        return _per_device("Uptime", sel, lambda d: _fmt_uptime(d.get("uptime")))
     if cmd in ("best", "bestdiff", "bestshare"):
-        return _per_device(sel, lambda d: _fmt_diff(d.get("best_diff")), "No matching devices.")
+        return _per_device("Best difficulty", sel, lambda d: _fmt_diff(d.get("best_diff")))
     if cmd in ("wifi", "rssi"):
-        return _per_device(sel, lambda d: f"{d['rssi']} dBm" if d.get("rssi") is not None else "—", "No matching devices.")
+        return _per_device("WiFi signal", sel, lambda d: f"{d['rssi']} dBm" if d.get("rssi") is not None else "—")
     if cmd in ("stratum", "pool"):
-        return _per_device(sel, lambda d: f"{d.get('pool') or '—'} ({d.get('worker') or '—'})", "No matching devices.")
+        return _per_device("Pool", sel, lambda d: f"{d.get('pool') or '—'} ({d.get('worker') or '—'})")
     if cmd in ("version", "ver"):
-        return _per_device(sel, lambda d: d.get("version") or "—", "No matching devices.")
+        return _per_device("Firmware version", sel, lambda d: d.get("version") or "—")
     return None
 
 
@@ -269,25 +282,11 @@ async def _run_bot(token: str, prefix: str) -> None:
             devices = await collect_devices()
             reply = handle_command(cmd, args, devices)
         except Exception:
-            reply = "⚠️ Failed to query the fleet."
+            reply = _embed("Error", [], "⚠️ Failed to query the fleet.")
         if reply:
-            for chunk in _chunk(reply, 1900):
-                await message.channel.send(chunk)
+            await message.channel.send(embed=discord.Embed.from_dict(reply))
 
     await client.start(token)
-
-
-def _chunk(text: str, size: int) -> list[str]:
-    """Split a reply into Discord-message-sized pieces on line boundaries."""
-    out, buf = [], ""
-    for line in text.split("\n"):
-        if len(buf) + len(line) + 1 > size:
-            out.append(buf)
-            buf = ""
-        buf += line + "\n"
-    if buf.strip():
-        out.append(buf)
-    return out or [text[:size]]
 
 
 async def _discord_bot_loop() -> None:
