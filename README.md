@@ -103,6 +103,14 @@ On first start, `dashboard_config.json` is created automatically. Add devices vi
 - Live Discord dashboard (self-updating fleet embed)
 - Auto-fan (PID) and auto-restart automation
 - Pool presets (saved on the Pool page)
+- Interactive Discord bot (bot token + command prefix)
+
+### Backup & Data
+
+The **Settings → Backup & Data** page lets you:
+
+- **Export / import** the full configuration as JSON, and export the alert log
+- **Purge data** by category — devices, pool presets, groups, schedules, wallets, templates, stats & history, alert log, discovery state or notification channels — with a confirmation step. Auth and general preferences are never affected.
 
 ---
 
@@ -135,24 +143,24 @@ Unregister-ScheduledTask -TaskName "HashHive" -Confirm:$false
 
 ## GitHub Actions
 
-| Workflow | Trigger | Was passiert |
+| Workflow | Trigger | What it does |
 |---|---|---|
-| **Secret Scan** | Jeder Push / PR | `gitleaks` scannt die gesamte Git-History auf API-Keys, Tokens, Passwörter |
-| **Release Please** | Push auf `main` | Analysiert Commits; öffnet/aktualisiert Release PR mit `CHANGELOG.md` + `version.txt` Bump |
-| **Release** | `v*`-Tag (nach Merge des Release PR) | Docker-Build → Push zu GHCR; GitHub Release mit `docker run`-Snippet |
+| **Secret Scan** | Every push / PR | `gitleaks` scans the entire Git history for API keys, tokens and passwords |
+| **Release Please** | Push to `main` | Analyses commits; opens/updates a release PR with a `CHANGELOG.md` + `version.txt` bump |
+| **Release** | `v*` tag (after the release PR is merged) | Docker build → push to GHCR; GitHub Release with a `docker run` snippet |
 
-### Release auslösen
+### Triggering a release
 
-Commits nach [Conventional Commits](https://www.conventionalcommits.org/) schreiben:
+Write commits following [Conventional Commits](https://www.conventionalcommits.org/):
 
-| Prefix | Version-Bump |
+| Prefix | Version bump |
 |---|---|
 | `feat: ...` | Minor (`1.0.0 → 1.1.0`) |
 | `fix: ...` | Patch (`1.0.0 → 1.0.1`) |
 | `feat!: ...` | Major (`1.0.0 → 2.0.0`) |
-| `chore:`, `docs:` | kein Release |
+| `chore:`, `docs:` | no release |
 
-Nach dem Merge des Release PR steht das Image bereit:
+Once the release PR is merged, the image is available:
 
 ```bash
 docker pull ghcr.io/fgrfn/hashhive:latest
@@ -162,11 +170,11 @@ docker pull ghcr.io/fgrfn/hashhive:latest
 
 ## Version
 
-Die App-Version steht in [`version.txt`](version.txt) und wird automatisch durch Release Please aktualisiert.
+The app version lives in [`version.txt`](version.txt) and is bumped automatically by Release Please.
 
-- **Backend** liest `version.txt` beim Start und exposes sie in `/api/health`
-- **Frontend** zeigt die Version in der Sidebar (lädt von `/api/health`)
-- **Docker-Image** enthält `version.txt` im Build-Kontext
+- **Backend** reads `version.txt` at startup and exposes it at `/api/health`
+- **Frontend** shows the version in the sidebar (loaded from `/api/health`)
+- **Docker image** includes `version.txt` in the build context
 
 ---
 
