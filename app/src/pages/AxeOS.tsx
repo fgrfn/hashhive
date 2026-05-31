@@ -123,7 +123,7 @@ export function AxeOS() {
         </div>
       ) : (
       <div style={{ overflowX: 'auto' }}>
-      <Card t={t} noPad style={{ minWidth: 1100 }}>
+      <Card t={t} noPad style={{ width: 'max-content', minWidth: '100%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 1fr 90px 110px 70px 75px 85px 80px 80px 80px 65px 70px 80px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
           <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d._ip || ''))); }} style={{ accentColor: t.info }} /></div>
           <Label t={t}>Name / IP</Label>
