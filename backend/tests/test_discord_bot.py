@@ -10,7 +10,16 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from routers.discord_bot import _chunk, handle_command  # noqa: E402
+from routers.discord_bot import handle_command  # noqa: E402
+
+
+def _text(embed: dict) -> str:
+    """Flatten an embed dict (title + description + field names/values) to text
+    so assertions can stay simple."""
+    parts = [embed.get("title", ""), embed.get("description", "")]
+    for f in embed.get("fields", []):
+        parts += [f.get("name", ""), f.get("value", "")]
+    return " ".join(parts)
 
 _DEVS = [
     {"name": "bitaxe-gamma", "ip": "10.0.0.1", "family": "bitaxe", "online": True,
@@ -26,9 +35,17 @@ _DEVS = [
 ]
 
 
-def test_status_summarises_fleet():
+def test_replies_are_embeds_in_house_style():
     out = handle_command("status", "", _DEVS)
-    assert "1/2 online" in out
+    assert isinstance(out, dict)
+    assert out["color"] == 0x7C3AED
+    assert out["title"].startswith("🐝")
+    assert out["footer"]["text"] == "HashHive"
+
+
+def test_status_summarises_fleet():
+    out = _text(handle_command("status", "", _DEVS))
+    assert "1/2" in out and "online" in out
     assert "1.41 TH/s" in out
     assert "bitaxe-gamma" in out and "NMMiner4" in out
 
@@ -38,35 +55,26 @@ def test_unknown_command_is_silent():
 
 
 def test_help_lists_commands():
-    out = handle_command("help", "", _DEVS)
+    out = _text(handle_command("help", "", _DEVS))
     assert "hashrate" in out and "stratum" in out
 
 
 def test_name_filter_selects_one_device():
-    out = handle_command("hashrate", "gamma", _DEVS)
+    out = _text(handle_command("hashrate", "gamma", _DEVS))
     assert "bitaxe-gamma" in out
     assert "NMMiner4" not in out
 
 
 def test_power_and_fans_only_have_values_for_axeos():
-    power = handle_command("power", "", _DEVS)
-    assert "20.1 W" in power      # axeos
-    fans = handle_command("fans", "gamma", _DEVS)
-    assert "30%" in fans
+    assert "20.1 W" in _text(handle_command("power", "", _DEVS))   # axeos
+    assert "30%" in _text(handle_command("fans", "gamma", _DEVS))
 
 
 def test_best_diff_formatting():
-    out = handle_command("best", "", _DEVS)
+    out = _text(handle_command("best", "", _DEVS))
     assert "12.95G" in out and "3.32K" in out
 
 
 def test_prefix_chars_are_stripped():
-    # leading !/ should be tolerated by the dispatcher
-    assert handle_command("!status", "", _DEVS) == handle_command("status", "", _DEVS)
-
-
-def test_chunk_splits_on_line_boundaries():
-    text = "\n".join(f"line {i}" for i in range(500))
-    chunks = _chunk(text, 1900)
-    assert len(chunks) > 1
-    assert all(len(c) <= 1900 for c in chunks)
+    # leading !/ should be tolerated by the dispatcher (ignore the per-call timestamp)
+    assert _text(handle_command("!status", "", _DEVS)) == _text(handle_command("status", "", _DEVS))
