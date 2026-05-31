@@ -274,6 +274,60 @@ async def _weekly_summary_loop() -> None:
         await asyncio.sleep(60)
 
 
+@router.get("/api/notifications/channels")
+async def get_notification_channels():
+    """Return the configured-state of each notification channel for the Channels tab.
+
+    Reads config["notifications"] (the same store the Settings page writes) and
+    reports, per channel, whether it is enabled and sufficiently configured —
+    without ever leaking tokens/webhooks back to the frontend.
+    """
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    n = config.get("notifications", {})
+
+    def _mask(value: str) -> str:
+        """Show only enough to recognise a value, never the secret itself."""
+        if not value:
+            return ""
+        return f"…{value[-4:]}" if len(value) > 4 else "set"
+
+    channels = [
+        {
+            "id": "telegram", "name": "Telegram", "color": "#38bdf8",
+            "enabled": bool(n.get("telegram_enabled")),
+            "configured": bool(n.get("telegram_token") and n.get("telegram_chat_id")),
+            "detail": f"chat {n['telegram_chat_id']}" if n.get("telegram_chat_id") else "Bot token + chat ID required",
+        },
+        {
+            "id": "discord", "name": "Discord Webhook", "color": "#a855f7",
+            "enabled": bool(n.get("discord_enabled")),
+            "configured": bool(n.get("discord_webhook")),
+            "detail": "webhook configured" if n.get("discord_webhook") else "Webhook URL required",
+        },
+        {
+            "id": "gotify", "name": "Gotify", "color": "#22c55e",
+            "enabled": bool(n.get("gotify_enabled")),
+            "configured": bool(n.get("gotify_url") and n.get("gotify_token")),
+            "detail": n.get("gotify_url") or "Server URL + app token required",
+        },
+        {
+            "id": "ntfy", "name": "ntfy", "color": "#fbbf24",
+            "enabled": bool(n.get("ntfy_enabled")),
+            "configured": bool(n.get("ntfy_url") and n.get("ntfy_topic")),
+            "detail": f"{n.get('ntfy_url', '')}/{n['ntfy_topic']}" if n.get("ntfy_topic") else "Server + topic required",
+        },
+        {
+            "id": "pushover", "name": "Pushover", "color": "#ef4444",
+            "enabled": bool(n.get("pushover_enabled")),
+            "configured": bool(n.get("pushover_user_key") and n.get("pushover_app_token")),
+            "detail": f"user {_mask(n.get('pushover_user_key', ''))}" if n.get("pushover_user_key") else "User key + app token required",
+        },
+    ]
+    for c in channels:
+        c["status"] = "connected" if (c["enabled"] and c["configured"]) else "disconnected"
+    return channels
+
+
 @router.post("/api/notifications/test")
 async def test_notification():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)

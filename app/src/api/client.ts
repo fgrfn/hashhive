@@ -5,6 +5,7 @@ import type {
   AxeActionResponse, AxeAction, NmAction, DeviceTemplate, SoloDevice, StatSample,
   Group, GroupActionResult, Alert, HealthData, EarningsEntry, PoolPreset, Wallet,
   Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult, AnalyticsResult,
+  AlertRule, NotificationChannel,
 } from './types';
 
 export const api = {
@@ -69,6 +70,10 @@ export const api = {
     list:    (days = 7) => get<Alert[]>(`/api/alerts?days=${days}`),
     readAll: ()         => post('/api/alerts/read-all'),
     delete:  ()         => del('/api/alerts'),
+    rules:      ()                                                  => get<AlertRule[]>('/api/alerts/rules'),
+    updateRule: (kind: string, body: { enabled?: boolean; threshold?: number }) => patch(`/api/alerts/rules/${kind}`, body),
+    channels:   ()                                                  => get<NotificationChannel[]>('/api/notifications/channels'),
+    test:       ()                                                  => post<{ results: Record<string, boolean> }>('/api/notifications/test'),
   },
   health:   (ip?: string) => ip ? get<HealthData>(`/api/health/${ip}`) : get<HealthData>('/api/health'),
   earnings: (days = 30)   => get<EarningsEntry[]>(`/api/earnings?days=${days}`),

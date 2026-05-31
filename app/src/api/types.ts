@@ -200,6 +200,28 @@ export interface Alert {
   when?: string;
 }
 
+export interface AlertRule {
+  kind: string;
+  label: string;
+  severity: 'critical' | 'warning' | 'info';
+  enabled: boolean;
+  condition: string;
+  threshold_key: string | null;
+  threshold: number | null;
+  unit: string;
+  fired24h: number;
+}
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  color: string;
+  enabled: boolean;
+  configured: boolean;
+  detail: string;
+  status: 'connected' | 'disconnected';
+}
+
 export interface Wallet {
   id: string;
   label: string;

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Pill, Toggle, Segmented, SkeletonRow, EmptyState, btnStyle } from '../components/primitives';
+import { Card, Pill, Toggle, Segmented, SkeletonRow, SkeletonCard, EmptyState, btnStyle } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api } from '../api';
-import type { Alert } from '../api';
-import { Bell, Check, Eye, Download, Plus, Edit, MoreHorizontal } from 'lucide-react';
+import type { Alert, AlertRule, NotificationChannel } from '../api';
+import { Bell, Check, Eye, Download, Settings as SettingsIcon } from 'lucide-react';
 import { useMobile } from '../hooks/useWindowWidth';
+import { useNavigate } from 'react-router-dom';
 
 export function Alerts() {
   const { theme: t } = useThemeStore();
@@ -54,6 +55,19 @@ function AlertFeed() {
     return true;
   });
 
+  const exportCsv = () => {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['timestamp', 'severity', 'source', 'device', 'kind', 'message'];
+    const rows = filtered.map(a => [a.timestamp || a.when || '', a.severity, a.source || '', a.device || '', a.kind || '', a.title || a.message]);
+    const csv = [header, ...rows].map(r => r.map(esc).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hashhive-alerts-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!fetched) {
     return (
       <Card t={t} noPad>
@@ -69,7 +83,7 @@ function AlertFeed() {
         <Segmented t={t} value={state} onChange={setState} options={[{ value: 'all', label: 'All' }, { value: 'unread', label: 'Unread' }, { value: 'unresolved', label: 'Open' }]} />
         <div style={{ flex: 1 }} />
         {unreadAlerts > 0 && <button onClick={markAllRead} style={{ ...btnStyle(t), fontSize: 12 }}><Check size={13} /> Mark all read</button>}
-        <button style={{ ...btnStyle(t), fontSize: 12 }}><Download size={13} /> Export</button>
+        <button onClick={exportCsv} disabled={filtered.length === 0} style={{ ...btnStyle(t), fontSize: 12, opacity: filtered.length === 0 ? 0.5 : 1 }}><Download size={13} /> Export</button>
       </div>
 
       <Card t={t} noPad>
@@ -104,74 +118,100 @@ function AlertFeed() {
   );
 }
 
-const MOCK_RULES = [
-  { id: 'r1', name: 'Device offline', condition: 'no response > 5 min', severity: 'critical', channels: ['telegram'], enabled: true, fired24h: 3, scope: 'all devices' },
-  { id: 'r2', name: 'Chip temperature high', condition: 'chip temp > 70 °C', severity: 'warning', channels: ['telegram'], enabled: true, fired24h: 12, scope: 'all devices' },
-  { id: 'r3', name: 'Share error rate', condition: 'rejects > 3% over 15 min', severity: 'warning', channels: ['email'], enabled: true, fired24h: 4, scope: 'all devices' },
-  { id: 'r4', name: 'Pool disconnected', condition: 'stratum drop > 30 s', severity: 'critical', channels: ['telegram'], enabled: true, fired24h: 1, scope: 'all devices' },
-  { id: 'r5', name: 'Hashrate drop', condition: 'hr < 80% expected for 10 min', severity: 'warning', channels: ['email'], enabled: false, fired24h: 2, scope: 'all devices' },
-];
-
 function AlertRules() {
   const { theme: t } = useThemeStore();
-  const [rules, setRules] = useState(MOCK_RULES);
+  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
   const mobile = useMobile();
+
+  useEffect(() => {
+    api.alerts.rules().then(setRules).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+
+  const toggle = async (r: AlertRule, on: boolean) => {
+    setRules(rs => rs.map(x => x.kind === r.kind ? { ...x, enabled: on } : x));
+    await api.alerts.updateRule(r.kind, { enabled: on }).catch(() => {
+      setRules(rs => rs.map(x => x.kind === r.kind ? { ...x, enabled: !on } : x));  // revert on failure
+    });
+  };
+
+  const startEdit = (r: AlertRule) => { setEditing(r.kind); setDraft(String(r.threshold ?? '')); };
+
+  const saveEdit = async (r: AlertRule) => {
+    const value = Number(draft);
+    setEditing(null);
+    if (!Number.isFinite(value) || value === r.threshold) return;
+    setRules(rs => rs.map(x => x.kind === r.kind ? { ...x, threshold: value } : x));
+    await api.alerts.updateRule(r.kind, { threshold: value })
+      .then(() => api.alerts.rules().then(setRules))  // re-pull to refresh the condition string
+      .catch(() => {});
+  };
+
+  if (!loaded) {
+    return <Card t={t} noPad>{Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} t={t} cols={['40px', '200px', '160px', '90px', '70px']} height={60} />)}</Card>;
+  }
+
+  const renderThreshold = (r: AlertRule) => {
+    if (!r.threshold_key) return <span style={{ color: t.textDim }}>—</span>;
+    if (editing === r.kind) {
+      return (
+        <input
+          autoFocus type="number" value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => saveEdit(r)}
+          onKeyDown={e => { if (e.key === 'Enter') saveEdit(r); if (e.key === 'Escape') setEditing(null); }}
+          style={{ width: 72, background: t.surface2, border: `1px solid ${t.accent}`, borderRadius: 4, color: t.text, fontFamily: FONT_MONO, fontSize: 12, padding: '3px 6px' }}
+        />
+      );
+    }
+    return (
+      <span onClick={() => startEdit(r)} title="Click to edit threshold" style={{ cursor: 'pointer', fontFamily: FONT_MONO, fontSize: 12, color: t.accent, borderBottom: `1px dashed ${t.border}` }}>
+        {r.threshold}{r.unit ? ` ${r.unit}` : ''}
+      </span>
+    );
+  };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 13, color: t.textMuted }}>Rules are evaluated every 10 seconds.</div>
-        <button style={{ ...btnStyle(t, 'primary') }}><Plus size={13} /> New rule</button>
+      <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>
+        These are HashHive's built-in detectors. Toggle one off to silence it, or click a threshold to tune it.
       </div>
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rules.map(r => (
-            <Card key={r.id} t={t} style={{ opacity: r.enabled ? 1 : 0.55 }}>
+            <Card key={r.kind} t={t} style={{ opacity: r.enabled ? 1 : 0.55 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>Scope: {r.scope}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{r.label}</div>
+                  <div style={{ fontSize: 12, fontFamily: FONT_MONO, color: t.accent, marginTop: 3 }}>{r.condition}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Pill t={t} sev={r.severity === 'critical' ? 'critical' : 'warning'}>{r.severity}</Pill>
-                  <Toggle t={t} on={r.enabled} onChange={v => setRules(rules.map(x => x.id === r.id ? { ...x, enabled: v } : x))} size="sm" />
+                  <Pill t={t} sev={r.severity === 'critical' ? 'critical' : r.severity === 'info' ? 'info' : 'warning'}>{r.severity}</Pill>
+                  <Toggle t={t} on={r.enabled} onChange={v => toggle(r, v)} size="sm" />
                 </div>
               </div>
-              <div style={{ fontSize: 12, fontFamily: FONT_MONO, color: t.accent, marginBottom: 8 }}>{r.condition}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {r.channels.map(c => <span key={c} style={{ padding: '2px 7px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 10, fontFamily: FONT_MONO }}>{c}</span>)}
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}x</span>
-                  <Edit size={13} style={{ cursor: 'pointer', color: t.textMuted }} />
-                  <MoreHorizontal size={13} style={{ cursor: 'pointer', color: t.textMuted }} />
-                </div>
+                <div>{renderThreshold(r)}</div>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}× · 24h</span>
               </div>
             </Card>
           ))}
         </div>
       ) : (
       <Card t={t} noPad>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px 1.5fr 1fr 0.9fr 1fr 100px 50px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
-          <span /><span>Rule</span><span>Condition</span><span>Severity</span><span>Channels</span><span>Fired 24h</span><span />
+        <div style={{ display: 'grid', gridTemplateColumns: '50px 1.5fr 1.4fr 0.9fr 100px 90px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
+          <span /><span>Rule</span><span>Condition</span><span>Severity</span><span>Threshold</span><span>Fired 24h</span>
         </div>
         {rules.map((r, i) => (
-          <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '40px 1.5fr 1fr 0.9fr 1fr 100px 50px', gap: 10, padding: '14px 16px', borderBottom: i === rules.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, opacity: r.enabled ? 1 : 0.55 }}>
-            <Toggle t={t} on={r.enabled} onChange={v => setRules(rules.map(x => x.id === r.id ? { ...x, enabled: v } : x))} size="sm" />
-            <div>
-              <div style={{ fontWeight: 600 }}>{r.name}</div>
-              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>Scope: {r.scope}</div>
-            </div>
+          <div key={r.kind} style={{ display: 'grid', gridTemplateColumns: '50px 1.5fr 1.4fr 0.9fr 100px 90px', gap: 10, padding: '14px 16px', borderBottom: i === rules.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, opacity: r.enabled ? 1 : 0.55 }}>
+            <Toggle t={t} on={r.enabled} onChange={v => toggle(r, v)} size="sm" />
+            <div style={{ fontWeight: 600 }}>{r.label}</div>
             <div style={{ fontSize: 12, fontFamily: FONT_MONO, color: t.accent }}>{r.condition}</div>
-            <Pill t={t} sev={r.severity === 'critical' ? 'critical' : 'warning'}>{r.severity}</Pill>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {r.channels.map(c => <span key={c} style={{ padding: '2px 7px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 10, fontFamily: FONT_MONO }}>{c}</span>)}
-            </div>
-            <div style={{ fontFamily: FONT_MONO, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}x</div>
-            <div style={{ color: t.textMuted, display: 'flex', gap: 4 }}>
-              <Edit size={13} style={{ cursor: 'pointer' }} />
-              <MoreHorizontal size={13} style={{ cursor: 'pointer' }} />
-            </div>
+            <Pill t={t} sev={r.severity === 'critical' ? 'critical' : r.severity === 'info' ? 'info' : 'warning'}>{r.severity}</Pill>
+            <div>{renderThreshold(r)}</div>
+            <div style={{ fontFamily: FONT_MONO, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}×</div>
           </div>
         ))}
       </Card>
@@ -180,32 +220,64 @@ function AlertRules() {
   );
 }
 
-const CHANNELS = [
-  { id: 'telegram', name: 'Telegram', status: 'connected', detail: '@hashhive_alerts', color: '#38bdf8' },
-  { id: 'discord', name: 'Discord Webhook', status: 'connected', detail: 'webhook · #mining-alerts', color: '#a855f7' },
-  { id: 'email', name: 'Email (SMTP)', status: 'disconnected', detail: 'Configure SMTP settings', color: '#fbbf24' },
-];
-
 function AlertChannels() {
   const { theme: t } = useThemeStore();
+  const navigate = useNavigate();
+  const [channels, setChannels] = useState<NotificationChannel[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    api.alerts.channels().then(setChannels).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+
+  const runTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    const res = await api.alerts.test().catch(() => ({ results: {} as Record<string, boolean> }));
+    setTestResult(res.results || {});
+    setTesting(false);
+  };
+
+  if (!loaded) {
+    return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} t={t} height={120} />)}</div>;
+  }
+
+  const anyConnected = channels.some(c => c.status === 'connected');
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-      {CHANNELS.map(c => (
-        <Card key={c.id} t={t}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: c.color }}>{c.name}</div>
-              <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2 }}>{c.detail}</div>
-            </div>
-            <Pill t={t} sev={c.status === 'connected' ? 'success' : 'muted'}>{c.status}</Pill>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={{ ...btnStyle(t), fontSize: 11 }}>Test</button>
-            <button style={{ ...btnStyle(t), fontSize: 11 }}>Configure</button>
-            {c.status === 'disconnected' && <button style={{ ...btnStyle(t, 'primary'), fontSize: 11, marginLeft: 'auto' }}>Connect</button>}
-          </div>
-        </Card>
-      ))}
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ fontSize: 13, color: t.textMuted }}>Channels are configured on the Settings page. Send a test to every connected channel below.</div>
+        <button onClick={runTest} disabled={testing || !anyConnected} style={{ ...btnStyle(t, 'primary'), fontSize: 12, opacity: testing || !anyConnected ? 0.6 : 1 }}>
+          {testing ? 'Sending…' : 'Send test'}
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+        {channels.map(c => {
+          const tested = testResult ? testResult[c.id] : undefined;
+          return (
+            <Card key={c.id} t={t} style={{ opacity: c.status === 'connected' ? 1 : 0.75 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: c.color }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2, wordBreak: 'break-all' }}>{c.detail}</div>
+                </div>
+                <Pill t={t} sev={c.status === 'connected' ? 'success' : 'muted'}>{c.status}</Pill>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button onClick={() => navigate('/settings')} style={{ ...btnStyle(t), fontSize: 11 }}><SettingsIcon size={11} /> Configure</button>
+                {tested !== undefined && (
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: FONT_MONO, color: tested ? t.success : t.danger }}>
+                    {tested ? '✓ delivered' : '✗ failed'}
+                  </span>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
