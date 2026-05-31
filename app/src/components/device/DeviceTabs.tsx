@@ -245,11 +245,16 @@ export function ConsoleTab({ t, ip }: { t: Theme; ip: string }) {
   );
 }
 
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
 export function PowerCurveTab({ t, ip, axeDevice }: { t: Theme; ip: string; axeDevice?: AxeDevice }) {
   const curFreq = axeDevice?.frequency ?? 525;
-  const curVolt = axeDevice?.core_voltage ?? axeDevice?.voltage ?? 1100;
-  const [freq, setFreq] = useState(curFreq);
-  const [volt, setVolt] = useState(curVolt);
+  // AxeOS exposes the ASIC core voltage as `coreVoltage` (set, mV) / `coreVoltageActual`
+  // (measured, mV). The plain `voltage` field is the *input* rail (~5000 mV) and must NOT
+  // be used here, or the slider/estimate blow up (e.g. 4955 mV -> ~60 W).
+  const curVolt = axeDevice?.coreVoltage ?? axeDevice?.core_voltage ?? axeDevice?.coreVoltageActual ?? 1200;
+  const [freq, setFreq] = useState(clamp(curFreq, 200, 800));
+  const [volt, setVolt] = useState(clamp(curVolt, 1000, 1300));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -257,7 +262,13 @@ export function PowerCurveTab({ t, ip, axeDevice }: { t: Theme; ip: string; axeD
     return <div style={{ color: t.textMuted, fontSize: 13 }}>Power curve is only available for AxeOS devices.</div>;
   }
 
-  const estimatedPower = (freq / 525) * (volt / 1100) * (axeDevice.power || 15);
+  // Dynamic ASIC power scales ~linearly with frequency and with the square of core
+  // voltage (P proportional to f*V^2). Anchor on the device's measured power at its current
+  // operating point so the estimate matches reality at the current settings.
+  const basePower = axeDevice.power || 15;
+  const freqFactor = curFreq > 0 ? freq / curFreq : 1;
+  const voltFactor = curVolt > 0 ? volt / curVolt : 1;
+  const estimatedPower = basePower * freqFactor * voltFactor * voltFactor;
 
   const apply = async () => {
     setSaving(true);

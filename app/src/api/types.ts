@@ -142,6 +142,8 @@ export interface AxeDevice {
   frequency?: number;
   actualFrequency?: number;
   core_voltage?: number;
+  coreVoltage?: number;
+  coreVoltageActual?: number;
   fanspeed?: number;
   fanrpm?: number;
   fan2rpm?: number;
