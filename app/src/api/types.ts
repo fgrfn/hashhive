@@ -353,6 +353,19 @@ export interface NMMinerConfig {
   LedEnable?: number | boolean;
   ScreenSaver?: string;
   ScreenSaverMode?: string;
+  // /api/setting/market
+  MainCoin?: string;
+  WatchCoins?: string;
+  KlineInterval?: string;
+  KlineRotate?: string;
+  PricePageMode?: string;
+  // /api/setting/weather
+  WeatherCity?: string;
+  WeatherLat?: string;
+  WeatherLon?: string;
+  WeatherTempUnit?: string;
+  WeatherSpeedUnit?: string;
+  WeatherAltMode?: string;
 }
 
 export interface PoolPreset {

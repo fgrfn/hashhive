@@ -79,6 +79,8 @@ def test_device_config_post_routes_fields_to_correct_endpoints():
                 "Hostname": "nm1", "WiFiSSID": "net", "WiFiPWD": "pw",
                 "Timezone": "1", "TimeFormat": 24, "DateFormat": "YYYY-MM-DD",
                 "Brightness": 80, "RotateScreen": 90, "LedEnable": 1, "ScreenSaver": "5m",
+                "MainCoin": "BTC", "WatchCoins": "BTC,ETH", "PricePageMode": "kline",
+                "WeatherCity": "Berlin", "WeatherLat": "52.52", "WeatherTempUnit": "celsius",
                 "bogus": "ignored",
             })
 
@@ -87,5 +89,7 @@ def test_device_config_post_routes_fields_to_correct_endpoints():
     assert posts["setting/network"] == ["Hostname", "WiFiPWD", "WiFiSSID"]
     assert posts["setting/time"] == ["DateFormat", "TimeFormat", "Timezone"]
     assert posts["setting/preference"] == ["Brightness", "LedEnable", "RotateScreen", "ScreenSaver"]
+    assert posts["setting/market"] == ["MainCoin", "PricePageMode", "WatchCoins"]
+    assert posts["setting/weather"] == ["WeatherCity", "WeatherLat", "WeatherTempUnit"]
     # "bogus" never reaches any endpoint
     assert all("bogus" not in keys for keys in posts.values())
