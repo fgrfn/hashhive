@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme';
 import { type Theme, FONT_MONO, bodyFont } from '../../tokens';
-import { HiveMark, Spinner, btnStyle } from '../primitives';
+import { HiveMark, Spinner, btnStyle, GithubIcon } from '../primitives';
 import { useAppStore } from '../../store/app';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 
@@ -364,8 +364,18 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
           <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700, letterSpacing: '0.06em', background: t.warning + '22', color: t.warning }}>NEW</span>
         )}
       </div>
-      <div style={{ fontSize: 10, color: t.textDim, display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-        <span>{current || '—'}</span>
+      <div style={{ fontSize: 10, color: t.textDim, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <a
+          href="https://github.com/fgrfn/hashhive"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="HashHive on GitHub"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: t.textDim, textDecoration: 'none' }}
+          onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = t.accent}
+          onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = t.textDim}
+        >
+          <GithubIcon size={11} /> {current || '—'}
+        </a>
         <span>{devicesTotal} devices</span>
       </div>
 

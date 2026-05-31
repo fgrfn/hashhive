@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Eye, Bell, Thermometer, Download, HelpCircle, Lock } from 'lucide-react';
+import { Settings as SettingsIcon, Eye, Bell, Thermometer, Download, HelpCircle, Lock, ExternalLink } from 'lucide-react';
+import { GithubIcon } from '../components/primitives';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Toggle, Input, FormField, Segmented, btnStyle, HiveMark } from '../components/primitives';
@@ -230,6 +231,14 @@ export function Settings() {
                   </div>
                 ))}
               </div>
+              <a
+                href="https://github.com/fgrfn/hashhive"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...btnStyle(t), display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 18, fontSize: 13, textDecoration: 'none' }}
+              >
+                <GithubIcon size={15} /> View on GitHub <ExternalLink size={13} style={{ opacity: 0.6 }} />
+              </a>
             </Card>
           </div>
         )}
