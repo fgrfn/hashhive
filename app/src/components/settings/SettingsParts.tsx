@@ -6,7 +6,7 @@ import { FONT_MONO, type Theme } from '../../tokens';
 import { api } from '../../api';
 import type { AppSettings } from '../../api';
 import { toast } from '../../store/toast';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, Check } from 'lucide-react';
 
 export function BackupSection({ t }: { t: Theme }) {
   const { setSettings } = useAppStore();
@@ -180,12 +180,14 @@ export function SecuritySection({ t, localSettings, updToggle }: {
   );
 }
 
-export function SaveBar({ t, saving, onSave }: { t: Theme; saving: boolean; onSave: () => void }) {
+/** Auto-save status line. Settings persist automatically on change, so there is
+ *  no Save button — this just reflects state. */
+export function AutoSaveHint({ t, saving }: { t: Theme; saving: boolean }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-      <button onClick={onSave} disabled={saving} style={{ ...btnStyle(t, 'primary'), opacity: saving ? 0.7 : 1 }}>
-        {saving ? <><Spinner t={t} size={12} /> Saving…</> : 'Save changes'}
-      </button>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 14, fontSize: 12, color: t.textMuted, fontFamily: FONT_MONO }}>
+      {saving
+        ? <><Spinner t={t} size={12} /> Saving…</>
+        : <><Check size={12} color={t.success} /> Changes save automatically</>}
     </div>
   );
 }
