@@ -3,7 +3,7 @@ import { get, post, put, patch, del } from './http';
 import type {
   DashboardData, AppSettings, NMMinerDevice, NMMinerConfig, AxeDevice,
   AxeActionResponse, AxeAction, NmAction, DeviceTemplate, SoloDevice, StatSample,
-  Group, GroupActionResult, Alert, HealthData, EarningsEntry, PoolPreset, Wallet,
+  Group, GroupActionResult, Alert, HealthData, PoolPreset, Wallet,
   Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult, AnalyticsResult,
   AlertRule, NotificationChannel,
 } from './types';
@@ -79,7 +79,6 @@ export const api = {
     test:       ()                                                  => post<{ results: Record<string, boolean> }>('/api/notifications/test'),
   },
   health:   (ip?: string) => ip ? get<HealthData>(`/api/health/${ip}`) : get<HealthData>('/api/health'),
-  earnings: (days = 30)   => get<EarningsEntry[]>(`/api/earnings?days=${days}`),
   pools: {
     list:         ()                                   => get<PoolPreset[]>('/api/pools'),
     create:       (p: Partial<PoolPreset>)             => post<PoolPreset>('/api/pools', p),

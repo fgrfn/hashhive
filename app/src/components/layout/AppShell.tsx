@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Zap, Grid3x3, Globe, Copy,
-  Activity, Wallet, TrendingUp, Bell, Settings, BarChart3,
+  Activity, Wallet, Bell, Settings, BarChart3,
   Sun, Moon, Plus, Search, Menu, X,
   Download, LogOut, type LucideIcon,
 } from 'lucide-react';
@@ -25,7 +25,6 @@ const NAV_ITEMS: Array<{ id: string; path: string; label: string; Icon: LucideIc
   { id: 'templates',     path: '/templates',       label: 'Templates',        Icon: Copy },
   { id: 'schedules',     path: '/schedules',       label: 'Schedules',        Icon: Activity },
   { id: 'wallets',       path: '/wallets',         label: 'Wallets',          Icon: Wallet },
-  { id: 'earnings',      path: '/earnings',        label: 'Earnings',         Icon: TrendingUp },
   { id: 'analytics',     path: '/analytics',       label: 'Analytics',        Icon: BarChart3 },
   { id: 'alerts',        path: '/alerts',          label: 'Alerts',           Icon: Bell, badge: true },
   { id: 'settings',      path: '/settings',        label: 'Settings',         Icon: Settings },
@@ -41,7 +40,6 @@ const TITLE_MAP: Record<string, string> = {
   templates: 'Templates',
   schedules: 'Schedules',
   wallets: 'Wallets',
-  earnings: 'Earnings',
   analytics: 'Analytics',
   alerts: 'Alerts & Notifications',
   settings: 'Settings',
@@ -100,7 +98,7 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
         <div style={{ flex: 1, overflow: 'auto', padding: '14px 16px 80px' }}>{children}</div>
 
         <nav style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: t.surface, borderTop: `1px solid ${t.border}`, display: 'flex', padding: '8px 4px 10px', justifyContent: 'space-around', zIndex: 50 }}>
-          {NAV_ITEMS.filter(n => ['dashboard','lottominer','axeos','earnings','alerts'].includes(n.id)).map(({ id, path, label, Icon, badge }) => {
+          {NAV_ITEMS.filter(n => ['dashboard','lottominer','axeos','analytics','alerts'].includes(n.id)).map(({ id, path, label, Icon, badge }) => {
             const on = active === id;
             return (
               <button key={id} onClick={() => go(path)} style={{ background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 8px', cursor: 'pointer', color: on ? t.accent : t.textMuted, position: 'relative' }}>
