@@ -164,7 +164,7 @@ export function Lottominer() {
         </div>
       ) : filtered.length > 0 && (
       <div style={{ overflowX: 'auto' }}>
-      <Card t={t} noPad style={{ minWidth: 960 }}>
+      <Card t={t} noPad style={{ width: 'max-content', minWidth: '100%' }}>
         <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, alignItems: 'center' }}>
             <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d.ip || ''))); }} style={{ accentColor: t.info }} /></div>
@@ -357,7 +357,7 @@ function SoloFleet({ t, title, fetcher }: { t: Theme; title: string; fetcher: ()
     <div style={{ marginTop: 20 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 10, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
       <div style={{ overflowX: 'auto' }}>
-        <Card t={t} noPad style={{ minWidth: 720 }}>
+        <Card t={t} noPad style={{ width: 'max-content', minWidth: '100%' }}>
           <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
             <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 90px 110px 70px 100px 80px', gap: 12 }}>
               {['IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Best Diff', 'Uptime'].map(c => <Label key={c} t={t}>{c}</Label>)}
