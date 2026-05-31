@@ -320,6 +320,35 @@ export function Lottominer() {
                 </div>
               </div>
             </Section>
+            {/* Weather widget */}
+            <Section t={t} label="Weather">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <FormField t={t} label="City" value={String(config.WeatherCity ?? '')} onChange={v => setConfig({ ...config, WeatherCity: v })} placeholder="Berlin" />
+                <FormField t={t} label="Latitude" value={String(config.WeatherLat ?? '')} onChange={v => setConfig({ ...config, WeatherLat: v })} mono placeholder="52.52" />
+                <FormField t={t} label="Longitude" value={String(config.WeatherLon ?? '')} onChange={v => setConfig({ ...config, WeatherLon: v })} mono placeholder="13.40" />
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Temperature</Label>
+                  <select value={config.WeatherTempUnit ?? 'celsius'} onChange={e => setConfig({ ...config, WeatherTempUnit: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['celsius', 'fahrenheit'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Wind speed</Label>
+                  <select value={config.WeatherSpeedUnit ?? 'kmh'} onChange={e => setConfig({ ...config, WeatherSpeedUnit: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['kmh', 'mph', 'ms', 'kn'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Altitude mode</Label>
+                  <select value={config.WeatherAltMode ?? 'pressure'} onChange={e => setConfig({ ...config, WeatherAltMode: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['pressure', 'altitude'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            </Section>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
               <button onClick={() => setEditDevice(null)} style={btnStyle(t)}>Cancel</button>
               <button onClick={saveEdit} disabled={saving} style={{ ...btnStyle(t, 'primary'), opacity: saving ? 0.7 : 1 }}>

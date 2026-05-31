@@ -148,12 +148,15 @@ async def broadcast_lottominer_config(data: dict):
 #   /api/setting/time        → timezone + clock format
 #   /api/setting/preference  → display (brightness, rotation, LED, screen saver)
 #   /api/setting/market      → coin/price display (BTC ticker, watch list, kline)
+#   /api/setting/weather     → on-device weather widget
 _MINING_KEYS = {"PrimaryPool", "PrimaryAddress", "PrimaryPassword",
                 "SecondaryPool", "SecondaryAddress", "SecondaryPassword"}
 _NETWORK_KEYS = {"Hostname", "WiFiSSID", "WiFiPWD"}
 _TIME_KEYS = {"Timezone", "TimeFormat", "DateFormat"}
 _PREFERENCE_KEYS = {"Brightness", "RotateScreen", "LedEnable", "ScreenSaver", "ScreenSaverMode"}
 _MARKET_KEYS = {"MainCoin", "WatchCoins", "KlineRotate", "KlineInterval", "PricePageMode"}
+_WEATHER_KEYS = {"WeatherCity", "WeatherLat", "WeatherLon", "WeatherTempUnit",
+                 "WeatherSpeedUnit", "WeatherAltMode"}
 
 # Read-back: which fields to surface from each GET endpoint (WiFiPWD is never returned).
 _NETWORK_READ = {"Hostname", "WiFiSSID"}
@@ -183,6 +186,7 @@ async def get_lottominer_device_config(ip: str):
         await _merge("/api/setting/time", _TIME_KEYS)
         await _merge("/api/setting/preference", _PREFERENCE_KEYS)
         await _merge("/api/setting/market", _MARKET_KEYS)
+        await _merge("/api/setting/weather", _WEATHER_KEYS)
         cfg["ip"] = ip
         return cfg
 
@@ -198,6 +202,7 @@ async def post_lottominer_device_config(data: dict):
     time_cfg = {k: v for k, v in data.items() if k in _TIME_KEYS}
     preference = {k: v for k, v in data.items() if k in _PREFERENCE_KEYS}
     market = {k: v for k, v in data.items() if k in _MARKET_KEYS}
+    weather = {k: v for k, v in data.items() if k in _WEATHER_KEYS}
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             if mining:
@@ -210,6 +215,8 @@ async def post_lottominer_device_config(data: dict):
                 await client.post(f"http://{device_ip}/api/setting/preference", json=preference)
             if market:
                 await client.post(f"http://{device_ip}/api/setting/market", json=market)
+            if weather:
+                await client.post(f"http://{device_ip}/api/setting/weather", json=weather)
             hostname = data.get("Hostname") or device_ip
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({
