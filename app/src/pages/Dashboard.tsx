@@ -84,6 +84,14 @@ export function Dashboard() {
   const sparkData = statSamples.slice(-30).map(s => s.gh ?? 0);
   const metricUnit = metric === 'power' ? 'W' : metric === 'efficiency' ? 'W/TH' : 'GH/s';
 
+  // Chart headline shows the *current* live value (consistent with the KPI strip),
+  // not the window average — otherwise stale history (e.g. a past spike) makes the
+  // header read a high hashrate while the fleet is actually offline / has 0 devices.
+  const liveHeadline =
+    metric === 'power' ? totalPower
+    : metric === 'efficiency' ? (totalHr > 0 ? totalPower / (totalHr / 1000) : 0)
+    : totalHr;
+
   const filteredLog = logLines.filter(l => {
     if (logFilter === 'Lottominer') return l.source === 'lottominer';
     if (logFilter === 'BitAxe')  return l.source === 'axeos';
@@ -123,11 +131,11 @@ export function Dashboard() {
           <div>
             <Label t={t}>{metric === 'power' ? 'Power' : metric === 'efficiency' ? 'Efficiency' : 'Hashrate'} · {range}</Label>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 4 }}>
-              {chartData.length > 0
+              {devicesOnline > 0
                 ? <>{metric === 'hashrate'
-                      ? fmtHashrate(chartData.reduce((a, b) => a + b, 0) / chartData.length)
-                      : `${(chartData.reduce((a, b) => a + b, 0) / chartData.length).toFixed(1)} ${metricUnit}`}
-                    <span style={{ color: t.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 6 }}>avg</span></>
+                      ? fmtHashrate(liveHeadline)
+                      : `${liveHeadline.toFixed(1)} ${metricUnit}`}
+                    <span style={{ color: t.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 6 }}>now</span></>
                 : <span style={{ color: t.textMuted, fontSize: 14, fontWeight: 400 }}>—</span>
               }
             </div>
