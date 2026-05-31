@@ -74,23 +74,10 @@ export function getNmStatus(d: NMMinerDevice): 'online' | 'offline' | 'warning' 
 }
 
 /** Format a probability (0..1) as a readable chance: percent, or "1 in N" when tiny. */
-/** Compact odds denominator: 540541 → "541K", 100000000 → "100M". Keeps one
- *  decimal for non-round values (3.8M) and drops it when redundant (100M). */
-function fmtOdds(n: number): string {
-  const units: [number, string][] = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
-  for (const [factor, suffix] of units) {
-    if (n >= factor) {
-      const scaled = n / factor;
-      return `${scaled >= 100 ? Math.round(scaled) : scaled.toFixed(1).replace(/\.0$/, '')}${suffix}`;
-    }
-  }
-  return String(Math.round(n));
-}
-
 export function fmtProb(p: number | null | undefined): string {
   if (p == null || !Number.isFinite(p) || p <= 0) return '—';
   if (p >= 0.0001) return `${(p * 100).toFixed(p >= 0.1 ? 1 : 3)}%`;
-  return `1 : ${fmtOdds(Math.round(1 / p))}`;
+  return `1 : ${Math.round(1 / p).toLocaleString()}`;
 }
 
 /** Case-insensitive match of a global search query against a device's name/hostname/ip.

@@ -92,10 +92,5 @@ describe('fmtProb', () => {
   });
   it('formats a large probability as percent', () => expect(fmtProb(0.25)).toBe('25.0%'));
   it('formats a small-but-visible probability with more decimals', () => expect(fmtProb(0.001)).toBe('0.100%'));
-  it('formats a tiny probability as compact odds', () => expect(fmtProb(0.00001)).toBe('1 : 100K'));
-  it('uses M/B suffixes for long odds', () => {
-    expect(fmtProb(1e-8)).toBe('1 : 100M');
-    expect(fmtProb(1 / 3846154)).toBe('1 : 3.8M');
-    expect(fmtProb(1 / 540541)).toBe('1 : 541K');
-  });
+  it('formats a tiny probability as full odds with separators', () => expect(fmtProb(0.00001)).toBe('1 : 100,000'));
 });
