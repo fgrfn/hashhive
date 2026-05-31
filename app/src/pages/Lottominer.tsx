@@ -157,7 +157,7 @@ export function Lottominer() {
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <NmMobileCard key={d.ip} t={t} d={d} selected={selected.has(d.ip || '')} onToggle={() => toggleSelect(d.ip || '')} onEdit={() => openEdit(d.ip || '')} />
+            <NmMobileCard key={d.ip} t={t} d={d} selected={selected.has(d.ip || '')} onToggle={() => toggleSelect(d.ip || '')} onEdit={() => openEdit(d.ip || '')} onOpen={() => navigate(`/devices/${d.ip || ''}`)} />
           ))}
         </div>
       ) : filtered.length > 0 && (
@@ -190,8 +190,8 @@ export function Lottominer() {
               <div onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(ip)} onChange={() => toggleSelect(ip)} style={{ accentColor: t.info }} />
               </div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{ip}</div>
-              <div style={{ fontWeight: 500 }}>{name}</div>
+              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted, cursor: 'pointer' }}>{ip}</div>
+              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontWeight: 500, cursor: 'pointer' }}>{name}</div>
               <StatusPill t={t} status={status} />
               <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
                 {fmtHashrate(hr)}
@@ -312,7 +312,7 @@ export function Lottominer() {
   );
 }
 
-function NmMobileCard({ t, d, selected, onToggle, onEdit }: { t: Theme; d: NMMinerDevice; selected: boolean; onToggle: () => void; onEdit: () => void }) {
+function NmMobileCard({ t, d, selected, onToggle, onEdit, onOpen }: { t: Theme; d: NMMinerDevice; selected: boolean; onToggle: () => void; onEdit: () => void; onOpen: () => void }) {
   const status = getNmStatus(d);
   const hr = getHashrate(d);
   const temp = getTemp(d);
@@ -325,7 +325,7 @@ function NmMobileCard({ t, d, selected, onToggle, onEdit }: { t: Theme; d: NMMin
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <input type="checkbox" checked={selected} onChange={onToggle} style={{ accentColor: t.info, marginTop: 3 }} />
-          <div>
+          <div onClick={onOpen} style={{ cursor: 'pointer' }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
             <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
           </div>
