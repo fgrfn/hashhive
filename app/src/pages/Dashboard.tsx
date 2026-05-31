@@ -8,16 +8,12 @@ import { FONT_MONO, type Theme } from '../tokens';
 import { api, getHashrate, getTemp, fmtHashrate, getAxeHashrate, matchesSearch, fmtProb, type StatSample, type ProbabilityResult } from '../api';
 import type { Alert } from '../api';
 
-/** Time-only for today's entries; "MMM D, HH:MM:SS" for older ones (so logs from
- *  previous days aren't mistaken for today). */
+/** Always show date + time ("MMM D, HH:MM:SS") so every log line carries its
+ *  date — not just entries from previous days. */
 function fmtLogTime(ts: string): string {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return '';
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString()
-    : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString()}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString()}`;
 }
 
 export function Dashboard() {
