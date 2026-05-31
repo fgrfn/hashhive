@@ -96,6 +96,7 @@ from routers.notifications import _weekly_summary_loop
 from routers.discovery import _discovery_background_loop
 from routers.autofan import _autofan_loop
 from routers.schedules import _schedules_execution_loop
+from routers.discord_dashboard import _discord_dashboard_loop
 
 import routers.auth as _auth_router
 import routers.settings as _settings_router
@@ -117,6 +118,7 @@ import routers.pools as _pools_router
 import routers.templates as _templates_router
 import routers.probability as _probability_router
 import routers.analytics as _analytics_router
+import routers.discord_dashboard as _discord_dashboard_router
 
 
 @asynccontextmanager
@@ -138,6 +140,7 @@ async def lifespan(app: FastAPI):
     disc_task = asyncio.create_task(_discovery_background_loop())
     fan_task = asyncio.create_task(_autofan_loop())
     sched_task = asyncio.create_task(_schedules_execution_loop())
+    dd_task = asyncio.create_task(_discord_dashboard_loop())
     _append_entry({
         "id": f"system:startup:{datetime.now(timezone.utc).isoformat()}",
         "device": "system",
@@ -154,7 +157,8 @@ async def lifespan(app: FastAPI):
     disc_task.cancel()
     fan_task.cancel()
     sched_task.cancel()
-    for t in (task, ws_task, disc_task, fan_task, sched_task):
+    dd_task.cancel()
+    for t in (task, ws_task, disc_task, fan_task, sched_task, dd_task):
         try:
             await t
         except asyncio.CancelledError:
@@ -192,6 +196,7 @@ app.include_router(_pools_router.router)
 app.include_router(_templates_router.router)
 app.include_router(_probability_router.router)
 app.include_router(_analytics_router.router)
+app.include_router(_discord_dashboard_router.router)
 
 # ── Static assets ──────────────────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ STATS_DIR = DATA_DIR / "stats"
 TEMPLATES_DIR = DATA_DIR / "templates"  # one JSON file per device template
 DISCOVERY_STATE_FILE = DATA_DIR / "discovery_state.json"  # known IPs for continuous scan
 RECORDS_FILE = DATA_DIR / "records.json"  # all-time best-share records per device
+DISCORD_DASHBOARD_STATE_FILE = DATA_DIR / "discord_dashboard_state.json"  # last webhook message id
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 _SESSIONS_FILE = DATA_DIR / "sessions.json"
 

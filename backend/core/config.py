@@ -59,6 +59,11 @@ DEFAULT_CONFIG: dict = {
         "day": "monday",
         "time": "08:00",
     },
+    "discord_dashboard": {
+        "enabled": False,
+        "webhook": "",            # optional; falls back to notifications.discord_webhook
+        "interval_seconds": 60,
+    },
     "pool_presets": [],
     "groups": [],
     "schedules": [],
