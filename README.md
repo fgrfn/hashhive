@@ -16,14 +16,21 @@
 
 | | |
 |---|---|
-| 📊 **Dashboard** | Live stats — hashrate, temperature, power, share rate |
-| ⛏️ **NMMiner** | Full swarm table · per-device config modal · pool push |
-| 🔧 **BitAxe / NerdAxe** | Live stats · pause / resume / restart / identify · bulk actions · inline rename |
-| 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets |
-| 🔔 **Alerts** | Offline · temp spike · VR temp · hashrate drop · error rate · fan failure · pool loss · fallback · reboot detection |
-| 📨 **Notifications** | Telegram · Discord · Gotify · weekly summary |
-| 📋 **Live Log** | Source badges · search filter · load up to 7 days history · persists across refresh |
-| 📊 **Share Acceptance Rate** | Color-coded acc% column on AxeOS table · Pool Status table |
+| 📊 **Dashboard** | Live fleet stats — hashrate, temperature, power, share rate · block-chance odds · live log |
+| ⛏️ **Lottominer** (NMMiner) | Per-device table · full configure modal (pool · WiFi · time · display) · pool push |
+| 🔧 **BitAxe / NerdAxe** | Live stats · per-device configure modal (pool · fallback · WiFi · fan · freq/voltage) · pause / resume / restart / identify · bulk actions · inline rename |
+| 🪙 **Solo miners** | NerdMiner & SparkMiner monitoring |
+| 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets · live pool status |
+| 👥 **Groups** | Group devices and run pool-switch / restart / pause actions on a whole group |
+| 🗓️ **Schedules** | Time-based automation — restart / pause / resume / pool-switch on a cron-like schedule |
+| 📑 **Templates** | Save and apply reusable device configurations |
+| 💰 **Wallets & Earnings** | Track payout wallets and estimated earnings |
+| 📈 **Analytics** | Block / best-share predictions (Poisson) · KPI strip · best-share trend · efficiency ranking · all-time leaderboard |
+| 🔍 **Discovery** | One unified "Add device" flow · subnet auto-scan · continuous background discovery |
+| 🌡️ **Automation** | PID auto-fan control · auto-restart on stalled hashrate |
+| 🔔 **Alerts** | Offline · temp spike · VR temp · hashrate drop · error rate · fan failure · pool loss · fallback · reboot · RSSI · block found — each toggleable with editable thresholds |
+| 📨 **Notifications** | Telegram · Discord · Gotify · ntfy · Pushover · weekly summary · live self-updating Discord dashboard embed |
+| 📋 **Live Log** | Source badges · search filter · up to 30 days history · persists across refresh |
 
 ---
 
@@ -86,14 +93,15 @@ Change the port in `docker-compose.yml`: `"9000:8000"`.
 
 ## Configuration
 
-On first start, `dashboard_config.json` is created automatically. Configure via the **Settings** page:
+On first start, `dashboard_config.json` is created automatically. Add devices via the **Add device** flow (auto-scan or manual IP) and configure via the **Settings** page:
 
-- NMMiner master IP (all devices fetched via swarm)
-- AxeOS device list (IP · name · type)
-- Alert thresholds (max chip temp · max VR temp · min hashrate · max error rate)
-- Refresh interval
-- Notification credentials (Telegram / Discord / Gotify)
+- Device lists — Lottominer (NMMiner), BitAxe / NerdAxe, NerdMiner, SparkMiner (each standalone by IP)
+- Alert rules — toggle each detector on/off and edit its threshold (chip temp · VR temp · min hashrate · error rate · RSSI · offline grace)
+- Refresh interval and offline grace period
+- Notification channels (Telegram / Discord / Gotify / ntfy / Pushover) — with per-channel test
 - Weekly summary schedule (day + time)
+- Live Discord dashboard (self-updating fleet embed)
+- Auto-fan (PID) and auto-restart automation
 - Pool presets (saved on the Pool page)
 
 ---
@@ -164,10 +172,23 @@ Die App-Version steht in [`version.txt`](version.txt) und wird automatisch durch
 
 ## Stack
 
-- **Backend** — Python 3.10+ · FastAPI · httpx · asyncio
-- **Frontend** — Vanilla HTML / CSS / JS · single file · no build step
+- **Backend** — Python 3.10+ · FastAPI · httpx · asyncio · per-family miner drivers (`backend/miners/`)
+- **Frontend** — React 19 · TypeScript · Vite · Zustand
 - **Persistence** — JSON files · daily log rotation · no database required
-- **Notifications** — Telegram · Discord · Gotify
+- **Notifications** — Telegram · Discord · Gotify · ntfy · Pushover
+
+---
+
+## Discord integration
+
+HashHive folds in the monitoring ideas from [bitaxe-discord-bot](https://github.com/fgrfn/bitaxe-discord-bot),
+generalised from a single BitAxe to the whole fleet:
+
+- **Alerts → Discord** — every alert type can be pushed to a Discord webhook (also Telegram / Gotify / ntfy / Pushover).
+- **Live dashboard embed** — a single fleet-summary message that updates itself in place (hashrate, devices online, temp, power, shares). Enable it under **Settings → Notifications → Live Discord Dashboard**.
+- **Weekly summary** — scheduled fleet recap.
+
+> An interactive command bot (`!status`, `!hashrate`, …) is not yet included — push + live dashboard are.
 
 ---
 
