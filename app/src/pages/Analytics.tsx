@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useThemeStore } from '../store/theme';
 import { Card, Label, useDataReady } from '../components/primitives';
+import { BarChartComponent } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtHashrate, fmtBestDiff, fmtProb } from '../api';
 import type { AnalyticsResult, ProbWindows } from '../api';
-import { Award, Target, Trophy } from 'lucide-react';
+import { Award, Target, Trophy, Leaf } from 'lucide-react';
 
 /** Humanize a duration in seconds into a coarse "12 months" / "46 years" string. */
 function humanizeDuration(seconds: number | null | undefined): string {
@@ -29,6 +30,14 @@ function relativeTime(ts: string | null): string {
   return 'just now';
 }
 
+/** Absolute calendar date for a best-share record (locale-aware), e.g. "31 May 2026". */
+function absoluteDate(ts: string | null): string {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const MEDAL = ['#f59e0b', '#9ca3af', '#b45309'];
 
 export function Analytics() {
@@ -45,10 +54,30 @@ export function Analytics() {
     return <div style={{ color: t.textMuted, fontSize: 13 }}>Loading analytics…</div>;
   }
 
-  const { fleet, beat_best, block, leaderboard } = data;
+  const { fleet, beat_best, block, leaderboard, summary, best_share_series, efficiency } = data;
+
+  const kpis: Array<{ label: string; value: string; color: string }> = [
+    { label: 'All-time best', value: fmtBestDiff(summary.all_time_best), color: t.accent },
+    { label: 'Active miners', value: String(summary.active_miners), color: t.success },
+    { label: 'Best diff · today', value: summary.best_today > 0 ? fmtBestDiff(summary.best_today) : '—', color: t.honey },
+    { label: 'Shares · today', value: summary.shares_today.toLocaleString(), color: t.info },
+    { label: 'Shares · 7d', value: summary.shares_7d.toLocaleString(), color: t.text },
+  ];
+
+  const seriesWithData = best_share_series.filter(s => s.best > 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        {kpis.map(k => (
+          <div key={k.label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '12px 14px' }}>
+            <Label t={t}>{k.label}</Label>
+            <div style={{ fontSize: 20, fontWeight: 700, color: k.color, fontFamily: FONT_MONO, marginTop: 4 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
       <Card t={t}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -72,6 +101,47 @@ export function Analytics() {
         </div>
       </Card>
 
+      {seriesWithData.length > 0 && (
+        <Card t={t}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Award size={16} color={t.accent} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Best share trend</div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>Daily peak difficulty across the fleet · last 7 days.</div>
+            </div>
+          </div>
+          <BarChartComponent t={t} color={t.accent} h={150}
+            data={best_share_series.map(s => s.best)}
+            labels={best_share_series.map(s => s.date.slice(5))} />
+        </Card>
+      )}
+
+      {efficiency.length > 0 && (
+        <Card t={t} noPad>
+          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Leaf size={16} color={t.success} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Efficiency ranking</div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>Watts per TH/s today — most efficient first (powered devices only).</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 110px 90px 100px', gap: 10, padding: '8px 18px', borderBottom: `1px solid ${t.border}` }}>
+            {['#', 'MINER', 'HASHRATE', 'POWER', 'W/TH'].map((c, i) => (
+              <Label key={c} t={t} style={{ textAlign: i >= 2 ? 'right' : 'left' }}>{c}</Label>
+            ))}
+          </div>
+          {efficiency.map((d, i) => (
+            <div key={d.ip} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 110px 90px 100px', gap: 10, padding: '12px 18px', borderBottom: i === efficiency.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+              <div style={{ color: MEDAL[i] || t.textMuted, fontWeight: 700, fontFamily: FONT_MONO }}>{i < 3 ? '●' : ''} {i + 1}</div>
+              <div style={{ fontWeight: 600 }}>{d.name}</div>
+              <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: t.textMuted }}>{fmtHashrate(d.hashrate_ghs)}</div>
+              <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: t.textMuted }}>{d.power_w.toFixed(1)} W</div>
+              <div style={{ textAlign: 'right', fontFamily: FONT_MONO, fontWeight: 700, color: i === 0 ? t.success : t.text }}>{d.w_per_th.toFixed(1)}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+
       <Card t={t} noPad>
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
           <Trophy size={16} color={t.honey} />
@@ -80,7 +150,7 @@ export function Analytics() {
             <div style={{ fontSize: 12, color: t.textMuted }}>All-time leaderboard across your miners.</div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 90px', gap: 10, padding: '8px 18px', borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 130px', gap: 10, padding: '8px 18px', borderBottom: `1px solid ${t.border}` }}>
           {['#', 'MINER', 'BEST', 'WHEN'].map((c, i) => (
             <Label key={c} t={t} style={{ textAlign: i >= 2 ? 'right' : 'left' }}>{c}</Label>
           ))}
@@ -88,7 +158,7 @@ export function Analytics() {
         {leaderboard.length === 0 ? (
           <div style={{ padding: '24px 18px', color: t.textMuted, fontSize: 13 }}>No best-share records yet — they accumulate as your miners run.</div>
         ) : leaderboard.map((d, i) => (
-          <div key={d.ip} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 90px', gap: 10, padding: '12px 18px', borderBottom: i === leaderboard.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+          <div key={d.ip} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 130px', gap: 10, padding: '12px 18px', borderBottom: i === leaderboard.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
             <div style={{ color: MEDAL[i] || t.textMuted, fontWeight: 700, fontFamily: FONT_MONO }}>
               {i < 3 ? '●' : ''} {i + 1}
             </div>
@@ -97,7 +167,10 @@ export function Analytics() {
               {d.type && <div style={{ fontSize: 11, color: t.textMuted }}>{d.type}</div>}
             </div>
             <div style={{ textAlign: 'right', fontFamily: FONT_MONO, fontWeight: 700, color: t.accent }}>{fmtBestDiff(d.best_diff)}</div>
-            <div style={{ textAlign: 'right', fontSize: 12, color: t.textMuted, fontFamily: FONT_MONO }}>{relativeTime(d.ts)}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO }} title={d.ts ? new Date(d.ts).toLocaleString() : undefined}>
+              <div style={{ fontSize: 12.5, color: t.text }}>{absoluteDate(d.ts)}</div>
+              <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 1 }}>{relativeTime(d.ts)}</div>
+            </div>
           </div>
         ))}
       </Card>
