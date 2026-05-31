@@ -80,6 +80,9 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
   const [extraIps, setExtraIps] = useState('');
 
   const disc = settings?.discovery ?? {};
+  // IPs already in the saved config — shown but not selectable in scan results.
+  const configuredIps = new Set(configuredDevices(settings).map(d => d.ip));
+  const addable = (result?.found ?? []).filter(d => !configuredIps.has(d.ip));
 
   const scan = async () => {
     setScanning(true);
@@ -93,11 +96,14 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
     setScanning(false);
   };
 
-  const toggle = (ip: string) => setSelected(prev => {
-    const s = new Set(prev);
-    if (s.has(ip)) s.delete(ip); else s.add(ip);
-    return s;
-  });
+  const toggle = (ip: string) => {
+    if (configuredIps.has(ip)) return;  // already-added devices aren't selectable
+    setSelected(prev => {
+      const s = new Set(prev);
+      if (s.has(ip)) s.delete(ip); else s.add(ip);
+      return s;
+    });
+  };
 
   const addSelected = async () => {
     if (!result) return;
@@ -159,28 +165,30 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textMuted, cursor: 'pointer' }}>
-                    <input type="checkbox"
-                      checked={selected.size === result.found.length && result.found.length > 0}
-                      onChange={() => setSelected(selected.size === result.found.length ? new Set() : new Set(result.found.map(d => d.ip)))}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textMuted, cursor: addable.length ? 'pointer' : 'default' }}>
+                    <input type="checkbox" disabled={addable.length === 0}
+                      checked={addable.length > 0 && selected.size === addable.length}
+                      onChange={() => setSelected(selected.size === addable.length ? new Set() : new Set(addable.map(d => d.ip)))}
                       style={{ accentColor: t.accent }}
                     />
-                    Select all
+                    Select all new
                   </label>
                   <span style={{ fontSize: 12, color: t.textMuted }}>{selected.size} selected</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
                   {result.found.map(d => {
+                    const configured = configuredIps.has(d.ip);
                     const sel = selected.has(d.ip);
                     return (
                       <div key={d.ip} onClick={() => toggle(d.ip)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, border: `1px solid ${sel ? t.accent : t.border}`, background: sel ? t.accentGlow : t.surface, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={sel} onChange={() => toggle(d.ip)} onClick={e => e.stopPropagation()} style={{ accentColor: t.accent }} />
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, border: `1px solid ${sel ? t.accent : t.border}`, background: sel ? t.accentGlow : t.surface, cursor: configured ? 'default' : 'pointer', opacity: configured ? 0.55 : 1 }}>
+                        <input type="checkbox" checked={sel} disabled={configured} onChange={() => toggle(d.ip)} onClick={e => e.stopPropagation()} style={{ accentColor: t.accent }} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</span>
                             <span style={{ fontSize: 10, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4 }}>{TYPE_LABEL[d.type]}</span>
                             <span style={{ fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 3 }}>{VIA_ICON[d.discovered_via]} {d.discovered_via}</span>
+                            {configured && <span style={{ fontSize: 10, color: t.success, fontFamily: FONT_MONO, background: `${t.success}22`, padding: '1px 5px', borderRadius: 4 }}>Already added</span>}
                           </div>
                           <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, marginTop: 2 }}>{d.ip}</div>
                         </div>
@@ -189,7 +197,10 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
                     );
                   })}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: t.textMuted }}>
+                    {addable.length} new · {result.found.length - addable.length} already added
+                  </span>
                   <button onClick={addSelected} disabled={selected.size === 0 || adding} style={{ ...btnStyle(t, 'primary'), opacity: selected.size === 0 || adding ? 0.5 : 1 }}>
                     {adding ? 'Adding…' : `Add ${selected.size || ''} device${selected.size !== 1 ? 's' : ''}`}
                   </button>

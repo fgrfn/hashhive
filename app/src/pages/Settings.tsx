@@ -10,7 +10,7 @@ import { api } from '../api';
 import type { AppSettings } from '../api';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
-import { BackupSection, SectionHeader, SettingRow, SecuritySection, SaveBar } from '../components/settings/SettingsParts';
+import { BackupSection, SectionHeader, SettingRow, SecuritySection, AutoSaveHint } from '../components/settings/SettingsParts';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
@@ -32,40 +32,44 @@ export function Settings() {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings || {});
   const latestSettings = useRef(localSettings);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const initialized = useRef(false);
 
+  // Seed local state from the store exactly once (first time settings arrive).
+  // After that, local state is the source of truth and we push to the server —
+  // re-syncing on every store change would clobber whatever the user is typing.
   useEffect(() => {
-    latestSettings.current = localSettings;
-  });
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (settings) setLocalSettings(settings);
+    if (!initialized.current && settings) {
+      initialized.current = true;
+      latestSettings.current = settings;
+      setLocalSettings(settings);
+    }
   }, [settings]);
 
   const save = useCallback(async () => {
     setSaving(true);
     try {
       const updated = await api.settings.save(latestSettings.current);
+      // Update the store WITHOUT re-seeding local state (initialized guard stays
+      // set), so an in-flight save can't wipe fields edited since it started.
       setSettings(updated);
-      toast('Settings saved');
     } catch {
       toast('Failed to save settings', 'error');
     }
     setSaving(false);
   }, [setSettings]);
 
-  const upd = (patch: Partial<AppSettings>) => setLocalSettings(s => ({ ...s, ...patch }));
-
-  // For toggles: patch state and debounce-save after 500ms so rapid changes coalesce.
-  const updToggle = (patch: Partial<AppSettings>) => {
+  // Every edit (text fields and toggles alike) patches local state, keeps the
+  // ref in sync synchronously, and debounce-saves — no manual Save button.
+  const upd = (patch: Partial<AppSettings>) => {
     setLocalSettings(s => {
       const next = { ...s, ...patch };
       latestSettings.current = next;
       return next;
     });
     clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(save, 500);
+    autoSaveTimer.current = setTimeout(save, 700);
   };
+  const updToggle = upd;
 
   const mobile = useMobile();
 
@@ -100,7 +104,7 @@ export function Settings() {
                 <Input t={t} value={String(localSettings.alert_cooldown_minutes || 30)} onChange={v => upd({ alert_cooldown_minutes: Number(v) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
             </Card>
-            <SaveBar t={t} saving={saving} onSave={save} />
+            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -123,7 +127,7 @@ export function Settings() {
                 <Input t={t} value={String(localSettings.electricity_kwh_price || 0)} onChange={v => upd({ electricity_kwh_price: Number(v) })} mono type="number" style={{ width: 100 }} />
               </SettingRow>
             </Card>
-            <SaveBar t={t} saving={saving} onSave={save} />
+            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -163,7 +167,7 @@ export function Settings() {
                 </>
               ); })()}
             </Card>
-            <SaveBar t={t} saving={saving} onSave={save} />
+            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -200,7 +204,7 @@ export function Settings() {
 
             <DiscordDashboardCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
 
-            <SaveBar t={t} saving={saving} onSave={save} />
+            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
