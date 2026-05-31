@@ -46,6 +46,17 @@ export interface ProbabilityResult {
 
 export interface AnalyticsResult {
   fleet: { hashrate_ghs: number; network_difficulty: number | null; best_share: number };
+  summary: {
+    all_time_best: number;
+    record_count: number;
+    active_miners: number;
+    shares_today: number;
+    shares_7d: number;
+    best_today: number;
+    best_7d: number;
+  };
+  best_share_series: Array<{ date: string; best: number }>;
+  efficiency: Array<{ ip: string; name: string; hashrate_ghs: number; power_w: number; w_per_th: number }>;
   beat_best: { record: number; expected_seconds: number | null; windows: ProbWindows };
   block: { expected_seconds: number | null; windows: ProbWindows };
   leaderboard: Array<{ ip: string; name: string; type: string; best_diff: number; ts: string | null }>;
