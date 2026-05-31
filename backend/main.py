@@ -110,7 +110,6 @@ import routers.notifications as _notifications_router
 import routers.groups as _groups_router
 import routers.schedules as _schedules_router
 import routers.wallets as _wallets_router
-import routers.earnings as _earnings_router
 import routers.stats as _stats_router
 import routers.health as _health_router
 import routers.updates as _updates_router
@@ -190,7 +189,6 @@ app.include_router(_notifications_router.router)
 app.include_router(_groups_router.router)
 app.include_router(_schedules_router.router)
 app.include_router(_wallets_router.router)
-app.include_router(_earnings_router.router)
 app.include_router(_stats_router.router)
 app.include_router(_health_router.router)
 app.include_router(_updates_router.router)

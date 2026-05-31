@@ -261,15 +261,6 @@ export interface Schedule {
   desc?: string;
 }
 
-export interface EarningsEntry {
-  date: string;
-  avg_hr_ghs: number;
-  avg_power_w: number;
-  btc_reward: number;
-  usd_reward: number;
-  usd_cost: number;
-  samples: number;
-}
 
 export interface HealthData {
   version: string;

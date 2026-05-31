@@ -17,7 +17,6 @@ const Pool         = lazy(() => import('./pages/Pool').then(m => ({ default: m.P
 const Templates    = lazy(() => import('./pages/Templates').then(m => ({ default: m.Templates })));
 const Schedules    = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
 const Alerts       = lazy(() => import('./pages/Alerts').then(m => ({ default: m.Alerts })));
-const Earnings     = lazy(() => import('./pages/Earnings').then(m => ({ default: m.Earnings })));
 const Wallets      = lazy(() => import('./pages/Wallets').then(m => ({ default: m.Wallets })));
 const Settings     = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const DeviceDetail = lazy(() => import('./pages/DeviceDetail').then(m => ({ default: m.DeviceDetail })));
@@ -59,7 +58,6 @@ function AppInner() {
             <Route path="/templates" element={<Templates />} />
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/alerts" element={<Alerts />} />
-            <Route path="/earnings" element={<Earnings />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/wallets" element={<Wallets />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />

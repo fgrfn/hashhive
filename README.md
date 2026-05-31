@@ -24,7 +24,7 @@
 | 👥 **Groups** | Group devices and run pool-switch / restart / pause actions on a whole group |
 | 🗓️ **Schedules** | Time-based automation — restart / pause / resume / pool-switch on a cron-like schedule |
 | 📑 **Templates** | Save and apply reusable device configurations |
-| 💰 **Wallets & Earnings** | Track payout wallets and estimated earnings |
+| 💰 **Wallets** | Track payout wallet addresses |
 | 📈 **Analytics** | Block / best-share predictions (Poisson) · KPI strip · best-share trend · efficiency ranking · all-time leaderboard |
 | 🔍 **Discovery** | One unified "Add device" flow · subnet auto-scan · continuous background discovery |
 | 🌡️ **Automation** | PID auto-fan control · auto-restart on stalled hashrate |
