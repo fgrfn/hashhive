@@ -1,5 +1,7 @@
 """Settings router: get/post settings, backup/restore, device patch."""
 
+import copy
+import shutil
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +10,12 @@ from fastapi.responses import FileResponse
 from core import (
     CONFIG_FILE,
     DEFAULT_CONFIG,
+    LOGS_DIR,
+    RECORDS_FILE,
+    STATS_DIR,
+    TEMPLATES_DIR,
+    DEVICE_STATE_FILE,
+    DISCOVERY_STATE_FILE,
     PatchDeviceRequest,
     _append_entry,
     _hash_pw,
@@ -16,6 +24,78 @@ from core import (
 )
 
 router = APIRouter()
+
+
+# Purgeable data categories. Each maps to config keys reset to their default
+# and/or on-disk paths to delete. Keeps destructive actions explicit + scoped.
+_PURGE_CATEGORIES: dict[str, dict] = {
+    "devices": {
+        "label": "Devices",
+        "config_keys": ["lottominer_master", "lottominer_devices", "nerdminer_devices",
+                        "sparkminer_devices", "axeos_devices"],
+    },
+    "pools": {"label": "Pool presets", "config_keys": ["pool_presets"]},
+    "groups": {"label": "Groups", "config_keys": ["groups"]},
+    "schedules": {"label": "Schedules", "config_keys": ["schedules"]},
+    "wallets": {"label": "Wallets", "config_keys": ["wallets"]},
+    "templates": {"label": "Templates", "dirs": [TEMPLATES_DIR]},
+    "stats": {"label": "Stats & history", "dirs": [STATS_DIR], "files": [RECORDS_FILE]},
+    "logs": {"label": "Alert log", "dirs": [LOGS_DIR]},
+    "discovery_state": {"label": "Discovery state", "files": [DISCOVERY_STATE_FILE, DEVICE_STATE_FILE]},
+    "notifications": {"label": "Notification channels", "config_keys": ["notifications"]},
+}
+
+
+@router.get("/api/settings/purge-categories")
+async def list_purge_categories():
+    """Expose the purgeable categories so the UI can build the selection list."""
+    return [{"id": cid, "label": c["label"]} for cid, c in _PURGE_CATEGORIES.items()]
+
+
+@router.post("/api/settings/purge")
+async def purge_data(data: dict):
+    """Reset selected data categories to their defaults. Body: {categories: [...]}.
+
+    Each category resets its config keys to DEFAULT_CONFIG values and/or deletes
+    the associated data files/dirs. Auth and core preferences are never touched.
+    """
+    categories = data.get("categories", [])
+    if not isinstance(categories, list) or not categories:
+        raise HTTPException(status_code=400, detail="categories (non-empty list) required")
+    unknown = [c for c in categories if c not in _PURGE_CATEGORIES]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"unknown categories: {unknown}")
+
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    purged: list[str] = []
+    for cid in categories:
+        spec = _PURGE_CATEGORIES[cid]
+        for key in spec.get("config_keys", []):
+            config[key] = copy.deepcopy(DEFAULT_CONFIG[key])
+        for d in spec.get("dirs", []):
+            if d.exists():
+                shutil.rmtree(d, ignore_errors=True)
+            d.mkdir(parents=True, exist_ok=True)
+        for f in spec.get("files", []):
+            try:
+                f.unlink(missing_ok=True)
+            except OSError:
+                pass
+        purged.append(spec["label"])
+
+    save_json(CONFIG_FILE, config)
+    now = datetime.now(timezone.utc).isoformat()
+    _append_entry({
+        "id": f"system:purge:{now}",
+        "device": "system",
+        "kind": "config_purged",
+        "severity": "warning",
+        "message": f"Purged: {', '.join(purged)}",
+        "timestamp": now,
+        "read": True,
+        "source": "system",
+    })
+    return {"status": "ok", "purged": categories}
 
 
 @router.get("/api/settings")

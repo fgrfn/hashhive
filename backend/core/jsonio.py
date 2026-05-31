@@ -1,5 +1,6 @@
 """Atomic JSON load/save helpers."""
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -11,8 +12,11 @@ def load_json(path: Path, default: Any) -> Any:
             return json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             pass
+    # Seed the file with the default, but return a *copy* — never the caller's
+    # default object by reference, or mutating the result would corrupt shared
+    # defaults (e.g. DEFAULT_CONFIG) process-wide.
     save_json(path, default)
-    return default
+    return copy.deepcopy(default)
 
 
 def save_json(path: Path, data: Any) -> None:
