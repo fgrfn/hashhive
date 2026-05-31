@@ -147,11 +147,13 @@ async def broadcast_lottominer_config(data: dict):
 #   /api/setting/network     → hostname + WiFi
 #   /api/setting/time        → timezone + clock format
 #   /api/setting/preference  → display (brightness, rotation, LED, screen saver)
+#   /api/setting/market      → coin/price display (BTC ticker, watch list, kline)
 _MINING_KEYS = {"PrimaryPool", "PrimaryAddress", "PrimaryPassword",
                 "SecondaryPool", "SecondaryAddress", "SecondaryPassword"}
 _NETWORK_KEYS = {"Hostname", "WiFiSSID", "WiFiPWD"}
 _TIME_KEYS = {"Timezone", "TimeFormat", "DateFormat"}
 _PREFERENCE_KEYS = {"Brightness", "RotateScreen", "LedEnable", "ScreenSaver", "ScreenSaverMode"}
+_MARKET_KEYS = {"MainCoin", "WatchCoins", "KlineRotate", "KlineInterval", "PricePageMode"}
 
 # Read-back: which fields to surface from each GET endpoint (WiFiPWD is never returned).
 _NETWORK_READ = {"Hostname", "WiFiSSID"}
@@ -159,7 +161,7 @@ _NETWORK_READ = {"Hostname", "WiFiSSID"}
 
 @router.get("/api/lottominer/device-config")
 async def get_lottominer_device_config(ip: str):
-    """Read NMMiner mining + network + time + preference settings into one object."""
+    """Read NMMiner mining + network + time + preference + market settings into one object."""
     _validate_device_ip(ip)
     async with httpx.AsyncClient(timeout=10) as client:
         try:
@@ -180,6 +182,7 @@ async def get_lottominer_device_config(ip: str):
         await _merge("/api/setting/network", _NETWORK_READ)
         await _merge("/api/setting/time", _TIME_KEYS)
         await _merge("/api/setting/preference", _PREFERENCE_KEYS)
+        await _merge("/api/setting/market", _MARKET_KEYS)
         cfg["ip"] = ip
         return cfg
 
@@ -194,6 +197,7 @@ async def post_lottominer_device_config(data: dict):
     network = {k: v for k, v in data.items() if k in _NETWORK_KEYS}
     time_cfg = {k: v for k, v in data.items() if k in _TIME_KEYS}
     preference = {k: v for k, v in data.items() if k in _PREFERENCE_KEYS}
+    market = {k: v for k, v in data.items() if k in _MARKET_KEYS}
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             if mining:
@@ -204,6 +208,8 @@ async def post_lottominer_device_config(data: dict):
                 await client.post(f"http://{device_ip}/api/setting/time", json=time_cfg)
             if preference:
                 await client.post(f"http://{device_ip}/api/setting/preference", json=preference)
+            if market:
+                await client.post(f"http://{device_ip}/api/setting/market", json=market)
             hostname = data.get("Hostname") or device_ip
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({

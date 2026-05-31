@@ -299,6 +299,27 @@ export function Lottominer() {
                 </div>
               </div>
             </Section>
+            {/* Market / price ticker */}
+            <Section t={t} label="Market">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <FormField t={t} label="Main coin" value={String(config.MainCoin ?? '')} onChange={v => setConfig({ ...config, MainCoin: v })} mono placeholder="BTC" />
+                <FormField t={t} label="Watch coins (comma-separated)" value={String(config.WatchCoins ?? '')} onChange={v => setConfig({ ...config, WatchCoins: v })} mono placeholder="BTC,ETH,LTC" />
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Price page mode</Label>
+                  <select value={config.PricePageMode ?? 'kline'} onChange={e => setConfig({ ...config, PricePageMode: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['kline', 'pricewall'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Kline interval</Label>
+                  <select value={config.KlineInterval ?? '1h'} onChange={e => setConfig({ ...config, KlineInterval: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['1m', '5m', '15m', '1h', '4h', '1d', '1w'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            </Section>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
               <button onClick={() => setEditDevice(null)} style={btnStyle(t)}>Cancel</button>
               <button onClick={saveEdit} disabled={saving} style={{ ...btnStyle(t, 'primary'), opacity: saving ? 0.7 : 1 }}>

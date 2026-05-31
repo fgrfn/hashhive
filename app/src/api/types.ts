@@ -353,6 +353,12 @@ export interface NMMinerConfig {
   LedEnable?: number | boolean;
   ScreenSaver?: string;
   ScreenSaverMode?: string;
+  // /api/setting/market
+  MainCoin?: string;
+  WatchCoins?: string;
+  KlineInterval?: string;
+  KlineRotate?: string;
+  PricePageMode?: string;
 }
 
 export interface PoolPreset {
