@@ -39,6 +39,7 @@ export const api = {
     configAll:   (cfg: Record<string, unknown>)                  => patch('/api/axeos/config/all', cfg),
     configBatch: (ips: string[], freq: number, voltage: number)  => patch('/api/axeos/config/batch', { ips, frequency: freq, coreVoltage: voltage }),
     configOne:   (ip: string, cfg: Record<string, unknown>)      => patch<AxeActionResponse>(`/api/axeos/config/${ip}`, cfg),
+    configOne1:  (ip: string)                                     => get<Record<string, unknown>>(`/api/axeos/config/${ip}`),
     scan:        ()                                               => get<AxeDevice[]>('/api/axeos/scan'),
   },
   device: {

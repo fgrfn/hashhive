@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
+(Path(_tmpdir) / "logs").mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -53,3 +54,38 @@ def test_normalize_info_maps_fields():
     assert d["bestDiff"] == 1.23e10
     assert d["shares_ok"] == 12 and d["shares_err"] == 1
     assert d["version"] == "0.4.2"
+
+
+def test_device_config_post_routes_fields_to_correct_endpoints():
+    """Each settings group must POST to its own NMMiner endpoint, unknown keys dropped."""
+    import asyncio as _asyncio
+    from unittest.mock import patch
+    from routers import lottominer as lm
+
+    posts: dict[str, list] = {}
+
+    async def run():
+        client = AsyncMock()
+
+        async def _post(url, json=None):
+            posts[url.split("/api/")[-1]] = sorted(json.keys())
+            return _resp(200, {})
+        client.post = _post
+        with patch("routers.lottominer.httpx.AsyncClient") as M:
+            M.return_value.__aenter__.return_value = client
+            await lm.post_lottominer_device_config({
+                "ip": "192.168.1.50",
+                "PrimaryPool": "p", "PrimaryAddress": "a", "PrimaryPassword": "x",
+                "Hostname": "nm1", "WiFiSSID": "net", "WiFiPWD": "pw",
+                "Timezone": "1", "TimeFormat": 24, "DateFormat": "YYYY-MM-DD",
+                "Brightness": 80, "RotateScreen": 90, "LedEnable": 1, "ScreenSaver": "5m",
+                "bogus": "ignored",
+            })
+
+    _asyncio.run(run())
+    assert posts["setting/mining"] == ["PrimaryAddress", "PrimaryPassword", "PrimaryPool"]
+    assert posts["setting/network"] == ["Hostname", "WiFiPWD", "WiFiSSID"]
+    assert posts["setting/time"] == ["DateFormat", "TimeFormat", "Timezone"]
+    assert posts["setting/preference"] == ["Brightness", "LedEnable", "RotateScreen", "ScreenSaver"]
+    # "bogus" never reaches any endpoint
+    assert all("bogus" not in keys for keys in posts.values())

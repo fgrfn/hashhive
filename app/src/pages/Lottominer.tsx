@@ -39,9 +39,7 @@ export function Lottominer() {
     try {
       await api.lottominer.saveDeviceConfig({
         ...config,
-        SaveUptime: config.SaveUptime ? 1 : 0,
         LedEnable: config.LedEnable ? 1 : 0,
-        AutoBrightness: config.AutoBrightness ? 1 : 0,
       });
       toast('Device config saved');
     } catch {
@@ -257,22 +255,48 @@ export function Lottominer() {
               </div>
             </Section>
             {/* Display */}
-            <Section t={t} label="Display & System">
+            <Section t={t} label="Display">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <FormField t={t} label="Brightness (0–100)" value={String(config.Brightness ?? 100)} onChange={v => setConfig({ ...config, Brightness: Number(v) })} mono type="number" />
-                <FormField t={t} label="UI Refresh (s)" value={String(config.UIRefresh ?? 2)} onChange={v => setConfig({ ...config, UIRefresh: Number(v) })} mono type="number" />
+                <FormField t={t} label="Brightness (1–100)" value={String(config.Brightness ?? 100)} onChange={v => setConfig({ ...config, Brightness: Number(v) })} mono type="number" />
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Rotate screen</Label>
+                  <select value={String(config.RotateScreen ?? 0)} onChange={e => setConfig({ ...config, RotateScreen: Number(e.target.value) })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {[0, 90, 180, 270].map(deg => <option key={deg} value={deg}>{deg}°</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Screen saver</Label>
+                  <select value={config.ScreenSaver ?? 'never'} onChange={e => setConfig({ ...config, ScreenSaver: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['never', '30s', '1m', '5m', '15m', '30m'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10 }}>
-                {[
-                  ['Save History', 'SaveUptime'],
-                  ['LED Enable', 'LedEnable'],
-                  ['Auto Brightness', 'AutoBrightness'],
-                ].map(([label, key]) => (
-                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13 }}>{label}</span>
-                    <Toggle t={t} on={Boolean(config[key as keyof NMMinerConfig])} onChange={v => setConfig({ ...config, [key]: v ? 1 : 0 })} />
-                  </div>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <span style={{ fontSize: 13 }}>LED enabled</span>
+                <Toggle t={t} on={Boolean(config.LedEnable)} onChange={v => setConfig({ ...config, LedEnable: v ? 1 : 0 })} />
+              </div>
+            </Section>
+            {/* Time */}
+            <Section t={t} label="Time">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <FormField t={t} label="Timezone (UTC offset)" value={String(config.Timezone ?? '')} onChange={v => setConfig({ ...config, Timezone: v })} mono placeholder="1" />
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Clock</Label>
+                  <select value={String(config.TimeFormat ?? 24)} onChange={e => setConfig({ ...config, TimeFormat: Number(e.target.value) })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    <option value={24}>24h</option>
+                    <option value={12}>12h</option>
+                  </select>
+                </div>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>Date format</Label>
+                  <select value={config.DateFormat ?? 'YYYY-MM-DD'} onChange={e => setConfig({ ...config, DateFormat: e.target.value })}
+                    style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, padding: '8px 10px', fontFamily: FONT_MONO }}>
+                    {['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
               </div>
             </Section>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
