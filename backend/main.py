@@ -97,6 +97,7 @@ from routers.discovery import _discovery_background_loop
 from routers.autofan import _autofan_loop
 from routers.schedules import _schedules_execution_loop
 from routers.discord_dashboard import _discord_dashboard_loop
+from routers.discord_bot import _discord_bot_loop
 
 import routers.auth as _auth_router
 import routers.settings as _settings_router
@@ -141,6 +142,7 @@ async def lifespan(app: FastAPI):
     fan_task = asyncio.create_task(_autofan_loop())
     sched_task = asyncio.create_task(_schedules_execution_loop())
     dd_task = asyncio.create_task(_discord_dashboard_loop())
+    db_task = asyncio.create_task(_discord_bot_loop())
     _append_entry({
         "id": f"system:startup:{datetime.now(timezone.utc).isoformat()}",
         "device": "system",
@@ -158,7 +160,8 @@ async def lifespan(app: FastAPI):
     fan_task.cancel()
     sched_task.cancel()
     dd_task.cancel()
-    for t in (task, ws_task, disc_task, fan_task, sched_task, dd_task):
+    db_task.cancel()
+    for t in (task, ws_task, disc_task, fan_task, sched_task, dd_task, db_task):
         try:
             await t
         except asyncio.CancelledError:

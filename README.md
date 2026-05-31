@@ -29,7 +29,7 @@
 | 🔍 **Discovery** | One unified "Add device" flow · subnet auto-scan · continuous background discovery |
 | 🌡️ **Automation** | PID auto-fan control · auto-restart on stalled hashrate |
 | 🔔 **Alerts** | Offline · temp spike · VR temp · hashrate drop · error rate · fan failure · pool loss · fallback · reboot · RSSI · block found — each toggleable with editable thresholds |
-| 📨 **Notifications** | Telegram · Discord · Gotify · ntfy · Pushover · weekly summary · live self-updating Discord dashboard embed |
+| 📨 **Notifications** | Telegram · Discord · Gotify · ntfy · Pushover · weekly summary · live Discord dashboard embed · interactive Discord bot (`!status`, `!hashrate`, …) |
 | 📋 **Live Log** | Source badges · search filter · up to 30 days history · persists across refresh |
 
 ---
@@ -186,9 +186,8 @@ generalised from a single BitAxe to the whole fleet:
 
 - **Alerts → Discord** — every alert type can be pushed to a Discord webhook (also Telegram / Gotify / ntfy / Pushover).
 - **Live dashboard embed** — a single fleet-summary message that updates itself in place (hashrate, devices online, temp, power, shares). Enable it under **Settings → Notifications → Live Discord Dashboard**.
+- **Interactive bot** — connect a bot token and query the fleet from Discord: `!status`, `!hashrate`, `!temp`, `!power`, `!fans`, `!uptime`, `!best`, `!wifi`, `!stratum`, `!version`, `!help` (each optionally filtered by device name). Enable it under **Settings → Notifications → Interactive Discord Bot**.
 - **Weekly summary** — scheduled fleet recap.
-
-> An interactive command bot (`!status`, `!hashrate`, …) is not yet included — push + live dashboard are.
 
 ---
 

@@ -64,6 +64,11 @@ DEFAULT_CONFIG: dict = {
         "webhook": "",            # optional; falls back to notifications.discord_webhook
         "interval_seconds": 60,
     },
+    "discord_bot": {
+        "enabled": False,
+        "token": "",              # Discord bot token (Gateway connection)
+        "prefix": "!",            # command prefix
+    },
     "pool_presets": [],
     "groups": [],
     "schedules": [],

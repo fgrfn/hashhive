@@ -204,6 +204,8 @@ export function Settings() {
 
             <DiscordDashboardCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
 
+            <DiscordBotCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
+
             <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
@@ -301,6 +303,36 @@ function DiscordDashboardCard({ t, localSettings, upd, updToggle }: {
         style={{ ...btnStyle(t), fontSize: 11, opacity: hasWebhook && !testing ? 1 : 0.5 }}>
         {testing ? 'Sending…' : 'Send now'}
       </button>
+    </Card>
+  );
+}
+
+function DiscordBotCard({ t, localSettings, upd, updToggle }: {
+  t: import('../tokens').Theme;
+  localSettings: AppSettings;
+  upd: (patch: Partial<AppSettings>) => void;
+  updToggle: (patch: Partial<AppSettings>) => void;
+}) {
+  const bot = localSettings.discord_bot || {};
+  const enabled = !!bot.enabled;
+  return (
+    <Card t={t} style={{ marginTop: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.accent }}>Interactive Discord Bot</div>
+          <div style={{ fontSize: 12, color: t.textMuted, marginTop: 3 }}>
+            Answers commands in Discord — <code style={{ fontFamily: FONT_MONO }}>{bot.prefix || '!'}status</code>, <code style={{ fontFamily: FONT_MONO }}>{bot.prefix || '!'}hashrate</code>, <code style={{ fontFamily: FONT_MONO }}>{bot.prefix || '!'}temp</code>, … Needs a bot token with the Message Content intent.
+          </div>
+        </div>
+        <Toggle t={t} on={enabled} onChange={v => updToggle({ discord_bot: { ...bot, enabled: v } })} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <FormField t={t} label="Bot token" value={String(bot.token || '')} onChange={v => upd({ discord_bot: { ...bot, token: v } })} mono type="password"
+          placeholder="MTk4N…" />
+      </div>
+      <div style={{ width: 120 }}>
+        <FormField t={t} label="Command prefix" value={String(bot.prefix ?? '!')} onChange={v => upd({ discord_bot: { ...bot, prefix: v || '!' } })} mono />
+      </div>
     </Card>
   );
 }
