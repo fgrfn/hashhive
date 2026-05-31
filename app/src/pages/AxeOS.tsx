@@ -2,13 +2,22 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, btnStyle } from '../components/primitives';
+import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, fmtRssi, fmtShares, matchesSearch } from '../api';
 import type { AxeDevice } from '../api';
-import { Zap, Pause, Play, RotateCcw, Lightbulb } from 'lucide-react';
+import { Zap, Pause, Play, RotateCcw, Lightbulb, Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
+
+/** Writeable AxeOS config (matches the backend CONFIG_FIELDS whitelist). */
+interface AxeConfig {
+  stratumURL?: string; stratumPort?: number; stratumUser?: string; stratumPassword?: string;
+  fallbackStratumURL?: string; fallbackStratumPort?: number; fallbackStratumUser?: string; fallbackStratumPassword?: string;
+  frequency?: number; coreVoltage?: number;
+  autofanspeed?: number; fanspeed?: number; temptarget?: number;
+  hostname?: string; ssid?: string; wifiPass?: string;
+}
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
@@ -19,6 +28,7 @@ export function AxeOS() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [bulkFreqOpen, setBulkFreqOpen] = useState(false);
+  const [editIp, setEditIp] = useState<string | null>(null);
   const mobile = useMobile();
 
   const filtered = axeDevices.filter(d => {
@@ -118,7 +128,7 @@ export function AxeOS() {
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <AxeMobileCard key={d._ip || ''} t={t} d={d} onAction={doAction} onNavigate={navigate} />
+            <AxeMobileCard key={d._ip || ''} t={t} d={d} onAction={doAction} onNavigate={navigate} onConfigure={setEditIp} />
           ))}
         </div>
       ) : (
@@ -183,6 +193,7 @@ export function AxeOS() {
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : (d.rssi ?? 0) > -65 ? t.success : (d.rssi ?? 0) > -80 ? t.warning : t.danger }}>{rssi}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || d.axeOSVersion || '—'}</div>
               <div style={{ display: 'flex', gap: 4 }}>
+                <button title="Configure" onClick={() => setEditIp(ip)} style={{ ...btnStyle(t), padding: '3px 5px' }}><SettingsIcon size={11} /></button>
                 {d._online && (
                   <>
                     {status !== 'paused'
@@ -210,11 +221,123 @@ export function AxeOS() {
           }}
         />
       )}
+
+      {editIp && <AxeConfigModal t={t} ip={editIp} onClose={() => setEditIp(null)} />}
     </div>
   );
 }
 
-function AxeMobileCard({ t, d, onAction, onNavigate }: { t: Theme; d: AxeDevice; onAction: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => void; onNavigate: (path: string) => void }) {
+function AxeConfigModal({ t, ip, onClose }: { t: Theme; ip: string; onClose: () => void }) {
+  const [cfg, setCfg] = useState<AxeConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    api.axeos.configOne1(ip).then(d => setCfg(d as AxeConfig)).catch(() => {
+      toast('Failed to load device config', 'error');
+      setCfg({});
+    });
+  }, [ip]);
+
+  const set = (patch: Partial<AxeConfig>) => setCfg(c => ({ ...(c || {}), ...patch }));
+  const num = (v: string): number | undefined => (v === '' ? undefined : Number(v));
+
+  const save = async () => {
+    if (!cfg) return;
+    setSaving(true);
+    // Send only fields that carry a value (empty password keeps the device's current one).
+    const payload = Object.fromEntries(
+      Object.entries(cfg).filter(([, v]) => v !== undefined && v !== '')
+    );
+    try {
+      await api.axeos.configOne(ip, payload);
+      toast('Device config saved — restart to apply pool/wifi changes');
+      onClose();
+    } catch {
+      toast('Failed to save config', 'error');
+    }
+    setSaving(false);
+  };
+
+  const autofan = !!cfg?.autofanspeed;
+
+  return (
+    <Modal t={t} title={`Configure ${cfg?.hostname || ip}`} onClose={onClose} width={560}>
+      {!cfg ? (
+        <div style={{ color: t.textMuted, fontSize: 13, padding: 20 }}>Loading device config…</div>
+      ) : (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <AxeSection t={t} label="Network">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <FormField t={t} label="Hostname" value={cfg.hostname || ''} onChange={v => set({ hostname: v })} />
+            <FormField t={t} label="WiFi SSID" value={cfg.ssid || ''} onChange={v => set({ ssid: v })} />
+            <FormField t={t} label="WiFi Password (blank = keep)" value={cfg.wifiPass || ''} onChange={v => set({ wifiPass: v })} type="password" />
+          </div>
+        </AxeSection>
+
+        <AxeSection t={t} label="Primary Pool">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FormField t={t} label="Stratum URL" value={cfg.stratumURL || ''} onChange={v => set({ stratumURL: v })} mono placeholder="stratum.example.com" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 10 }}>
+              <FormField t={t} label="Worker / User" value={cfg.stratumUser || ''} onChange={v => set({ stratumUser: v })} mono />
+              <FormField t={t} label="Port" value={String(cfg.stratumPort ?? '')} onChange={v => set({ stratumPort: num(v) })} mono type="number" />
+            </div>
+            <FormField t={t} label="Password" value={cfg.stratumPassword || ''} onChange={v => set({ stratumPassword: v })} mono placeholder="x" />
+          </div>
+        </AxeSection>
+
+        <AxeSection t={t} label="Fallback Pool">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FormField t={t} label="Stratum URL" value={cfg.fallbackStratumURL || ''} onChange={v => set({ fallbackStratumURL: v })} mono placeholder="backup.example.com" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 10 }}>
+              <FormField t={t} label="Worker / User" value={cfg.fallbackStratumUser || ''} onChange={v => set({ fallbackStratumUser: v })} mono />
+              <FormField t={t} label="Port" value={String(cfg.fallbackStratumPort ?? '')} onChange={v => set({ fallbackStratumPort: num(v) })} mono type="number" />
+            </div>
+            <FormField t={t} label="Password" value={cfg.fallbackStratumPassword || ''} onChange={v => set({ fallbackStratumPassword: v })} mono placeholder="x" />
+          </div>
+        </AxeSection>
+
+        <AxeSection t={t} label="Performance">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <FormField t={t} label="Frequency (MHz)" value={String(cfg.frequency ?? '')} onChange={v => set({ frequency: num(v) })} mono type="number" />
+            <FormField t={t} label="Core Voltage (mV)" value={String(cfg.coreVoltage ?? '')} onChange={v => set({ coreVoltage: num(v) })} mono type="number" />
+          </div>
+        </AxeSection>
+
+        <AxeSection t={t} label="Cooling">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13 }}>Automatic fan control</span>
+            <Toggle t={t} on={autofan} onChange={v => set({ autofanspeed: v ? 1 : 0 })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {autofan
+              ? <FormField t={t} label="Target temp (°C)" value={String(cfg.temptarget ?? '')} onChange={v => set({ temptarget: num(v) })} mono type="number" />
+              : <FormField t={t} label="Fan speed (%)" value={String(cfg.fanspeed ?? '')} onChange={v => set({ fanspeed: num(v) })} mono type="number" />
+            }
+          </div>
+        </AxeSection>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
+          <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
+          <button onClick={save} disabled={saving} style={{ ...btnStyle(t, 'primary'), opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+      )}
+    </Modal>
+  );
+}
+
+function AxeSection({ t, label, children }: { t: Theme; label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <Label t={t} style={{ marginBottom: 8 }}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function AxeMobileCard({ t, d, onAction, onNavigate, onConfigure }: { t: Theme; d: AxeDevice; onAction: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => void; onNavigate: (path: string) => void; onConfigure: (ip: string) => void }) {
   const ip = d._ip || '';
   const name = d._name || d.hostname || ip;
   const status = d.status || (d._online ? 'online' : 'offline');
@@ -241,16 +364,19 @@ function AxeMobileCard({ t, d, onAction, onNavigate }: { t: Theme; d: AxeDevice;
         <AxeKv t={t} label="Version" value={d.version || d.axeOSVersion || '—'} />
         <AxeKv t={t} label="ASIC" value={d.ASICModel || '—'} />
       </div>
-      {d._online && (
-        <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
-          {status !== 'paused'
-            ? <button onClick={() => onAction(ip, 'pause')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Pause size={11} /> Pause</button>
-            : <button onClick={() => onAction(ip, 'resume')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Play size={11} /> Resume</button>
-          }
-          <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>
-          <button onClick={() => onAction(ip, 'identify')} style={{ ...btnStyle(t), padding: '5px 10px' }}><Lightbulb size={11} /></button>
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+        <button onClick={() => onConfigure(ip)} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><SettingsIcon size={11} /> Configure</button>
+        {d._online && (
+          <>
+            {status !== 'paused'
+              ? <button onClick={() => onAction(ip, 'pause')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Pause size={11} /> Pause</button>
+              : <button onClick={() => onAction(ip, 'resume')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><Play size={11} /> Resume</button>
+            }
+            <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>
+            <button onClick={() => onAction(ip, 'identify')} style={{ ...btnStyle(t), padding: '5px 10px' }}><Lightbulb size={11} /></button>
+          </>
+        )}
+      </div>
     </Card>
   );
 }

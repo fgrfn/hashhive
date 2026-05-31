@@ -142,9 +142,24 @@ async def broadcast_lottominer_config(data: dict):
             raise HTTPException(status_code=502, detail=str(exc))
 
 
+# NMMiner groups settings across several POST endpoints (see API reference):
+#   /api/setting/mining      → pool credentials
+#   /api/setting/network     → hostname + WiFi
+#   /api/setting/time        → timezone + clock format
+#   /api/setting/preference  → display (brightness, rotation, LED, screen saver)
+_MINING_KEYS = {"PrimaryPool", "PrimaryAddress", "PrimaryPassword",
+                "SecondaryPool", "SecondaryAddress", "SecondaryPassword"}
+_NETWORK_KEYS = {"Hostname", "WiFiSSID", "WiFiPWD"}
+_TIME_KEYS = {"Timezone", "TimeFormat", "DateFormat"}
+_PREFERENCE_KEYS = {"Brightness", "RotateScreen", "LedEnable", "ScreenSaver", "ScreenSaverMode"}
+
+# Read-back: which fields to surface from each GET endpoint (WiFiPWD is never returned).
+_NETWORK_READ = {"Hostname", "WiFiSSID"}
+
+
 @router.get("/api/lottominer/device-config")
 async def get_lottominer_device_config(ip: str):
-    """Read NMMiner mining + network settings into a single config object."""
+    """Read NMMiner mining + network + time + preference settings into one object."""
     _validate_device_ip(ip)
     async with httpx.AsyncClient(timeout=10) as client:
         try:
@@ -153,19 +168,20 @@ async def get_lottominer_device_config(ip: str):
             cfg = dict(mining.json()) if isinstance(mining.json(), dict) else {}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
-        try:
-            net = await client.get(f"http://{ip}/api/setting/network")
-            if net.status_code == 200 and isinstance(net.json(), dict):
-                cfg.update({k: v for k, v in net.json().items() if k in ("Hostname", "WiFiSSID")})
-        except Exception:
-            pass
+
+        async def _merge(path: str, allowed: set | None):
+            try:
+                r = await client.get(f"http://{ip}{path}")
+                if r.status_code == 200 and isinstance(r.json(), dict):
+                    cfg.update({k: v for k, v in r.json().items() if allowed is None or k in allowed})
+            except Exception:
+                pass
+
+        await _merge("/api/setting/network", _NETWORK_READ)
+        await _merge("/api/setting/time", _TIME_KEYS)
+        await _merge("/api/setting/preference", _PREFERENCE_KEYS)
         cfg["ip"] = ip
         return cfg
-
-
-_MINING_KEYS = {"PrimaryPool", "PrimaryAddress", "PrimaryPassword",
-                "SecondaryPool", "SecondaryAddress", "SecondaryPassword"}
-_NETWORK_KEYS = {"Hostname", "WiFiSSID", "WiFiPWD"}
 
 
 @router.post("/api/lottominer/device-config")
@@ -176,12 +192,18 @@ async def post_lottominer_device_config(data: dict):
     _validate_device_ip(device_ip)
     mining = {k: v for k, v in data.items() if k in _MINING_KEYS}
     network = {k: v for k, v in data.items() if k in _NETWORK_KEYS}
+    time_cfg = {k: v for k, v in data.items() if k in _TIME_KEYS}
+    preference = {k: v for k, v in data.items() if k in _PREFERENCE_KEYS}
     async with httpx.AsyncClient(timeout=15) as client:
         try:
             if mining:
                 await client.post(f"http://{device_ip}/api/setting/mining", json=mining)
             if network:
                 await client.post(f"http://{device_ip}/api/setting/network", json=network)
+            if time_cfg:
+                await client.post(f"http://{device_ip}/api/setting/time", json=time_cfg)
+            if preference:
+                await client.post(f"http://{device_ip}/api/setting/preference", json=preference)
             hostname = data.get("Hostname") or device_ip
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({

@@ -10,12 +10,13 @@ import httpx
 
 from .base import MinerDriver
 
-# Writeable config fields exposed by GET /api/axeos/config/{ip}
+# Writeable config fields. GET returns the readable ones from /api/system/info;
+# wifiPass is write-only (the device never reports it back) but is accepted on PATCH.
 CONFIG_FIELDS = {
     "stratumURL", "stratumUser", "stratumPassword", "stratumPort",
     "fallbackStratumURL", "fallbackStratumUser", "fallbackStratumPassword", "fallbackStratumPort",
     "frequency", "coreVoltage", "fanspeed", "autofanspeed", "temptarget",
-    "hostname", "ssid",
+    "hostname", "ssid", "wifiPass",
 }
 
 AXE_ACTIONS = {"pause", "resume", "restart", "identify"}

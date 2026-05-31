@@ -342,17 +342,16 @@ export interface NMMinerConfig {
   SecondaryPool?: string;
   SecondaryAddress?: string;
   SecondaryPassword?: string;
-  Timezone?: number;
+  // /api/setting/time
+  Timezone?: number | string;
   TimeFormat?: number;
   DateFormat?: string;
-  UIRefresh?: number;
-  ScreenTimeout?: number;
+  // /api/setting/preference
   Brightness?: number;
-  SaveUptime?: number | boolean;
-  LedEnable?: number | boolean;
   RotateScreen?: number;
-  SelectedCoins?: string;
-  AutoBrightness?: number | boolean;
+  LedEnable?: number | boolean;
+  ScreenSaver?: string;
+  ScreenSaverMode?: string;
 }
 
 export interface PoolPreset {
