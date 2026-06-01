@@ -1,8 +1,9 @@
 """Unified auto-discovery: ARP table + mDNS + HTTP probing.
 
-Detects AxeOS (BitAxe/NerdAxe) and NMMiner masters/devices in one pass, can add
-discovered devices to the config, and runs an optional continuous background
-scan that notifies on new devices.
+Detects AxeOS (BitAxe/NerdAxe), NMMiner masters/devices and AxeHub
+(nerdminer-axehub) devices in one pass, can add discovered devices to the
+config, and runs an optional continuous background scan that notifies on new
+devices.
 """
 
 import asyncio
@@ -235,10 +236,16 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
                 continue
             lst.append(_entry({}))
             added.append(d)
+        elif dtype == "axehub_device":
+            lst = config.setdefault("axehub_devices", [])
+            if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
+                continue
+            lst.append(_entry({}))
+            added.append(d)
     return added
 
 
-_DEVICE_LISTS = ("axeos_devices", "lottominer_devices")
+_DEVICE_LISTS = ("axeos_devices", "lottominer_devices", "axehub_devices")
 
 
 def reconcile_macs(config: dict, mac_to_ip: dict[str, str]) -> list[dict]:

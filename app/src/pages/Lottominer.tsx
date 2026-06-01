@@ -191,7 +191,12 @@ export function Lottominer() {
                 <input type="checkbox" checked={selected.has(ip)} onChange={() => toggleSelect(ip)} style={{ accentColor: t.info }} />
               </div>
               <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted, cursor: 'pointer' }}>{ip}</div>
-              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontWeight: 500, cursor: 'pointer' }}>{name}</div>
+              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                {d._type === 'axehub' && (
+                  <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>AxeHub</span>
+                )}
+              </div>
               <StatusPill t={t} status={status} />
               <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
                 {fmtHashrate(hr)}
@@ -207,9 +212,13 @@ export function Lottominer() {
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : Number(d.rssi ?? d.wifi_rssi) > -65 ? t.success : Number(d.rssi ?? d.wifi_rssi) > -80 ? t.warning : t.danger }}>{rssi}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || '—'}</div>
-              <button onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '5px 8px', fontSize: 11 }}>
-                <Edit3 size={12} />
-              </button>
+              {d._type === 'axehub' ? (
+                <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO }} title="Configure AxeHub pools from the Pools page">—</div>
+              ) : (
+                <button onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '5px 8px', fontSize: 11 }}>
+                  <Edit3 size={12} />
+                </button>
+              )}
             </div>
           );
         })}
@@ -373,13 +382,20 @@ function NmMobileCard({ t, d, selected, onToggle, onEdit, onOpen }: { t: Theme; 
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <input type="checkbox" checked={selected} onChange={onToggle} style={{ accentColor: t.info, marginTop: 3 }} />
           <div onClick={onOpen} style={{ cursor: 'pointer' }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{name}</div>
+            <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {name}
+              {d._type === 'axehub' && (
+                <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>AxeHub</span>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <StatusPill t={t} status={status} />
-          <button onClick={onEdit} style={{ ...btnStyle(t), padding: '4px 7px' }}><Edit3 size={12} /></button>
+          {d._type !== 'axehub' && (
+            <button onClick={onEdit} style={{ ...btnStyle(t), padding: '4px 7px' }}><Edit3 size={12} /></button>
+          )}
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>

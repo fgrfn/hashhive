@@ -13,6 +13,7 @@ const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   nerdaxe: 'NerdAxe',
   lottominer_master: 'Lottominer Master',
   lottominer_device: 'Lottominer Device',
+  axehub_device: 'AxeHub',
 };
 
 const VIA_ICON: Record<DiscoveredDevice['discovered_via'], React.ReactNode> = {
@@ -27,6 +28,7 @@ const MANUAL_TYPES: [DiscoveredDevice['type'], string][] = [
   ['nerdaxe', 'NerdAxe'],
   ['lottominer_master', 'Lottominer Master'],
   ['lottominer_device', 'Lottominer Device'],
+  ['axehub_device', 'AxeHub'],
 ];
 
 interface ConfiguredDevice { ip: string; name: string; type: string; list: keyof AppSettings; }
@@ -38,6 +40,7 @@ function configuredDevices(s: AppSettings | null): ConfiguredDevice[] {
   for (const d of s.axeos_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: d.type || 'bitaxe', list: 'axeos_devices' });
   if (s.lottominer_master) out.push({ ip: s.lottominer_master, name: `Master (${s.lottominer_master})`, type: 'lottominer_master', list: 'lottominer_master' });
   for (const d of s.lottominer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'lottominer', list: 'lottominer_devices' });
+  for (const d of s.axehub_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'axehub', list: 'axehub_devices' });
   return out;
 }
 

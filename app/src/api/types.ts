@@ -4,7 +4,7 @@ export interface OkResponse { ok?: boolean; status?: string }
 
 export interface DiscoveredDevice {
   ip: string;
-  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device';
+  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device' | 'axehub_device';
   name: string;
   discovered_via: 'arp' | 'mdns' | 'scan';
   asic?: string;
@@ -84,6 +84,7 @@ export interface DashboardData {
 
 export interface NMMinerDevice {
   ip: string;
+  _type?: 'lottominer' | 'axehub';
   name?: string;
   hostname?: string;
   status?: 'online' | 'offline' | 'warning';
@@ -260,6 +261,7 @@ export interface HealthData {
 export interface AppSettings {
   lottominer_master?: string;
   lottominer_devices?: Array<{ ip: string; name?: string }>;
+  axehub_devices?: Array<{ ip: string; name?: string }>;
   axeos_devices?: Array<{ ip: string; name: string; type: string }>;
   refresh_interval?: number;
   offline_grace_minutes?: number;

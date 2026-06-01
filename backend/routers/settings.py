@@ -31,7 +31,8 @@ router = APIRouter()
 _PURGE_CATEGORIES: dict[str, dict] = {
     "devices": {
         "label": "Devices",
-        "config_keys": ["lottominer_master", "lottominer_devices", "axeos_devices"],
+        "config_keys": ["lottominer_master", "lottominer_devices", "axeos_devices",
+                        "axehub_devices"],
     },
     "pools": {"label": "Pool presets", "config_keys": ["pool_presets"]},
     "groups": {"label": "Groups", "config_keys": ["groups"]},

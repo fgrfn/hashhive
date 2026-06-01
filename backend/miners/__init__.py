@@ -2,13 +2,14 @@
 
 One module per supported family; ``DRIVERS`` maps a family name to its driver
 class. ``probe_all`` runs the discovery probes in the same order the unified
-scan used previously (AxeOS → Lottominer).
+scan used previously (AxeOS → Lottominer → AxeHub).
 """
 
 from typing import Type
 
 import httpx
 
+from .axehub import AxehubDriver, probe_axehub
 from .axeos import AxeosDriver, probe_axeos
 from .base import MinerDriver, PoolConfig
 from .lottominer import LottominerDriver, probe_lottominer
@@ -18,6 +19,7 @@ DRIVERS: dict[str, Type[MinerDriver]] = {
     "bitaxe": AxeosDriver,
     "nerdaxe": AxeosDriver,
     "lottominer": LottominerDriver,
+    "axehub": AxehubDriver,
 }
 
 
@@ -39,11 +41,12 @@ async def probe_all(ip: str, client: httpx.AsyncClient) -> dict | None:
     return (
         await probe_axeos(ip, client)
         or await probe_lottominer(ip, client)
+        or await probe_axehub(ip, client)
     )
 
 
 __all__ = [
     "MinerDriver", "PoolConfig", "DRIVERS", "get_driver", "driver_for_record", "probe_all",
-    "AxeosDriver", "LottominerDriver",
-    "probe_axeos", "probe_lottominer",
+    "AxeosDriver", "LottominerDriver", "AxehubDriver",
+    "probe_axeos", "probe_lottominer", "probe_axehub",
 ]

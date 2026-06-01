@@ -22,6 +22,7 @@ from core import (
     save_json,
 )
 from miners.axeos import axeos_fanout
+from miners.axehub import axehub_fanout
 from miners.lottominer import lottominer_fanout
 from routers.pools import push_pool_to_device
 
@@ -129,7 +130,7 @@ def _resolve_target_ips(sched: dict, config: dict) -> list[str]:
     master = config.get("lottominer_master")
     if master:
         ips.append(master)
-    for key in ("lottominer_devices",):
+    for key in ("lottominer_devices", "axehub_devices"):
         ips += [_ip_of(d) for d in config.get(key, [])]
     return [ip for ip in ips if ip]
 
@@ -178,11 +179,15 @@ async def _run_schedule_action(sched: dict, config: dict) -> int:
         return count
     if action in ("restart", "pause", "resume"):
         axe_ips, nm_ips = _split_by_type(ips, config)
+        axehub_ips_set = {_ip_of(d) for d in config.get("axehub_devices", [])}
+        axehub_ips = [ip for ip in ips if ip in axehub_ips_set] if action == "restart" else []
         if axe_ips:
             await axeos_fanout(action, axe_ips)
         if nm_ips and action == "restart":
             await lottominer_fanout("restart", nm_ips)
-        return len(axe_ips) + (len(nm_ips) if action == "restart" else 0)
+        if axehub_ips:
+            await axehub_fanout("restart", axehub_ips)
+        return len(axe_ips) + (len(nm_ips) + len(axehub_ips) if action == "restart" else 0)
     if action in ("power_limit", "throttle"):
         # Lower the AxeOS clock to the scheduled frequency (MHz) to cap power /
         # throttle the device. Only AxeOS supports frequency control; NMMiner
