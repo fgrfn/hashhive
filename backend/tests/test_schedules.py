@@ -78,3 +78,39 @@ def test_run_action_pool_switch_missing_preset_noop():
         count = asyncio.run(sched._run_schedule_action(s, cfg))
     push.assert_not_awaited()
     assert count == 0
+
+
+def test_run_action_power_limit_sets_axeos_frequency():
+    cfg = _config()
+    s = {"action": "power_limit", "scope": "device", "deviceIps": ["192.168.1.10"], "power": 400}
+    sent = []
+
+    async def _run():
+        client = AsyncMock()
+
+        async def _patch(url, json=None):
+            sent.append((url, json))
+            return type("R", (), {"status_code": 200})()
+        client.patch = _patch
+        with patch("routers.schedules.httpx.AsyncClient") as M:
+            M.return_value.__aenter__.return_value = client
+            return await sched._run_schedule_action(s, cfg)
+
+    count = asyncio.run(_run())
+    assert count == 1
+    assert sent == [("http://192.168.1.10/api/system", {"frequency": 400})]
+
+
+def test_run_action_throttle_floor_guards_bad_freq():
+    cfg = _config()
+    s = {"action": "throttle", "scope": "device", "deviceIps": ["192.168.1.10"], "power": 50}
+    # below the 100 MHz floor → no-op, no device touched
+    count = asyncio.run(sched._run_schedule_action(s, cfg))
+    assert count == 0
+
+
+def test_run_action_power_limit_skips_when_no_axeos():
+    cfg = {**_config(), "axeos_devices": []}
+    s = {"action": "power_limit", "scope": "all", "power": 400}
+    count = asyncio.run(sched._run_schedule_action(s, cfg))
+    assert count == 0

@@ -16,6 +16,8 @@ const ACTION_META: Record<string, { label: string; color: (t: Theme) => string }
   restart: { label: 'Restart', color: t => t.warning },
   pause: { label: 'Pause', color: t => t.danger },
   resume: { label: 'Resume', color: t => t.success },
+  power_limit: { label: 'Power limit', color: t => t.honey },
+  throttle: { label: 'Throttle', color: t => t.honey },
 };
 
 export function Schedules() {
@@ -166,6 +168,7 @@ function ScheduleModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
   const [scope, setScope] = useState(existing?.scope ?? 'all');
   const [groupId, setGroupId] = useState(existing?.groupId ?? '');
   const [poolId, setPoolId] = useState(existing?.pool_id ?? '');
+  const [power, setPower] = useState(String(existing?.power ?? 400));
   const [deviceIps, setDeviceIps] = useState<string[]>(existing?.deviceIps ?? []);
   const [groups, setGroups] = useState<Group[]>([]);
   const [pools, setPools] = useState<PoolPreset[]>([]);
@@ -181,7 +184,9 @@ function ScheduleModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
     ...axeDevices.map(d => ({ ip: d._ip || '', name: d._name || d.hostname || d._ip || '' })),
   ].filter(d => d.ip);
 
-  const valid = name.trim() && (action !== 'pool_switch' || poolId) && (scope !== 'group' || groupId);
+  const needsPower = action === 'power_limit' || action === 'throttle';
+  const valid = name.trim() && (action !== 'pool_switch' || poolId) && (scope !== 'group' || groupId)
+    && (!needsPower || Number(power) >= 100);
 
   const save = async () => {
     if (!valid) return;
@@ -189,6 +194,7 @@ function ScheduleModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
     const payload: Partial<Schedule> = {
       name, action: action as Schedule['action'], time_start: timeStart, time_end: timeEnd,
       days, enabled: existing?.enabled ?? true, scope, groupId, pool_id: poolId, deviceIps,
+      power: needsPower ? Number(power) : undefined,
     };
     const saved = existing
       ? await api.schedules.update(existing.id, payload).catch(() => null)
@@ -212,6 +218,15 @@ function ScheduleModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
             ))}
           </div>
         </div>
+
+        {needsPower && (
+          <div>
+            <FormField t={t} label="Target frequency (MHz)" value={power} onChange={setPower} mono type="number" placeholder="400" />
+            <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
+              Lowers AxeOS devices to this clock to cap power. Min 100 MHz · NMMiner devices are skipped.
+            </div>
+          </div>
+        )}
 
         {action === 'pool_switch' && (
           <div>

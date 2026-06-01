@@ -10,6 +10,7 @@ import json
 import secrets
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from core import (
@@ -182,7 +183,30 @@ async def _run_schedule_action(sched: dict, config: dict) -> int:
         if nm_ips and action == "restart":
             await lottominer_fanout("restart", nm_ips)
         return len(axe_ips) + (len(nm_ips) if action == "restart" else 0)
-    # power_limit / throttle are not implemented yet — no-op.
+    if action in ("power_limit", "throttle"):
+        # Lower the AxeOS clock to the scheduled frequency (MHz) to cap power /
+        # throttle the device. Only AxeOS supports frequency control; NMMiner
+        # devices have no equivalent and are skipped. `power` carries the target
+        # frequency (e.g. 400); a sane floor of 100 MHz guards bad input.
+        axe_ips, _ = _split_by_type(ips, config)
+        try:
+            freq = int(sched.get("power") or 0)
+        except (TypeError, ValueError):
+            freq = 0
+        if not axe_ips or freq < 100:
+            return 0
+        count = 0
+        limits = httpx.Limits(max_connections=30, max_keepalive_connections=0)
+        async with httpx.AsyncClient(timeout=15, limits=limits) as client:
+            async def _set_freq(ip: str):
+                nonlocal count
+                try:
+                    await client.patch(f"http://{ip}/api/system", json={"frequency": freq})
+                    count += 1
+                except Exception:
+                    pass
+            await asyncio.gather(*[_set_freq(ip) for ip in axe_ips])
+        return count
     return 0
 
 
