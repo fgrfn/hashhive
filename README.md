@@ -194,7 +194,7 @@ generalised from a single BitAxe to the whole fleet:
 
 - **Alerts → Discord** — every alert type can be pushed to a Discord webhook (also Telegram / Gotify / ntfy / Pushover).
 - **Live dashboard embed** — a single fleet-summary message that updates itself in place (hashrate, devices online, temp, power, shares). Enable it under **Settings → Notifications → Live Discord Dashboard**.
-- **Interactive bot** — connect a bot token and query the fleet from Discord: `!status`, `!hashrate`, `!temp`, `!power`, `!fans`, `!uptime`, `!best`, `!wifi`, `!stratum`, `!version`, `!help` (each optionally filtered by device name). Enable it under **Settings → Notifications → Interactive Discord Bot**.
+- **Interactive bot** — connect a bot token and query the fleet from Discord: `!status`, `!hashrate`, `!temp`, `!power`, `!fans`, `!uptime`, `!best`, `!wifi`, `!stratum`, `!version`, `!help` (each optionally filtered by device name). Optionally restrict it to a single channel. Enable it under **Settings → Notifications → Interactive Discord Bot**.
 - **Weekly summary** — scheduled fleet recap.
 
 ---

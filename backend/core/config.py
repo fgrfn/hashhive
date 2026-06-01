@@ -68,6 +68,7 @@ DEFAULT_CONFIG: dict = {
         "enabled": False,
         "token": "",              # Discord bot token (Gateway connection)
         "prefix": "!",            # command prefix
+        "channel_id": "",         # optional: only respond in this channel (blank = any)
     },
     "pool_presets": [],
     "groups": [],
