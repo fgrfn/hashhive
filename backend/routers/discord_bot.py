@@ -263,8 +263,15 @@ def handle_command(cmd: str, args: str, devices: list[dict]) -> dict | None:
 _bot_task: asyncio.Task | None = None
 
 
-async def _run_bot(token: str, prefix: str) -> None:
+async def _run_bot(token: str, prefix: str, channel_id: str) -> None:
     import discord  # lazy: only needed when the bot is actually enabled
+
+    # Optional channel restriction: blank → respond anywhere the bot can read;
+    # set → only react to messages in that channel.
+    try:
+        only_channel = int(channel_id) if channel_id else None
+    except (TypeError, ValueError):
+        only_channel = None
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -273,6 +280,8 @@ async def _run_bot(token: str, prefix: str) -> None:
     @client.event
     async def on_message(message):
         if message.author == client.user or not message.content.startswith(prefix):
+            return
+        if only_channel is not None and message.channel.id != only_channel:
             return
         parts = message.content[len(prefix):].strip().split(maxsplit=1)
         if not parts:
@@ -289,23 +298,35 @@ async def _run_bot(token: str, prefix: str) -> None:
     await client.start(token)
 
 
+# Settings the running connection was started with — used to restart the bot
+# when the token/prefix/channel change while it's already running.
+_bot_signature: tuple | None = None
+
+
 async def _discord_bot_loop() -> None:
-    """Start/stop the gateway connection as the config toggles. Polls the config
-    so enabling the bot in Settings takes effect without a restart."""
-    global _bot_task
+    """Start/stop/restart the gateway connection as the config changes. Polls the
+    config so changes in Settings take effect without a backend restart."""
+    global _bot_task, _bot_signature
     while True:
         try:
             config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
             cfg = config.get("discord_bot", {})
             enabled = bool(cfg.get("enabled") and cfg.get("token"))
+            token = cfg.get("token") or ""
+            prefix = cfg.get("prefix") or "!"
+            channel_id = str(cfg.get("channel_id") or "")
+            signature = (token, prefix, channel_id)
             running = _bot_task is not None and not _bot_task.done()
-            if enabled and not running:
-                token = cfg["token"]
-                prefix = cfg.get("prefix") or "!"
-                _bot_task = asyncio.create_task(_run_bot(token, prefix))
+
+            if enabled and (not running or signature != _bot_signature):
+                if running:
+                    _bot_task.cancel()
+                _bot_task = asyncio.create_task(_run_bot(token, prefix, channel_id))
+                _bot_signature = signature
             elif not enabled and running:
                 _bot_task.cancel()
                 _bot_task = None
+                _bot_signature = None
         except Exception:
             pass
         await asyncio.sleep(30)

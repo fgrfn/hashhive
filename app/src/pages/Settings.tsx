@@ -330,8 +330,9 @@ function DiscordBotCard({ t, localSettings, upd, updToggle }: {
         <FormField t={t} label="Bot token" value={String(bot.token || '')} onChange={v => upd({ discord_bot: { ...bot, token: v } })} mono type="password"
           placeholder="MTk4N…" />
       </div>
-      <div style={{ width: 120 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10 }}>
         <FormField t={t} label="Command prefix" value={String(bot.prefix ?? '!')} onChange={v => upd({ discord_bot: { ...bot, prefix: v || '!' } })} mono />
+        <FormField t={t} label="Channel ID (optional — blank = any channel)" value={String(bot.channel_id ?? '')} onChange={v => upd({ discord_bot: { ...bot, channel_id: v } })} mono placeholder="123456789012345678" />
       </div>
     </Card>
   );
