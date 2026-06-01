@@ -24,7 +24,7 @@ from core import (
 
 router = APIRouter()
 
-_ALLOWED_TYPES = {"lottominer", "axeos", "both", "solominer"}
+_ALLOWED_TYPES = {"lottominer", "axeos", "both"}
 
 
 def _template_path(template_id: str):
@@ -105,10 +105,6 @@ def _device_type_for_ip(ip: str, config: dict) -> str:
         (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("lottominer_devices", [])
     ):
         return "lottominer"
-    if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("nerdminer_devices", [])):
-        return "solominer"
-    if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("sparkminer_devices", [])):
-        return "solominer"
     return "unknown"
 
 
@@ -136,8 +132,6 @@ async def apply_template(ip: str, request: Request):
                 resp = await client.patch(f"http://{ip}/api/system", json=cfg)
             elif dtype == "lottominer":
                 resp = await client.post(f"http://{ip}/broadcast-config", json={**cfg, "ip": ip})
-            elif dtype == "solominer":
-                resp = await client.post(f"http://{ip}/settings", json=cfg)
             else:
                 raise HTTPException(status_code=404, detail=f"Unknown device for IP {ip}")
             now = datetime.now(timezone.utc).isoformat()

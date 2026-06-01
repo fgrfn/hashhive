@@ -26,7 +26,6 @@ from core import (
 from routers.axeos import _fetch_axeos_device
 from routers.dashboard import _parse_nm_shares
 from routers.lottominer import _fetch_lottominer_safe
-from routers.solominer import _fetch_solo_miner
 
 router = APIRouter()
 
@@ -53,8 +52,6 @@ async def _collect_fleet() -> dict:
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
-    nerd_devices = config.get("nerdminer_devices", [])
-    spark_devices = config.get("sparkminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
     has_nm = bool(master or nm_devices)
 
@@ -62,8 +59,6 @@ async def _collect_fleet() -> dict:
         coros = []
         if has_nm:
             coros.append(_fetch_lottominer_safe(client, master, nm_devices))
-        coros += [_fetch_solo_miner(client, d) for d in nerd_devices]
-        coros += [_fetch_solo_miner(client, d) for d in spark_devices]
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
         results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
 
@@ -73,10 +68,6 @@ async def _collect_fleet() -> dict:
         first = results[0] if results else {}
         nm_data = first if isinstance(first, dict) else {"devices": []}
         idx = 1
-    nerd_results = [r for r in results[idx:idx + len(nerd_devices)] if isinstance(r, dict)]
-    idx += len(nerd_devices)
-    spark_results = [r for r in results[idx:idx + len(spark_devices)] if isinstance(r, dict)]
-    idx += len(spark_devices)
     axeos_results = [r for r in results[idx:] if isinstance(r, dict)]
 
     total_gh = 0.0
@@ -97,13 +88,6 @@ async def _collect_fleet() -> dict:
         total_acc += acc
         total_rej += rej
         max_temp = max(max_temp, float(d.get("temp") or 0))
-
-    for d in nerd_results + spark_results:
-        total += 1
-        if d.get("_online") or d.get("online"):
-            online += 1
-            total_gh += float(d.get("hashrate") or d.get("GHs") or 0)
-            max_temp = max(max_temp, float(d.get("temp") or 0))
 
     for d in axeos_results:
         total += 1

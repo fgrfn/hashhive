@@ -1,8 +1,6 @@
 """Lottominer router — generalized ESP-based lottery miners (formerly NMMiner).
 
-Handles the NMMiner-style firmware (master/swarm + per-device config). NerdMiner
-and SparkMiner are handled in solominer.py; the frontend Lottominer page unifies
-all three families.
+Handles the NMMiner-style firmware (master/swarm + per-device config).
 """
 
 import asyncio

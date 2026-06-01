@@ -67,7 +67,6 @@ from core import (  # noqa: F401
     _startup_time,
     _price_cache,
     _low_hr_since,
-    _solo_zero_hr_since,
     DEFAULT_CONFIG as DEFAULT_CONFIG_re,
     LoginRequest,
     PatchDeviceRequest,
@@ -75,7 +74,6 @@ from core import (  # noqa: F401
     AxeActionBatchRequest,
     _WSManager,
     _check_auto_restart,
-    _check_auto_restart_solo,
     _append_hashrate_sample,
     _append_device_samples,
     _append_bestdiff_samples,
@@ -103,7 +101,6 @@ import routers.auth as _auth_router
 import routers.settings as _settings_router
 import routers.lottominer as _lottominer_router
 import routers.axeos as _axeos_router
-import routers.solominer as _solominer_router
 import routers.dashboard as _dashboard_router
 import routers.alerts as _alerts_router
 import routers.notifications as _notifications_router
@@ -182,7 +179,6 @@ app.include_router(_auth_router.router)
 app.include_router(_settings_router.router)
 app.include_router(_lottominer_router.router)
 app.include_router(_axeos_router.router)
-app.include_router(_solominer_router.router)
 app.include_router(_dashboard_router.router)
 app.include_router(_alerts_router.router)
 app.include_router(_notifications_router.router)

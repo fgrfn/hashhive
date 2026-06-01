@@ -129,7 +129,7 @@ def _resolve_target_ips(sched: dict, config: dict) -> list[str]:
     master = config.get("lottominer_master")
     if master:
         ips.append(master)
-    for key in ("lottominer_devices", "nerdminer_devices", "sparkminer_devices"):
+    for key in ("lottominer_devices",):
         ips += [_ip_of(d) for d in config.get(key, [])]
     return [ip for ip in ips if ip]
 

@@ -15,7 +15,6 @@ from core import (
     _append_hashrate_sample,
     _update_records,
     _check_auto_restart,
-    _check_auto_restart_solo,
     _price_cache,
     _read_day,
     _today,
@@ -24,7 +23,6 @@ from core import (
 )
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
-from routers.solominer import _fetch_solo_miner
 
 router = APIRouter()
 
@@ -62,16 +60,12 @@ async def _dashboard_broadcast_loop():
             if _ws_manager.count > 0:
                 master = config.get("lottominer_master", "")
                 nm_devices = config.get("lottominer_devices", [])
-                nerdminer_devices = config.get("nerdminer_devices", [])
-                sparkminer_devices = config.get("sparkminer_devices", [])
                 axeos_devices = config.get("axeos_devices", [])
                 has_nmminer = bool(master or nm_devices)
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
                         coros.append(_fetch_lottominer_safe(client, master, nm_devices))
-                    coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
-                    coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
                     coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
                     results = await asyncio.gather(*coros) if coros else []
                 idx = 0
@@ -80,18 +74,12 @@ async def _dashboard_broadcast_loop():
                     idx += 1
                 else:
                     nmminer_data = {"devices": []}
-                nerdminer_results = list(results[idx:idx + len(nerdminer_devices)])
-                idx += len(nerdminer_devices)
-                sparkminer_results = list(results[idx:idx + len(sparkminer_devices)])
-                idx += len(sparkminer_devices)
                 axeos_results = list(results[idx:])
                 axeos_data = {"devices": axeos_results}
                 new_alerts: list = []
                 try:
                     new_alerts = await check_alerts(
                         config, nmminer_data, axeos_data,
-                        {"devices": nerdminer_results},
-                        {"devices": sparkminer_results},
                     )
                 except Exception:
                     pass
@@ -116,8 +104,6 @@ async def _dashboard_broadcast_loop():
                     # ── BestDiff samples (all device types) ───────────────
                     all_bd = (
                         list(nmminer_data.get("devices", []))
-                        + nerdminer_results
-                        + sparkminer_results
                         + axeos_results
                     )
                     _append_bestdiff_samples(all_bd)
@@ -128,16 +114,11 @@ async def _dashboard_broadcast_loop():
                 try:
                     async with httpx.AsyncClient(timeout=10) as ar_client:
                         await _check_auto_restart(config, axeos_results, ar_client)
-                        await _check_auto_restart_solo(
-                            config, nerdminer_results, sparkminer_results, ar_client
-                        )
                 except Exception:
                     pass
                 payload = json.dumps({
                     "type": "dashboard",
                     "lottominer": nmminer_data,
-                    "nerdminer": {"devices": nerdminer_results},
-                    "sparkminer": {"devices": sparkminer_results},
                     "axeos": axeos_data,
                     "unread_alerts": unread,
                     "new_alerts": new_alerts,
@@ -154,8 +135,6 @@ async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
-    nerdminer_devices = config.get("nerdminer_devices", [])
-    sparkminer_devices = config.get("sparkminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
     has_nmminer = bool(master or nm_devices)
 
@@ -163,8 +142,6 @@ async def get_dashboard():
         coros: list = []
         if has_nmminer:
             coros.append(_fetch_lottominer_safe(client, master, nm_devices))
-        coros += [_fetch_solo_miner(client, d) for d in nerdminer_devices]
-        coros += [_fetch_solo_miner(client, d) for d in sparkminer_devices]
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
 
         results = await asyncio.gather(*coros) if coros else []
@@ -176,10 +153,6 @@ async def get_dashboard():
     else:
         nmminer_data = {"devices": []}
 
-    nerdminer_results = list(results[idx:idx + len(nerdminer_devices)])
-    idx += len(nerdminer_devices)
-    sparkminer_results = list(results[idx:idx + len(sparkminer_devices)])
-    idx += len(sparkminer_devices)
     axeos_results = list(results[idx:])
 
     axeos_data = {"devices": axeos_results}
@@ -187,8 +160,6 @@ async def get_dashboard():
     try:
         await check_alerts(
             config, nmminer_data, axeos_data,
-            {"devices": nerdminer_results},
-            {"devices": sparkminer_results},
         )
     except Exception:
         pass  # Never let alert checks break the dashboard
@@ -198,10 +169,6 @@ async def get_dashboard():
     for d in nmminer_data.get("devices", []):
         if not d.get("online", True):
             key = f"lottominer:{d.get('ip', '')}"
-            d["_offline_since"] = device_state.get(key, {}).get("offline_since")
-    for d in nerdminer_results + sparkminer_results:
-        if not d.get("_online", True):
-            key = f"{d.get('_type', 'nerdminer')}:{d.get('_ip', '')}"
             d["_offline_since"] = device_state.get(key, {}).get("offline_since")
     for d in axeos_data.get("devices", []):
         if not d.get("_online", True):
@@ -213,8 +180,6 @@ async def get_dashboard():
 
     return {
         "lottominer": nmminer_data,
-        "nerdminer": {"devices": nerdminer_results},
-        "sparkminer": {"devices": sparkminer_results},
         "axeos": axeos_data,
         "unread_alerts": unread,
         "config": config,

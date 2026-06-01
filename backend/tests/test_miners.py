@@ -13,13 +13,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import miners  # noqa: E402
 from miners.axeos import AxeosDriver  # noqa: E402
-from miners.solo import NerdminerDriver  # noqa: E402
 
 
 def test_registry_maps_families():
     assert miners.get_driver("axeos") is AxeosDriver
     assert miners.get_driver("bitaxe") is AxeosDriver
-    assert miners.get_driver("nerdminer") is NerdminerDriver
 
 
 def test_get_driver_unknown_raises():

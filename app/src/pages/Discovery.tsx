@@ -13,8 +13,6 @@ const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   nerdaxe: 'NerdAxe',
   lottominer_master: 'Lottominer Master',
   lottominer_device: 'Lottominer Device',
-  nerdminer: 'NerdMiner',
-  sparkminer: 'SparkMiner',
 };
 
 const VIA_ICON: Record<DiscoveredDevice['discovered_via'], React.ReactNode> = {
@@ -29,8 +27,6 @@ const MANUAL_TYPES: [DiscoveredDevice['type'], string][] = [
   ['nerdaxe', 'NerdAxe'],
   ['lottominer_master', 'Lottominer Master'],
   ['lottominer_device', 'Lottominer Device'],
-  ['nerdminer', 'NerdMiner'],
-  ['sparkminer', 'SparkMiner'],
 ];
 
 interface ConfiguredDevice { ip: string; name: string; type: string; list: keyof AppSettings; }
@@ -42,8 +38,6 @@ function configuredDevices(s: AppSettings | null): ConfiguredDevice[] {
   for (const d of s.axeos_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: d.type || 'bitaxe', list: 'axeos_devices' });
   if (s.lottominer_master) out.push({ ip: s.lottominer_master, name: `Master (${s.lottominer_master})`, type: 'lottominer_master', list: 'lottominer_master' });
   for (const d of s.lottominer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'lottominer', list: 'lottominer_devices' });
-  for (const d of s.nerdminer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'nerdminer', list: 'nerdminer_devices' });
-  for (const d of s.sparkminer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'sparkminer', list: 'sparkminer_devices' });
   return out;
 }
 
@@ -140,8 +134,8 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
           <div style={{ fontWeight: 700, fontSize: 15 }}>Scan for miners</div>
         </div>
         <div style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
-          Scans your local network (ARP, mDNS, HTTP probing) for AxeOS (BitAxe/NerdAxe),
-          Lottominer (NMMiner) and SoloMiner (NerdMiner/SparkMiner) devices.
+          Scans your local network (ARP, mDNS, HTTP probing) for AxeOS (BitAxe/NerdAxe)
+          and Lottominer (NMMiner) devices.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <FormField t={t} label="Subnet (optional)" value={subnet} onChange={setSubnet} placeholder="e.g. 192.168.1" />

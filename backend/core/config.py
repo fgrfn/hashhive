@@ -5,8 +5,6 @@ from pydantic import BaseModel, field_validator
 DEFAULT_CONFIG: dict = {
     "lottominer_master": "",
     "lottominer_devices": [],
-    "nerdminer_devices": [],
-    "sparkminer_devices": [],
     "axeos_devices": [],
     "refresh_interval": 30,
     "offline_grace_minutes": 2,
@@ -79,10 +77,6 @@ DEFAULT_CONFIG: dict = {
         "enabled": False,
         "threshold_pct": 50,
         "duration_minutes": 10,
-    },
-    "auto_restart_solo": {
-        "enabled": False,
-        "zero_hr_minutes": 10,
     },
     "discovery": {
         "auto_scan": False,
