@@ -248,7 +248,7 @@ function TemplateModal({ t, existing, onClose, onSaved }: { t: Theme; existing?:
         <div>
           <Label t={t} style={{ marginBottom: 8 }}>Device type</Label>
           <div style={{ display: 'flex', gap: 6 }}>
-            {([['lottominer', 'Lottominer'], ['axeos', 'AxeOS'], ['solominer', 'SoloMiner'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
+            {([['lottominer', 'Lottominer'], ['axeos', 'AxeOS'], ['both', 'Both']] as [Template['type'], string][]).map(([v, label]) => (
               <button key={v} onClick={() => setType(v)} style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: `1px solid ${type === v ? t.accent : t.border}`, background: type === v ? t.accentGlow : 'transparent', color: type === v ? t.accent : t.textMuted, cursor: 'pointer' }}>
                 {label}
               </button>

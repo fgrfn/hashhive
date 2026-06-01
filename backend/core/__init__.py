@@ -23,7 +23,7 @@ from .paths import (
     KEEP_DAYS,
 )
 from .version import _resolve_version, APP_VERSION
-from .state import _startup_time, _price_cache, _low_hr_since, _solo_zero_hr_since
+from .state import _startup_time, _price_cache, _low_hr_since
 from .jsonio import load_json, save_json
 from .config import (
     DEFAULT_CONFIG,
@@ -72,7 +72,7 @@ from .auth import (
 )
 from .ws import _WSManager, _ws_manager
 from .migrations import _migrate_config, _migrate_legacy
-from .autorestart import _check_auto_restart, _check_auto_restart_solo
+from .autorestart import _check_auto_restart
 
 __all__ = [
     "BASE_DIR", "DATA_DIR", "CONFIG_FILE", "ALERT_HISTORY_FILE", "DEVICE_STATE_FILE",
@@ -80,7 +80,7 @@ __all__ = [
     "DISCORD_DASHBOARD_STATE_FILE", "FRONTEND_DIR",
     "_SESSIONS_FILE", "MAX_ENTRIES_PER_DAY", "KEEP_DAYS",
     "_resolve_version", "APP_VERSION",
-    "_startup_time", "_price_cache", "_low_hr_since", "_solo_zero_hr_since",
+    "_startup_time", "_price_cache", "_low_hr_since",
     "load_json", "save_json",
     "DEFAULT_CONFIG", "LoginRequest", "PatchDeviceRequest", "AxeConfigBatchRequest",
     "AxeActionBatchRequest", "NmActionBatchRequest",
@@ -95,5 +95,5 @@ __all__ = [
     "_load_sessions", "_persist_sessions", "_bootstrap_auth",
     "_WSManager", "_ws_manager",
     "_migrate_config", "_migrate_legacy",
-    "_check_auto_restart", "_check_auto_restart_solo",
+    "_check_auto_restart",
 ]

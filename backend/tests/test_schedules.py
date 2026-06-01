@@ -20,8 +20,6 @@ def _config():
         "axeos_devices": [{"ip": "192.168.1.10"}],
         "lottominer_devices": [{"ip": "192.168.1.20"}],
         "lottominer_master": "192.168.1.1",
-        "nerdminer_devices": [{"ip": "192.168.1.30"}],
-        "sparkminer_devices": [],
         "groups": [{"id": "g1", "devices": ["192.168.1.10", "192.168.1.20"]}],
         "pool_presets": [{"id": "p1", "url": "stratum+tcp://pool:3333"}],
     }
@@ -29,7 +27,7 @@ def _config():
 
 def test_resolve_targets_all():
     ips = sched._resolve_target_ips({"scope": "all"}, _config())
-    assert set(ips) == {"192.168.1.10", "192.168.1.20", "192.168.1.1", "192.168.1.30"}
+    assert set(ips) == {"192.168.1.10", "192.168.1.20", "192.168.1.1"}
 
 
 def test_resolve_targets_group_and_device():

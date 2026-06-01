@@ -2,7 +2,7 @@
 import { get, post, put, patch, del } from './http';
 import type {
   DashboardData, AppSettings, NMMinerDevice, NMMinerConfig, AxeDevice,
-  AxeActionResponse, AxeAction, NmAction, DeviceTemplate, SoloDevice, StatSample,
+  AxeActionResponse, AxeAction, NmAction, DeviceTemplate, StatSample,
   Group, GroupActionResult, Alert, HealthData, PoolPreset, Wallet,
   Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult, AnalyticsResult,
   AlertRule, NotificationChannel,
@@ -29,10 +29,6 @@ export const api = {
     saveDeviceConfig: (cfg: NMMinerConfig)                      => post('/api/lottominer/device-config', cfg),
     broadcastConfig:  (cfg: Record<string, unknown>)            => post('/api/lottominer/broadcast-config', cfg),
     batchAction:      (ips: string[], action: NmAction)         => post('/api/lottominer/action/batch', { ips, action }),
-  },
-  solo: {
-    nerdminer:  () => get<{ devices: SoloDevice[] }>('/api/nerdminer/devices'),
-    sparkminer: () => get<{ devices: SoloDevice[] }>('/api/sparkminer/devices'),
   },
   axeos: {
     devices:     ()                                               => get<AxeDevice[]>('/api/axeos/devices'),

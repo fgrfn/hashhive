@@ -1,8 +1,8 @@
 """Unified auto-discovery: ARP table + mDNS + HTTP probing.
 
-Detects AxeOS (BitAxe/NerdAxe), NMMiner masters/devices and SoloMiners
-(NerdMiner/SparkMiner) in one pass, can add discovered devices to the config,
-and runs an optional continuous background scan that notifies on new devices.
+Detects AxeOS (BitAxe/NerdAxe) and NMMiner masters/devices in one pass, can add
+discovered devices to the config, and runs an optional continuous background
+scan that notifies on new devices.
 """
 
 import asyncio
@@ -235,22 +235,10 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
                 continue
             lst.append(_entry({}))
             added.append(d)
-        elif dtype == "nerdminer":
-            lst = config.setdefault("nerdminer_devices", [])
-            if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
-                continue
-            lst.append(_entry({"type": "nerdminer"}))
-            added.append(d)
-        elif dtype == "sparkminer":
-            lst = config.setdefault("sparkminer_devices", [])
-            if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
-                continue
-            lst.append(_entry({"type": "sparkminer"}))
-            added.append(d)
     return added
 
 
-_DEVICE_LISTS = ("axeos_devices", "lottominer_devices", "nerdminer_devices", "sparkminer_devices")
+_DEVICE_LISTS = ("axeos_devices", "lottominer_devices")
 
 
 def reconcile_macs(config: dict, mac_to_ip: dict[str, str]) -> list[dict]:
@@ -288,7 +276,7 @@ async def discovery_scan(
     subnet: str | None = Query(None, description="Override subnet prefix, e.g. 192.168.1"),
     extra_ips: str | None = Query(None, description="Comma-separated extra IPs to probe"),
 ):
-    """Unified device discovery (ARP + mDNS + HTTP probing) for AxeOS, NMMiner and SoloMiners."""
+    """Unified device discovery (ARP + mDNS + HTTP probing) for AxeOS and NMMiner."""
     return await _run_scan(subnet, extra_ips)
 
 

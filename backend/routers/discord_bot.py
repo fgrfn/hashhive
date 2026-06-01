@@ -20,7 +20,6 @@ from core import CONFIG_FILE, DEFAULT_CONFIG, load_json
 from routers.axeos import _fetch_axeos_device
 from routers.dashboard import _parse_nm_shares
 from routers.lottominer import _fetch_lottominer_safe
-from routers.solominer import _fetch_solo_miner
 
 
 def _fmt_hashrate(gh: float) -> str:
@@ -72,8 +71,6 @@ async def collect_devices() -> list[dict]:
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
-    nerd_devices = config.get("nerdminer_devices", [])
-    spark_devices = config.get("sparkminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
     has_nm = bool(master or nm_devices)
 
@@ -81,8 +78,6 @@ async def collect_devices() -> list[dict]:
         coros = []
         if has_nm:
             coros.append(_fetch_lottominer_safe(client, master, nm_devices))
-        coros += [_fetch_solo_miner(client, d) for d in nerd_devices]
-        coros += [_fetch_solo_miner(client, d) for d in spark_devices]
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
         results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
 
@@ -92,10 +87,6 @@ async def collect_devices() -> list[dict]:
         first = results[0] if results else {}
         nm_data = first if isinstance(first, dict) else {"devices": []}
         idx = 1
-    nerd_results = [r for r in results[idx:idx + len(nerd_devices)] if isinstance(r, dict)]
-    idx += len(nerd_devices)
-    spark_results = [r for r in results[idx:idx + len(spark_devices)] if isinstance(r, dict)]
-    idx += len(spark_devices)
     axeos_results = [r for r in results[idx:] if isinstance(r, dict)]
 
     devices: list[dict] = []
@@ -117,25 +108,6 @@ async def collect_devices() -> list[dict]:
             "worker": d.get("worker") or d.get("stratumUser"),
             "frequency": None, "fan": None,
             "rssi": d.get("rssi") or d.get("wifi_rssi"),
-            "version": d.get("version"),
-        })
-
-    for d in nerd_results + spark_results:
-        devices.append({
-            "name": d.get("hostname") or d.get("minerName") or d.get("_name") or d.get("_ip"),
-            "ip": d.get("_ip") or d.get("ip"),
-            "family": d.get("_type") or "solo",
-            "online": bool(d.get("_online") or d.get("online")),
-            "hashrate": float(d.get("hashrate") or d.get("GHs") or 0),
-            "temp": d.get("temp"),
-            "power": None,
-            "uptime": d.get("uptime") or d.get("uptimeSeconds"),
-            "best_diff": d.get("bestDiff") or d.get("best_share") or d.get("bestShare"),
-            "accepted": d.get("shares_ok"), "rejected": d.get("shares_err"),
-            "pool": d.get("pool") or d.get("stratumURL"),
-            "worker": d.get("worker") or d.get("stratumUser"),
-            "frequency": None, "fan": None,
-            "rssi": d.get("rssi"),
             "version": d.get("version"),
         })
 

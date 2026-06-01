@@ -4,7 +4,7 @@ export interface OkResponse { ok?: boolean; status?: string }
 
 export interface DiscoveredDevice {
   ip: string;
-  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device' | 'nerdminer' | 'sparkminer';
+  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device';
   name: string;
   discovered_via: 'arp' | 'mdns' | 'scan';
   asic?: string;
@@ -62,29 +62,12 @@ export interface AnalyticsResult {
   leaderboard: Array<{ ip: string; name: string; type: string; best_diff: number; ts: string | null }>;
 }
 
-export interface SoloDevice {
-  _ip?: string;
-  _name?: string;
-  _type?: string;
-  _online?: boolean;
-  ip?: string;
-  hostname?: string;
-  hashRate?: number | string;
-  temp?: number;
-  walletAddress?: string;
-  poolUrl?: string;
-  bestDiff?: string;
-  uptime?: number | string;
-  version?: string;
-  online?: boolean;
-}
-
 export interface AxeActionResponse { ip: string; action: string; status: number }
 export interface StatSample { ts: string; gh: number; pwr?: number; shares?: number }
 export interface DeviceTemplate {
   id: string;
   name: string;
-  type: 'lottominer' | 'axeos' | 'both' | 'solominer';
+  type: 'lottominer' | 'axeos' | 'both';
   description?: string;
   config: Record<string, unknown>;
   created_at?: string;
@@ -277,8 +260,6 @@ export interface HealthData {
 export interface AppSettings {
   lottominer_master?: string;
   lottominer_devices?: Array<{ ip: string; name?: string }>;
-  nerdminer_devices?: Array<{ ip: string; name?: string; type?: string }>;
-  sparkminer_devices?: Array<{ ip: string; name?: string; type?: string }>;
   axeos_devices?: Array<{ ip: string; name: string; type: string }>;
   refresh_interval?: number;
   offline_grace_minutes?: number;

@@ -21,8 +21,6 @@ def _empty_config() -> dict:
     return {
         "axeos_devices": [],
         "lottominer_devices": [],
-        "nerdminer_devices": [],
-        "sparkminer_devices": [],
         "lottominer_master": "",
     }
 
@@ -34,15 +32,11 @@ def test_add_sorts_devices_by_type():
         {"ip": "192.168.1.11", "type": "nerdaxe", "name": "axe2"},
         {"ip": "192.168.1.12", "type": "lottominer_master", "name": "master"},
         {"ip": "192.168.1.13", "type": "lottominer_device", "name": "nmdev"},
-        {"ip": "192.168.1.14", "type": "nerdminer", "name": "nerd"},
-        {"ip": "192.168.1.15", "type": "sparkminer", "name": "spark"},
     ])
-    assert len(added) == 6
+    assert len(added) == 4
     assert {d["ip"] for d in config["axeos_devices"]} == {"192.168.1.10", "192.168.1.11"}
     assert config["lottominer_master"] == "192.168.1.12"
     assert config["lottominer_devices"][0]["ip"] == "192.168.1.13"
-    assert config["nerdminer_devices"][0]["type"] == "nerdminer"
-    assert config["sparkminer_devices"][0]["type"] == "sparkminer"
 
 
 def test_add_dedupes_by_ip():
