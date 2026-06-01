@@ -45,6 +45,7 @@ async def patch_axeos_config_all(data: dict):
         for device in devices:
             ip = device.get("ip", "")
             try:
+                _validate_device_ip(ip)  # guard against a tampered config file
                 resp = await client.patch(f"http://{ip}/api/system", json=data)
                 results.append({"ip": ip, "status": resp.status_code})
             except Exception as exc:
@@ -97,6 +98,8 @@ async def axeos_action_batch(data: AxeActionBatchRequest):
     if not ips:
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
+    for ip in ips:  # block hostname/URL injection + public-IP SSRF on each target
+        _validate_device_ip(ip)
     results = await axeos_fanout(action, ips)
     return {"action": action, "results": results}
 
@@ -108,6 +111,8 @@ async def patch_axeos_config_batch(data: AxeConfigBatchRequest):
     if not ips:
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         ips = [d["ip"] for d in config.get("axeos_devices", []) if d.get("ip")]
+    for ip in ips:  # block hostname/URL injection + public-IP SSRF on each target
+        _validate_device_ip(ip)
     payload = {k: v for k, v in data.model_dump().items() if k != "ips" and v is not None}
     if not payload:
         raise HTTPException(status_code=400, detail="No config fields to update")
