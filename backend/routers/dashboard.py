@@ -21,6 +21,7 @@ from core import (
     _ws_manager,
     load_json,
 )
+from miners.axehub import fetch_axehub_safe as _fetch_axehub_safe
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
 
@@ -60,20 +61,28 @@ async def _dashboard_broadcast_loop():
             if _ws_manager.count > 0:
                 master = config.get("lottominer_master", "")
                 nm_devices = config.get("lottominer_devices", [])
+                axehub_devices = config.get("axehub_devices", [])
                 axeos_devices = config.get("axeos_devices", [])
                 has_nmminer = bool(master or nm_devices)
+                has_axehub = bool(axehub_devices)
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
                         coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+                    if has_axehub:
+                        coros.append(_fetch_axehub_safe(client, axehub_devices))
                     coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
                     results = await asyncio.gather(*coros) if coros else []
                 idx = 0
                 if has_nmminer:
-                    nmminer_data = results[idx] if results else {"devices": []}
+                    nmminer_data = results[idx]
                     idx += 1
                 else:
                     nmminer_data = {"devices": []}
+                if has_axehub:
+                    nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+                        list(results[idx].get("devices", []))
+                    idx += 1
                 axeos_results = list(results[idx:])
                 axeos_data = {"devices": axeos_results}
                 new_alerts: list = []
@@ -135,23 +144,32 @@ async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
+    axehub_devices = config.get("axehub_devices", [])
     axeos_devices = config.get("axeos_devices", [])
     has_nmminer = bool(master or nm_devices)
+    has_axehub = bool(axehub_devices)
 
     async with httpx.AsyncClient(timeout=10) as client:
         coros: list = []
         if has_nmminer:
             coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+        if has_axehub:
+            coros.append(_fetch_axehub_safe(client, axehub_devices))
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
 
         results = await asyncio.gather(*coros) if coros else []
 
     idx = 0
     if has_nmminer:
-        nmminer_data = results[idx] if results else {"devices": []}
+        nmminer_data = results[idx]
         idx += 1
     else:
         nmminer_data = {"devices": []}
+
+    if has_axehub:
+        nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+            list(results[idx].get("devices", []))
+        idx += 1
 
     axeos_results = list(results[idx:])
 

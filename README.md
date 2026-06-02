@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | 📊 **Dashboard** | Live fleet stats — hashrate, temperature, power, share rate · block-chance odds · live log |
-| ⛏️ **Lottominer** (NMMiner) | Per-device table · full configure modal (pool · WiFi · time · display) · pool push |
+| ⛏️ **Lottominer** (NMMiner · AxeHub) | Per-device table · full configure modal (pool · WiFi · time · display) · pool push · AxeHub (nerdminer-axehub) devices shown alongside NMMiner |
 | 🔧 **BitAxe / NerdAxe** | Live stats · per-device configure modal (pool · fallback · WiFi · fan · freq/voltage) · pause / resume / restart / identify · bulk actions · inline rename |
 | 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets · live pool status |
 | 👥 **Groups** | Group devices and run pool-switch / restart / pause actions on a whole group |
@@ -94,7 +94,7 @@ Change the port in `docker-compose.yml`: `"9000:8000"`.
 
 On first start, `dashboard_config.json` is created automatically. Add devices via the **Add device** flow (auto-scan or manual IP) and configure via the **Settings** page:
 
-- Device lists — Lottominer (NMMiner), BitAxe / NerdAxe (each standalone by IP)
+- Device lists — Lottominer (NMMiner · AxeHub), BitAxe / NerdAxe (each standalone by IP)
 - Alert rules — toggle each detector on/off and edit its threshold (chip temp · VR temp · min hashrate · error rate · RSSI · offline grace)
 - Refresh interval and offline grace period
 - Notification channels (Telegram / Discord / Gotify / ntfy / Pushover) — with per-channel test

@@ -19,8 +19,10 @@ from core import (
 )
 # Lottominer device logic lives in the miners/ driver package. Re-exported here
 # so existing importers (dashboard, notifications) keep working.
+from miners.axehub import AXEHUB_ACTION_MAP as _AXEHUB_ACTION_MAP, axehub_fanout
 from miners.lottominer import (  # noqa: F401
     LOTTO_ACTION_MAP as _LOTTO_ACTION_MAP,
+    ensure_stratum_scheme,
     fetch_lottominer_safe as _fetch_lottominer_safe,
     lottominer_fanout,
 )
@@ -117,11 +119,28 @@ async def scan_lottominer_devices():
 
 @router.post("/api/lottominer/action/batch")
 async def lottominer_action_batch(data: NmActionBatchRequest):
-    """Batch action across multiple Lottominer devices. Body: {action, ips: [...]}"""
-    valid = set(_LOTTO_ACTION_MAP)
+    """Batch action across Lottominer + AxeHub devices. Body: {action, ips: [...]}
+
+    IPs are routed by family: those configured as ``axehub_devices`` go through
+    the AxeHub fanout, the rest through the NMMiner/Lottominer fanout. An action
+    unsupported by a family is skipped for that family.
+    """
+    valid = set(_LOTTO_ACTION_MAP) | set(_AXEHUB_ACTION_MAP)
     if data.action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
-    results = await lottominer_fanout(data.action, data.ips)
+
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    axehub_ips_set = {
+        (d.get("ip") if isinstance(d, dict) else d) for d in config.get("axehub_devices", [])
+    }
+    axehub_ips = [ip for ip in data.ips if ip in axehub_ips_set]
+    nm_ips = [ip for ip in data.ips if ip not in axehub_ips_set]
+
+    results: list[dict] = []
+    if nm_ips and data.action in _LOTTO_ACTION_MAP:
+        results += await lottominer_fanout(data.action, nm_ips)
+    if axehub_ips and data.action in _AXEHUB_ACTION_MAP:
+        results += await axehub_fanout(data.action, axehub_ips)
     return {"action": data.action, "results": results}
 
 
@@ -196,6 +215,9 @@ async def post_lottominer_device_config(data: dict):
         raise HTTPException(status_code=400, detail="ip field required in body")
     _validate_device_ip(device_ip)
     mining = {k: v for k, v in data.items() if k in _MINING_KEYS}
+    for pool_key in ("PrimaryPool", "SecondaryPool"):
+        if mining.get(pool_key):
+            mining[pool_key] = ensure_stratum_scheme(mining[pool_key])
     network = {k: v for k, v in data.items() if k in _NETWORK_KEYS}
     time_cfg = {k: v for k, v in data.items() if k in _TIME_KEYS}
     preference = {k: v for k, v in data.items() if k in _PREFERENCE_KEYS}

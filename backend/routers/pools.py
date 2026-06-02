@@ -9,6 +9,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from core import CONFIG_FILE, DEFAULT_CONFIG, _validate_device_ip, load_json, save_json
+from miners.axehub import set_axehub_pool
+from miners.lottominer import ensure_stratum_scheme
 
 router = APIRouter()
 
@@ -115,12 +117,18 @@ async def push_pool_to_device(ip: str, pool: dict):
     axe_devices = config.get("axeos_devices", [])
 
     is_axe = any(d.get("ip") == ip for d in axe_devices)
+    is_axehub = any(
+        (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("axehub_devices", [])
+    )
     is_nm = (ip == nm_master) or any(
         (d.get("ip") == ip if isinstance(d, dict) else d == ip) for d in nm_devices
     )
 
-    if not is_axe and not is_nm:
+    if not is_axe and not is_axehub and not is_nm:
         raise HTTPException(status_code=404, detail=f"Device {ip} not found in config")
+
+    if is_axehub:
+        return await set_axehub_pool(ip, pool)
 
     wallet = pool.get("wallet") or pool.get("worker", "")
     password = pool.get("password") or "x"
@@ -150,13 +158,13 @@ async def push_pool_to_device(ip: str, pool: dict):
             hostname = await _get_nm_hostname(client, ip)
             worker = f"{wallet}.{hostname}" if wallet else pool.get("worker", "")
             payload = {
-                "PrimaryPool": url,
+                "PrimaryPool": ensure_stratum_scheme(url),
                 "PrimaryAddress": worker,
                 "PrimaryPassword": password,
             }
             if url2:
                 w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
-                payload["SecondaryPool"] = url2
+                payload["SecondaryPool"] = ensure_stratum_scheme(url2)
                 payload["SecondaryAddress"] = w2
                 payload["SecondaryPassword"] = password2
             resp = await client.post(f"http://{ip}/api/setting/mining", json=payload)
