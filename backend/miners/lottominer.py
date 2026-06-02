@@ -24,6 +24,17 @@ LOTTO_ACTION_MAP = {
 }
 
 
+def ensure_stratum_scheme(url: str) -> str:
+    """NMMiner needs a full ``stratum+tcp://host:port`` pool URL. A bare
+    ``host:port`` makes its resolver fail with DNS errors, so prepend the
+    default scheme when none is present. URLs that already carry a scheme
+    (``stratum+tcp://``, ``stratum+ssl://``, …) are returned unchanged."""
+    url = (url or "").strip()
+    if not url or "://" in url:
+        return url
+    return f"stratum+tcp://{url}"
+
+
 def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
     """Map a NMMiner /api/system/info snapshot to the unified device dict."""
     identity = data.get("identity", {}) if isinstance(data, dict) else {}

@@ -22,6 +22,7 @@ from core import (
 from miners.axehub import AXEHUB_ACTION_MAP as _AXEHUB_ACTION_MAP, axehub_fanout
 from miners.lottominer import (  # noqa: F401
     LOTTO_ACTION_MAP as _LOTTO_ACTION_MAP,
+    ensure_stratum_scheme,
     fetch_lottominer_safe as _fetch_lottominer_safe,
     lottominer_fanout,
 )
@@ -214,6 +215,9 @@ async def post_lottominer_device_config(data: dict):
         raise HTTPException(status_code=400, detail="ip field required in body")
     _validate_device_ip(device_ip)
     mining = {k: v for k, v in data.items() if k in _MINING_KEYS}
+    for pool_key in ("PrimaryPool", "SecondaryPool"):
+        if mining.get(pool_key):
+            mining[pool_key] = ensure_stratum_scheme(mining[pool_key])
     network = {k: v for k, v in data.items() if k in _NETWORK_KEYS}
     time_cfg = {k: v for k, v in data.items() if k in _TIME_KEYS}
     preference = {k: v for k, v in data.items() if k in _PREFERENCE_KEYS}

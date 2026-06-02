@@ -47,3 +47,16 @@ def test_probe_all_returns_first_match():
     rec = asyncio.run(miners.probe_all("192.168.1.10", client))
     assert rec and rec["type"] in ("bitaxe", "nerdaxe")
     assert rec["ip"] == "192.168.1.10"
+
+
+def test_ensure_stratum_scheme():
+    from miners.lottominer import ensure_stratum_scheme
+    # bare host:port gets the default scheme (NMMiner needs it to resolve DNS)
+    assert ensure_stratum_scheme("eu.digi.hmpool.io:3337") == "stratum+tcp://eu.digi.hmpool.io:3337"
+    # already-schemed URLs are left untouched
+    assert ensure_stratum_scheme("stratum+tcp://eu.digi.hmpool.io:3337") == "stratum+tcp://eu.digi.hmpool.io:3337"
+    assert ensure_stratum_scheme("stratum+ssl://pool.example:443") == "stratum+ssl://pool.example:443"
+    # blank / whitespace stays blank
+    assert ensure_stratum_scheme("") == ""
+    assert ensure_stratum_scheme("  ") == ""
+    assert ensure_stratum_scheme(None) == ""
