@@ -87,3 +87,44 @@ def test_reconcile_macs_ignores_unknown_mac_and_macless():
     changes = reconcile_macs(config, {"99:99:99:99:99:99": "192.168.1.99"})
     assert changes == []
     assert config["axeos_devices"][0]["ip"] == "192.168.1.10"
+
+
+def test_run_scan_always_probes_full_24_even_with_populated_arp():
+    """Regression: some NMMiner were missed by autoscan because the full /24 was
+    only probed when ARP was sparse. The scan must always cover .1–.254 so
+    devices not in ARP and not advertising mDNS are still found."""
+    import asyncio
+    from unittest.mock import patch
+    import routers.discovery as disc
+
+    probed: list[str] = []
+
+    async def _fake_probe_all(ip, client):
+        probed.append(ip)
+        return None
+
+    async def _fake_mdns(*_a, **_k):
+        return set()
+
+    class _DummyClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_a):
+            return False
+
+    # A populated ARP table (>= 4 entries) — previously this skipped the full scan.
+    arp = {f"192.168.1.{i}": f"aa:bb:cc:00:00:0{i}" for i in (10, 11, 12, 13)}
+
+    with patch.object(disc, "_local_ip_and_subnet", return_value=("192.168.1.5", "192.168.1")), \
+         patch.object(disc, "_arp_map", return_value=arp), \
+         patch.object(disc, "_mdns_hosts", _fake_mdns), \
+         patch.object(disc.httpx, "AsyncClient", lambda *a, **k: _DummyClient()), \
+         patch.object(disc, "probe_all", _fake_probe_all):
+        result = asyncio.run(disc._run_scan())
+
+    # Full /24 (minus our own IP) was probed
+    assert result["method"] == "full_scan"
+    assert len([ip for ip in probed if ip.startswith("192.168.1.")]) == 253  # .1–.254 minus .5
+    assert "192.168.1.200" in probed  # an IP that was NOT in ARP
+    assert "192.168.1.5" not in probed  # local IP excluded
