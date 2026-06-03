@@ -1,6 +1,6 @@
 // Per-tab views for the device detail page (extracted from DeviceDetail.tsx).
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, Label, Spinner, btnStyle } from '../primitives';
+import React, { useState } from 'react';
+import { Card, Label, btnStyle } from '../primitives';
 import { AreaChart } from '../charts';
 import { FONT_MONO, type Theme } from '../../tokens';
 import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb } from '../../api';
@@ -186,93 +186,6 @@ export function ChartsTab({ t, health }: { t: Theme; ip?: string; health: Health
         <div style={{ color: t.textMuted, fontSize: 13, padding: '24px 0' }}>No historical data available yet.</div>
       )}
     </div>
-  );
-}
-
-export function LogsTab({ t, ip }: { t: Theme; ip: string }) {
-  const [logs, setLogs] = useState<string[]>([]);
-
-  useEffect(() => {
-    api.device.logs(ip).then(d => {
-      setLogs(Array.isArray(d) ? d : d.logs || []);
-    }).catch(() => {
-      setLogs(['[INFO] No log data available for this device.']);
-    });
-  }, [ip]);
-
-  return (
-    <Card t={t} noPad>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Label t={t}>Device log</Label>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted }}>{logs.length} lines</span>
-      </div>
-      <div style={{ maxHeight: 480, overflowY: 'auto', padding: '12px 16px', fontFamily: FONT_MONO, fontSize: 11, lineHeight: 1.7 }}>
-        {logs.length === 0 ? (
-          <div style={{ color: t.textMuted }}>No logs available.</div>
-        ) : logs.map((line, i) => {
-          const isError = /error|fail|err/i.test(line);
-          const isWarn = /warn/i.test(line);
-          return (
-            <div key={i} style={{ color: isError ? t.danger : isWarn ? t.warning : t.textMuted, marginBottom: 2 }}>{line}</div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
-export function ConsoleTab({ t, ip }: { t: Theme; ip: string }) {
-  const [history, setHistory] = useState<{ cmd: string; out: string }[]>([]);
-  const [input, setInput] = useState('');
-  const [running, setRunning] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history]);
-
-  const run = async () => {
-    const cmd = input.trim();
-    if (!cmd || running) return;
-    setInput('');
-    setRunning(true);
-    try {
-      const data = await api.device.exec(ip, cmd);
-      setHistory(prev => [...prev, { cmd, out: data.output || data.result || JSON.stringify(data) }]);
-    } catch {
-      setHistory(prev => [...prev, { cmd, out: 'Error: command failed' }]);
-    }
-    setRunning(false);
-  };
-
-  return (
-    <Card t={t} noPad>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}` }}>
-        <Label t={t}>Remote console</Label>
-      </div>
-      <div style={{ height: 380, overflowY: 'auto', padding: '12px 16px', fontFamily: FONT_MONO, fontSize: 12, background: t.surface2 }}>
-        {history.length === 0 && <div style={{ color: t.textDim }}>Type a command below and press Enter.</div>}
-        {history.map((h, i) => (
-          <div key={i} style={{ marginBottom: 10 }}>
-            <div style={{ color: t.accent }}>{'>'} {h.cmd}</div>
-            <pre style={{ margin: 0, color: t.text, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{h.out}</pre>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-      <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderTop: `1px solid ${t.border}` }}>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: t.accent, display: 'flex', alignItems: 'center' }}>{'>'}</span>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && run()}
-          placeholder="Enter command…"
-          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: FONT_MONO, fontSize: 13, color: t.text }}
-          autoFocus
-        />
-        {running && <Spinner t={t} size={14} />}
-      </div>
-    </Card>
   );
 }
 

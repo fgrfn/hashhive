@@ -180,9 +180,14 @@ export function Discovery() {
           Looks across your local network for AxeOS (BitAxe / NerdAxe), Lottominer (NMMiner)
           and AxeHub devices. Just press <strong>Start scan</strong> — the fields below are optional.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <FormField t={t} label="Subnet (optional)" value={subnet} onChange={setSubnet} placeholder="auto-detected, e.g. 192.168.1" />
-          <FormField t={t} label="Extra IPs (optional, comma-separated)" value={extraIps} onChange={setExtraIps} placeholder="e.g. 10.0.0.5, 10.0.0.6" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 6 }}>
+          <FormField t={t} label="Subnet /24 prefix (optional)" value={subnet} onChange={setSubnet} mono placeholder="192.168.1" />
+          <FormField t={t} label="Extra IPs (optional, comma-separated)" value={extraIps} onChange={setExtraIps} mono placeholder="10.0.0.5, 10.0.0.6" />
+        </div>
+        <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
+          Subnet is the first three octets of a /24 network (no last octet, no mask) — the scan
+          covers <code>.1</code>–<code>.254</code> automatically. Leave blank to use the
+          auto-detected network.
         </div>
         <button onClick={scan} disabled={scanning} style={{ ...btnStyle(t, 'primary'), alignSelf: 'flex-start' }}>
           {scanning ? <><Spinner t={t} size={14} /> Scanning…</> : <><Search size={14} /> Start scan</>}
