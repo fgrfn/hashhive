@@ -96,6 +96,9 @@ export const api = {
     test: () => post('/api/notifications/test'),
     testDiscordDashboard: () => post('/api/discord-dashboard/test'),
   },
+  market: {
+    prices: () => get<{ prices: Record<string, Record<string, number>>; coins: string[]; currency: string; enabled: boolean }>('/api/market/prices'),
+  },
   probability: () => get<ProbabilityResult>('/api/probability'),
   analytics: () => get<AnalyticsResult>('/api/analytics'),
   firmware: {

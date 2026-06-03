@@ -301,7 +301,7 @@ export interface AppSettings {
   wallets?: Wallet[];
   schedules?: Schedule[];
   groups?: Group[];
-  market?: { currency?: string };
+  market?: { enabled?: boolean; coins?: string[]; currency?: string };
   auth?: {
     enabled?: boolean;
     password?: string; // plaintext on write — backend hashes it; never returned on read

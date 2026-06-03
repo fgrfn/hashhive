@@ -102,8 +102,8 @@ DEFAULT_CONFIG: dict = {
     },
     "market": {
         "enabled": True,
-        "coin_id": "bitcoin",
-        "currency": "eur",
+        "coins": ["bitcoin"],   # CoinGecko ids shown in the top-bar price ticker
+        "currency": "usd",
     },
     "auth": {
         "enabled": False,

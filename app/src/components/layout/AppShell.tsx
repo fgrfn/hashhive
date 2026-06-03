@@ -10,7 +10,17 @@ import { useThemeStore } from '../../store/theme';
 import { type Theme, FONT_MONO, bodyFont } from '../../tokens';
 import { HiveMark, Spinner, btnStyle, GithubIcon } from '../primitives';
 import { useAppStore } from '../../store/app';
+import { api } from '../../api';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
+
+type PriceData = { prices: Record<string, Record<string, number>>; coins: string[]; currency: string; enabled: boolean };
+
+// Friendly tickers for common CoinGecko ids; falls back to the id, uppercased.
+const COIN_SYMBOL: Record<string, string> = {
+  bitcoin: 'BTC', 'bitcoin-cash': 'BCH', digibyte: 'DGB', litecoin: 'LTC',
+  ethereum: 'ETH', dogecoin: 'DOGE', monero: 'XMR', 'bitcoin-cash-node': 'BCH',
+};
+const CURRENCY_SYMBOL: Record<string, string> = { usd: '$', eur: '€', gbp: '£', jpy: '¥', chf: 'CHF', cad: 'C$', aud: 'A$' };
 
 function useWindowWidthLocal() {
   return useWindowWidth();
@@ -58,8 +68,17 @@ function activeId(pathname: string): string {
 
 export function AppShell({ children, onLogout }: { children: React.ReactNode; onLogout?: () => void }) {
   const { theme, dark, toggleDark, personality } = useThemeStore();
-  const { unreadAlerts, btcPrice, btcChange, globalSearch, setGlobalSearch, wsStatus } = useAppStore();
+  const { unreadAlerts, globalSearch, setGlobalSearch, wsStatus } = useAppStore();
   const t = theme;
+  const [priceData, setPriceData] = useState<PriceData | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.market.prices().then(d => { if (alive) setPriceData(d as PriceData); }).catch(() => {});
+    load();
+    const id = setInterval(load, 5 * 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const winW = useWindowWidthLocal();
@@ -182,7 +201,7 @@ export function AppShell({ children, onLogout }: { children: React.ReactNode; on
         <Topbar
           t={t} active={active} dark={dark} onToggleDark={toggleDark}
           globalSearch={globalSearch} setGlobalSearch={setGlobalSearch}
-          compact={isTablet} btcPrice={btcPrice} btcChange={btcChange}
+          compact={isTablet} priceData={priceData}
           onAddDevice={() => navigate('/discovery')}
         />
         {(wsStatus === 'disconnected' || wsStatus === 'reconnecting') && (
@@ -247,10 +266,10 @@ function NavItem({ t, on, expanded, onClick, label, badge, children }: {
   );
 }
 
-function Topbar({ t, active, dark, onToggleDark, globalSearch, setGlobalSearch, compact, btcPrice, btcChange, onAddDevice }: {
+function Topbar({ t, active, dark, onToggleDark, globalSearch, setGlobalSearch, compact, priceData, onAddDevice }: {
   t: Theme; active: string; dark: boolean; onToggleDark: () => void;
   globalSearch: string; setGlobalSearch: (v: string) => void;
-  compact: boolean; btcPrice: number; btcChange: number; onAddDevice: () => void;
+  compact: boolean; priceData: PriceData | null; onAddDevice: () => void;
 }) {
   const title = TITLE_MAP[active] || active;
   return (
@@ -277,15 +296,31 @@ function Topbar({ t, active, dark, onToggleDark, globalSearch, setGlobalSearch, 
           </div>
         )}
         {compact && <button style={{ ...btnStyle(t), padding: '6px 8px' }}><Search size={14} /></button>}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: 8, fontFamily: FONT_MONO, fontSize: 12, background: t.surface }}>
-          <span style={{ color: t.textMuted }}>BTC</span>
-          <span style={{ fontWeight: 600 }}>${btcPrice > 0 ? btcPrice.toLocaleString() : '—'}</span>
-          {!compact && btcPrice > 0 && (
-            <span style={{ color: btcChange >= 0 ? t.success : t.danger, fontSize: 11 }}>
-              {btcChange >= 0 ? '▲' : '▼'}{Math.abs(btcChange).toFixed(2)}%
-            </span>
-          )}
-        </div>
+        {priceData?.enabled && (priceData.coins || []).length > 0 && (() => {
+          const cur = priceData.currency;
+          const sym = CURRENCY_SYMBOL[cur] || '';
+          // On a tablet-width bar, only show the first coin to save space.
+          const coins = compact ? priceData.coins.slice(0, 1) : priceData.coins;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: 8, fontFamily: FONT_MONO, fontSize: 12, background: t.surface }}>
+              {coins.map((c, i) => {
+                const p = priceData.prices?.[c];
+                const price = p?.[cur];
+                const change = p?.[`${cur}_24h_change`];
+                const label = COIN_SYMBOL[c] || c.toUpperCase();
+                return (
+                  <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: i ? 8 : 0, borderLeft: i ? `1px solid ${t.border}` : 'none' }}>
+                    <span style={{ color: t.textMuted }}>{label}</span>
+                    <span style={{ fontWeight: 600 }}>{price != null ? `${sym}${price.toLocaleString(undefined, { maximumFractionDigits: price < 10 ? 4 : 0 })}` : '—'}</span>
+                    {!compact && change != null && (
+                      <span style={{ color: change >= 0 ? t.success : t.danger, fontSize: 11 }}>{change >= 0 ? '▲' : '▼'}{Math.abs(change).toFixed(2)}%</span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        })()}
         <button onClick={onToggleDark} style={{ ...btnStyle(t), padding: '7px 9px' }}>
           {dark ? <Sun size={14} /> : <Moon size={14} />}
         </button>
