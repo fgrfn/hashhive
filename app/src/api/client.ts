@@ -66,7 +66,7 @@ export const api = {
     readAll: ()         => post('/api/alerts/read-all'),
     delete:  ()         => del('/api/alerts'),
     rules:      ()                                                  => get<AlertRule[]>('/api/alerts/rules'),
-    updateRule: (kind: string, body: { enabled?: boolean; threshold?: number }) => patch(`/api/alerts/rules/${kind}`, body),
+    updateRule: (kind: string, body: { enabled?: boolean; threshold?: number; snooze_minutes?: number }) => patch(`/api/alerts/rules/${kind}`, body),
     channels:   ()                                                  => get<NotificationChannel[]>('/api/notifications/channels'),
     test:       ()                                                  => post<{ results: Record<string, boolean> }>('/api/notifications/test'),
   },

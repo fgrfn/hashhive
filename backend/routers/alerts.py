@@ -1,6 +1,6 @@
 """Alerts and logs router."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -69,11 +69,21 @@ async def get_alert_rules():
         k = entry.get("kind")
         if k:
             fired[k] = fired.get(k, 0) + 1
+    snooze = config.get("alert_snooze", {})
+    now = datetime.now(timezone.utc)
     rules = []
     for kind, type_key, label, severity, threshold_key, unit, template in _RULE_CATALOG:
         enabled = bool(at.get(type_key, True))
         value = _threshold_value(config, threshold_key)
         condition = template.format(v=value) if threshold_key and value is not None else template
+        # Surface an active snooze (mute-until) so the UI can show it.
+        snoozed_until = snooze.get(kind)
+        if snoozed_until:
+            try:
+                if datetime.fromisoformat(snoozed_until) <= now:
+                    snoozed_until = None  # expired
+            except (ValueError, TypeError):
+                snoozed_until = None
         rules.append({
             "kind": kind,
             "label": label,
@@ -84,6 +94,7 @@ async def get_alert_rules():
             "threshold": value,
             "unit": unit,
             "fired24h": fired.get(kind, 0),
+            "snoozed_until": snoozed_until,
         })
     return rules
 
@@ -99,6 +110,20 @@ async def update_alert_rule(kind: str, data: dict):
 
     if "enabled" in data:
         config.setdefault("alert_types", {})[type_key] = bool(data["enabled"])
+
+    # Snooze (temporary mute): snooze_minutes > 0 mutes the kind until now+minutes;
+    # 0 (or negative) clears an active snooze.
+    if "snooze_minutes" in data:
+        try:
+            minutes = int(data["snooze_minutes"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="snooze_minutes must be an integer")
+        snooze = config.setdefault("alert_snooze", {})
+        if minutes > 0:
+            until = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+            snooze[kind] = until.isoformat()
+        else:
+            snooze.pop(kind, None)
 
     if "threshold" in data and data["threshold"] is not None:
         if not threshold_key:

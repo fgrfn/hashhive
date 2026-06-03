@@ -207,6 +207,7 @@ export interface AlertRule {
   threshold: number | null;
   unit: string;
   fired24h: number;
+  snoozed_until?: string | null;
 }
 
 export interface NotificationChannel {
