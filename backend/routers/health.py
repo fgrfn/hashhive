@@ -12,6 +12,7 @@ from core import (
     _startup_time,
     _validate_device_ip,
     load_json,
+    sane_ghs,
 )
 
 router = APIRouter()
@@ -50,6 +51,9 @@ async def device_health(ip: str, hours: int = Query(default=24, ge=1, le=720)):
             except Exception:
                 pass
     samples.sort(key=lambda s: s.get("ts", ""))
+    # Drop implausible hashrate spikes (bad firmware readings) so the chart axis
+    # isn't dominated by a single absurd value.
+    samples = [s for s in samples if sane_ghs(s.get("gh", 0)) is not None]
     return {
         "ip": ip,
         "hashrate_series": [s.get("gh", 0) for s in samples],

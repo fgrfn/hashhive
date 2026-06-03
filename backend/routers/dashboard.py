@@ -13,6 +13,7 @@ from core import (
     _append_bestdiff_samples,
     _append_device_samples,
     _append_hashrate_sample,
+    sane_ghs,
     _update_records,
     _check_auto_restart,
     _price_cache,
@@ -105,12 +106,14 @@ async def _dashboard_broadcast_loop():
                     total_pwr = 0.0
                     total_shares = 0
                     for d in nmminer_data.get("devices", []):
-                        total_gh += float(d.get("GHs5s") or d.get("GHs5") or d.get("GHs1m") or
-                                          d.get("GHsav") or d.get("hashrate") or d.get("currentHashrate") or 0)
+                        # Drop implausible spikes (bad firmware reading) so they
+                        # don't wreck the fleet hashrate chart.
+                        total_gh += sane_ghs(d.get("GHs5s") or d.get("GHs5") or d.get("GHs1m") or
+                                             d.get("GHsav") or d.get("hashrate") or d.get("currentHashrate") or 0) or 0.0
                         total_shares += _parse_nm_shares(d)[0]
                     for d in axeos_results:
                         if d.get("_online"):
-                            total_gh += float(d.get("hashRate") or d.get("hashrate") or 0)
+                            total_gh += sane_ghs(d.get("hashRate") or d.get("hashrate") or 0) or 0.0
                             total_pwr += float(d.get("power") or 0)
                             total_shares += int(d.get("sharesAccepted") or 0)
                     _append_hashrate_sample(total_gh, total_pwr, total_shares)

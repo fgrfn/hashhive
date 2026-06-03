@@ -12,6 +12,22 @@ _last_stats_sample_ts: float = 0.0
 _last_dev_sample_ts: float = 0.0
 _last_bestdiff_sample_ts: float = 0.0
 
+# A single ESP miner (BitAxe/NerdAxe ~1-2 TH/s, NMMiner ~kH/s) physically can't
+# exceed this. Firmware occasionally reports a bogus huge value (wrong unit /
+# cumulative counter); such readings would wreck the chart axis, so we drop them.
+MAX_DEVICE_GHS = 100_000.0  # 100 TH/s
+
+
+def sane_ghs(value) -> float | None:
+    """Return a finite, non-negative, plausible GH/s value, else None."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if v != v or v < 0 or v > MAX_DEVICE_GHS:  # NaN / negative / implausible
+        return None
+    return v
+
 
 def _stats_file(date_str: str) -> Path:
     return STATS_DIR / f"{date_str}.json"
@@ -76,7 +92,10 @@ def _append_device_samples(devices: list) -> None:
         ip = d.get("_ip", "")
         if not ip:
             continue
-        gh = round(float(d.get("hashRate") or d.get("hashrate") or 0), 4)
+        gh_raw = sane_ghs(d.get("hashRate") or d.get("hashrate") or 0)
+        if gh_raw is None:
+            continue  # skip an implausible reading rather than spike the chart
+        gh = round(gh_raw, 4)
         sample = {"ts": now_iso, "gh": gh}
         temp = d.get("temp")
         if temp is not None:
