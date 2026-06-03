@@ -40,10 +40,6 @@ export const api = {
     configOne1:  (ip: string)                                     => get<Record<string, unknown>>(`/api/axeos/config/${ip}`),
     scan:        ()                                               => get<AxeDevice[]>('/api/axeos/scan'),
   },
-  device: {
-    logs:    (ip: string)              => get<string[] | { logs: string[] }>(`/api/device/${ip}/logs`),
-    exec:    (ip: string, cmd: string) => post<{ output?: string; result?: string; error?: string }>(`/api/device/${ip}/exec`, { cmd }),
-  },
   templates: {
     list:   ()                                                                       => get<DeviceTemplate[]>('/api/templates'),
     create: (t: Partial<DeviceTemplate>)                                             => post<DeviceTemplate>('/api/templates', t),

@@ -6,14 +6,12 @@ import { Pill, StatusPill, btnStyle } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api, getHashrate } from '../api';
 import type { HealthData, ProbabilityResult } from '../api';
-import { ArrowLeft, Cpu, Activity, FileText, Terminal, Zap, Settings, RefreshCw, Play, Pause } from 'lucide-react';
-import { OverviewTab, ChartsTab, LogsTab, ConsoleTab, PowerCurveTab, ConfigTab } from '../components/device/DeviceTabs';
+import { ArrowLeft, Cpu, Activity, Zap, Settings, RefreshCw, Play, Pause } from 'lucide-react';
+import { OverviewTab, ChartsTab, PowerCurveTab, ConfigTab } from '../components/device/DeviceTabs';
 
 const TABS = [
   { id: 'overview', label: 'Overview', Icon: Activity },
   { id: 'charts', label: 'Charts', Icon: Activity },
-  { id: 'logs', label: 'Logs', Icon: FileText },
-  { id: 'console', label: 'Console', Icon: Terminal },
   { id: 'power', label: 'Power curve', Icon: Zap },
   { id: 'config', label: 'Config', Icon: Settings },
 ];
@@ -119,8 +117,6 @@ export function DeviceDetail() {
 
       {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} prob={devProb} />}
       {tab === 'charts' && <ChartsTab t={t} ip={ip!} health={health} />}
-      {tab === 'logs' && <LogsTab t={t} ip={ip!} />}
-      {tab === 'console' && <ConsoleTab t={t} ip={ip!} />}
       {tab === 'power' && <PowerCurveTab t={t} ip={ip!} axeDevice={axeDevice} />}
       {tab === 'config' && <ConfigTab t={t} ip={ip!} nmDevice={nmDevice} axeDevice={axeDevice} />}
     </div>
