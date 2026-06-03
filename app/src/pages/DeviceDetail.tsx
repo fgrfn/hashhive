@@ -16,6 +16,7 @@ export function DeviceDetail() {
   const { devices, axeDevices } = useAppStore();
   const [tab, setTab] = useState('overview');
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [fwLatest, setFwLatest] = useState<Record<string, { version: string; html_url: string }>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [prob, setProb] = useState<ProbabilityResult | null>(null);
 
@@ -36,6 +37,7 @@ export function DeviceDetail() {
   useEffect(() => {
     if (ip) api.health(ip).then(setHealth).catch(() => {});
     api.probability().then(setProb).catch(() => setProb(null));
+    api.firmware.latest().then(setFwLatest).catch(() => {});
   }, [ip]);
 
   if (!nmDevice && !axeDevice) {
@@ -117,7 +119,7 @@ export function DeviceDetail() {
         ))}
       </div>
 
-      {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} prob={devProb} />}
+      {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} prob={devProb} fwLatest={fwLatest} />}
       {tab === 'charts' && <ChartsTab t={t} ip={ip!} health={health} />}
       {tab === 'logs' && isAxe && <LogsTab t={t} ip={ip!} />}
       {tab === 'power' && <PowerCurveTab t={t} ip={ip!} axeDevice={axeDevice} />}
