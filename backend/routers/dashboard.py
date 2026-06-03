@@ -58,13 +58,18 @@ async def _dashboard_broadcast_loop():
         try:
             config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
             interval = max(5, int(config.get("refresh_interval", 30)))
-            if _ws_manager.count > 0:
-                master = config.get("lottominer_master", "")
-                nm_devices = config.get("lottominer_devices", [])
-                axehub_devices = config.get("axehub_devices", [])
-                axeos_devices = config.get("axeos_devices", [])
-                has_nmminer = bool(master or nm_devices)
-                has_axehub = bool(axehub_devices)
+            # Poll + record + run alert/auto-restart/pool-health checks on every
+            # interval regardless of whether a browser is connected. Otherwise
+            # history (the 24h charts), alerts and watchdogs would only run while
+            # someone has the UI open — leaving sparse, misleading charts and
+            # silent monitoring. Only the WS *broadcast* is gated on clients.
+            master = config.get("lottominer_master", "")
+            nm_devices = config.get("lottominer_devices", [])
+            axehub_devices = config.get("axehub_devices", [])
+            axeos_devices = config.get("axeos_devices", [])
+            has_nmminer = bool(master or nm_devices)
+            has_axehub = bool(axehub_devices)
+            if has_nmminer or has_axehub or axeos_devices:
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
@@ -109,7 +114,9 @@ async def _dashboard_broadcast_loop():
                             total_pwr += float(d.get("power") or 0)
                             total_shares += int(d.get("sharesAccepted") or 0)
                     _append_hashrate_sample(total_gh, total_pwr, total_shares)
-                    _append_device_samples(axeos_results)
+                    # Per-device samples for BOTH families so every device gets a
+                    # 24h chart (NMMiner was previously omitted).
+                    _append_device_samples(axeos_results + list(nmminer_data.get("devices", [])))
                     # ── BestDiff samples (all device types) ───────────────
                     all_bd = (
                         list(nmminer_data.get("devices", []))
@@ -125,15 +132,16 @@ async def _dashboard_broadcast_loop():
                         await _check_auto_restart(config, axeos_results, ar_client)
                 except Exception:
                     pass
-                payload = json.dumps({
-                    "type": "dashboard",
-                    "lottominer": nmminer_data,
-                    "axeos": axeos_data,
-                    "unread_alerts": unread,
-                    "new_alerts": new_alerts,
-                    "config": config,
-                })
-                await _ws_manager.broadcast(payload)
+                if _ws_manager.count > 0:
+                    payload = json.dumps({
+                        "type": "dashboard",
+                        "lottominer": nmminer_data,
+                        "axeos": axeos_data,
+                        "unread_alerts": unread,
+                        "new_alerts": new_alerts,
+                        "config": config,
+                    })
+                    await _ws_manager.broadcast(payload)
         except Exception:
             pass
         await asyncio.sleep(interval)
