@@ -45,31 +45,20 @@ function configuredDevices(s: AppSettings | null): ConfiguredDevice[] {
   return out;
 }
 
-export function Discovery() {
-  const { theme: t } = useThemeStore();
-  const { settings, setSettings } = useAppStore();
-  const [tab, setTab] = useState<'discover' | 'manual'>('discover');
-
+/** Small numbered step badge for the top-to-bottom guided flow. */
+function StepBadge({ t, n }: { t: Theme; n: number }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${t.border}`, gap: 0 }}>
-        {([['discover', 'Auto-discover'], ['manual', 'Add manually']] as const).map(([id, label]) => (
-          <div key={id} onClick={() => setTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: tab === id ? t.accent : t.textMuted, borderBottom: tab === id ? `2px solid ${t.accent}` : '2px solid transparent', marginBottom: -1 }}>
-            {id === 'discover' ? <Radar size={14} /> : <Plus size={14} />}
-            {label}
-          </div>
-        ))}
-      </div>
-
-      {tab === 'discover'
-        ? <DiscoverTab t={t} settings={settings} setSettings={setSettings} />
-        : <ManualTab t={t} settings={settings} setSettings={setSettings} />}
-    </div>
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 11, background: t.accent, color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+      {n}
+    </span>
   );
 }
 
-function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSettings | null; setSettings: (s: AppSettings) => void }) {
+export function Discovery() {
+  const { theme: t } = useThemeStore();
+  const { settings, setSettings } = useAppStore();
+
+  // ── Scan state ──────────────────────────────────────────────────────────
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<{ found: DiscoveredDevice[]; method: string; arp_count: number; mdns_count: number; subnet?: string } | null>(null);
   const [selected, setSelected] = useState(new Set<string>());
@@ -77,9 +66,15 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
   const [subnet, setSubnet] = useState('');
   const [extraIps, setExtraIps] = useState('');
 
+  // ── Manual-add state ────────────────────────────────────────────────────
+  const [ip, setIp] = useState('');
+  const [name, setName] = useState('');
+  const [type, setType] = useState<DiscoveredDevice['type']>('bitaxe');
+  const [busy, setBusy] = useState(false);
+
   const disc = settings?.discovery ?? {};
-  // IPs already in the saved config — shown but not selectable in scan results.
-  const configuredIps = new Set(configuredDevices(settings).map(d => d.ip));
+  const devices = configuredDevices(settings);
+  const configuredIps = new Set(devices.map(d => d.ip));
   const addable = (result?.found ?? []).filter(d => !configuredIps.has(d.ip));
 
   const scan = async () => {
@@ -94,11 +89,11 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
     setScanning(false);
   };
 
-  const toggle = (ip: string) => {
-    if (configuredIps.has(ip)) return;  // already-added devices aren't selectable
+  const toggle = (deviceIp: string) => {
+    if (configuredIps.has(deviceIp)) return;  // already-added devices aren't selectable
     setSelected(prev => {
       const s = new Set(prev);
-      if (s.has(ip)) s.delete(ip); else s.add(ip);
+      if (s.has(deviceIp)) s.delete(deviceIp); else s.add(deviceIp);
       return s;
     });
   };
@@ -123,7 +118,47 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
     setAdding(false);
   };
 
-  const saveSettings = async (patch: Record<string, unknown>) => {
+  const addManual = async () => {
+    const trimmed = ip.trim();
+    if (!trimmed) { toast('Enter an IP address', 'error'); return; }
+    setBusy(true);
+    try {
+      const res = await api.discovery.add([{ ip: trimmed, name: name.trim() || trimmed, type, discovered_via: 'scan' }]);
+      if (res.count > 0) {
+        toast(`Added ${TYPE_LABEL[type]} ${trimmed}`);
+        setIp(''); setName('');
+        try { setSettings(await api.settings.get()); } catch { /* keep going */ }
+        // Refresh the overview immediately so the new device is visible at once.
+        try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
+      } else {
+        toast('Device already added or invalid IP', 'error');
+      }
+    } catch {
+      toast('Failed to add device', 'error');
+    }
+    setBusy(false);
+  };
+
+  const remove = async (d: ConfiguredDevice) => {
+    const s: AppSettings = { ...(settings || {}) };
+    if (d.list === 'lottominer_master') {
+      s.lottominer_master = '';
+    } else {
+      const arr = (s[d.list] as Array<{ ip: string }> | undefined) || [];
+      (s as Record<string, unknown>)[d.list] = arr.filter(x => x.ip !== d.ip);
+    }
+    try {
+      const updated = await api.settings.save(s);
+      setSettings(updated);
+      // Reflect the removal in the overview without waiting for the next tick.
+      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
+      toast(`Removed ${d.ip}`);
+    } catch {
+      toast('Failed to remove device', 'error');
+    }
+  };
+
+  const saveSettings = async (patch: Partial<NonNullable<AppSettings['discovery']>>) => {
     try {
       const updated = await api.settings.save({ ...(settings || {}), discovery: { ...disc, ...patch } } as Parameters<typeof api.settings.save>[0]);
       setSettings(updated);
@@ -134,19 +169,20 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
   };
 
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Step 1 · Scan the network ─────────────────────────────────────── */}
       <Card t={t}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <Radar size={18} color={t.accent} />
-          <div style={{ fontWeight: 700, fontSize: 15 }}>Scan for miners</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <StepBadge t={t} n={1} />
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Scan your network for miners</div>
         </div>
-        <div style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
-          Scans your local network (ARP, mDNS, HTTP probing) for AxeOS (BitAxe/NerdAxe)
-          and Lottominer (NMMiner) devices.
+        <div style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.5, marginBottom: 14, paddingLeft: 32 }}>
+          Looks across your local network for AxeOS (BitAxe / NerdAxe), Lottominer (NMMiner)
+          and AxeHub devices. Just press <strong>Start scan</strong> — the fields below are optional.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <FormField t={t} label="Subnet (optional)" value={subnet} onChange={setSubnet} placeholder="e.g. 192.168.1" />
-          <FormField t={t} label="Extra IPs (comma-separated)" value={extraIps} onChange={setExtraIps} placeholder="e.g. 10.0.0.5, 10.0.0.6" />
+          <FormField t={t} label="Subnet (optional)" value={subnet} onChange={setSubnet} placeholder="auto-detected, e.g. 192.168.1" />
+          <FormField t={t} label="Extra IPs (optional, comma-separated)" value={extraIps} onChange={setExtraIps} placeholder="e.g. 10.0.0.5, 10.0.0.6" />
         </div>
         <button onClick={scan} disabled={scanning} style={{ ...btnStyle(t, 'primary'), alignSelf: 'flex-start' }}>
           {scanning ? <><Spinner t={t} size={14} /> Scanning…</> : <><Search size={14} /> Start scan</>}
@@ -158,10 +194,10 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
               {result.method} · {result.subnet ?? ''} · {result.arp_count} ARP · {result.mdns_count} mDNS · {result.found.length} found
             </div>
             {result.found.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: t.textMuted }}>
-                <Search size={28} style={{ marginBottom: 8, opacity: 0.3 }} />
+              <div style={{ textAlign: 'center', padding: '28px 0', color: t.textMuted }}>
+                <Search size={26} style={{ marginBottom: 8, opacity: 0.3 }} />
                 <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>No new devices found</div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>Make sure devices are powered on and on the same network, or add one manually.</div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>Make sure the miners are powered on and on the same network, or add one by IP below.</div>
               </div>
             ) : (
               <>
@@ -212,8 +248,52 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
         )}
       </Card>
 
+      {/* ── Step 2 · Add by IP ────────────────────────────────────────────── */}
       <Card t={t}>
-        <Label t={t} style={{ marginBottom: 12 }}>Continuous scan</Label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <StepBadge t={t} n={2} />
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Or add a device by IP</div>
+        </div>
+        <div style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.5, marginBottom: 14, paddingLeft: 32 }}>
+          Know the address already? Add it directly — handy for devices the scan can't reach.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1.4fr auto', gap: 10, alignItems: 'end' }}>
+          <FormField t={t} label="IP address" value={ip} onChange={setIp} placeholder="192.168.1.50" mono />
+          <FormField t={t} label="Name (optional)" value={name} onChange={setName} placeholder="e.g. Garage BitAxe" />
+          <div>
+            <Label t={t} style={{ marginBottom: 6 }}>Type</Label>
+            <Select t={t} value={type} options={MANUAL_TYPES} onChange={v => setType(v as DiscoveredDevice['type'])} />
+          </div>
+          <button onClick={addManual} disabled={busy || !ip.trim()} style={{ ...btnStyle(t, 'primary'), opacity: busy || !ip.trim() ? 0.5 : 1, height: 38 }}>
+            <Plus size={14} /> Add
+          </button>
+        </div>
+      </Card>
+
+      {/* ── Configured devices (always visible — confirms what was added) ──── */}
+      <Card t={t} noPad>
+        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Configured devices</div>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{devices.length}</span>
+        </div>
+        {devices.length === 0 ? (
+          <div style={{ padding: '20px 16px', color: t.textMuted, fontSize: 13 }}>No devices yet — scan above or add one by IP.</div>
+        ) : devices.map((d, i) => (
+          <div key={`${d.list}:${d.ip}:${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 110px 40px', gap: 10, padding: '11px 16px', borderBottom: i === devices.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+            <div style={{ fontWeight: 500 }}>{d.name}</div>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{d.ip}</div>
+            <span style={{ fontSize: 10, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '2px 6px', borderRadius: 4, justifySelf: 'start' }}>{d.type}</span>
+            <button onClick={() => remove(d)} title="Remove" style={{ ...btnStyle(t, 'danger'), padding: '5px 8px', justifySelf: 'end' }}><Trash2 size={12} /></button>
+          </div>
+        ))}
+      </Card>
+
+      {/* ── Continuous background scan ─────────────────────────────────────── */}
+      <Card t={t}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <Radar size={16} color={t.textMuted} />
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Continuous scan</div>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <ToggleRow t={t} label="Automatically scan in the background" value={!!disc.auto_scan} onChange={v => saveSettings({ auto_scan: v })} />
           <ToggleRow t={t} label="Notify when a new device appears" value={disc.notify ?? true} onChange={v => saveSettings({ notify: v })} />
@@ -226,92 +306,7 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
           </div>
         </div>
       </Card>
-    </>
-  );
-}
-
-function ManualTab({ t, settings, setSettings }: { t: Theme; settings: AppSettings | null; setSettings: (s: AppSettings) => void }) {
-  const [ip, setIp] = useState('');
-  const [name, setName] = useState('');
-  const [type, setType] = useState<DiscoveredDevice['type']>('bitaxe');
-  const [busy, setBusy] = useState(false);
-
-  const devices = configuredDevices(settings);
-
-  const add = async () => {
-    const trimmed = ip.trim();
-    if (!trimmed) { toast('Enter an IP address', 'error'); return; }
-    setBusy(true);
-    try {
-      const res = await api.discovery.add([{ ip: trimmed, name: name.trim() || trimmed, type, discovered_via: 'scan' }]);
-      if (res.count > 0) {
-        toast(`Added ${TYPE_LABEL[type]} ${trimmed}`);
-        setIp(''); setName('');
-        try { setSettings(await api.settings.get()); } catch { /* keep going */ }
-        // Refresh the overview immediately so the new device is visible at once.
-        try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
-      } else {
-        toast('Device already added or invalid IP', 'error');
-      }
-    } catch {
-      toast('Failed to add device', 'error');
-    }
-    setBusy(false);
-  };
-
-  const remove = async (d: ConfiguredDevice) => {
-    const s: AppSettings = { ...(settings || {}) };
-    if (d.list === 'lottominer_master') {
-      s.lottominer_master = '';
-    } else {
-      const arr = (s[d.list] as Array<{ ip: string }> | undefined) || [];
-      (s as Record<string, unknown>)[d.list] = arr.filter(x => x.ip !== d.ip);
-    }
-    try {
-      const updated = await api.settings.save(s);
-      setSettings(updated);
-      // Reflect the removal in the overview without waiting for the next tick.
-      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
-      toast(`Removed ${d.ip}`);
-    } catch {
-      toast('Failed to remove device', 'error');
-    }
-  };
-
-  return (
-    <>
-      <Card t={t}>
-        <Label t={t} style={{ marginBottom: 12 }}>Add a device by IP</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1.4fr auto', gap: 10, alignItems: 'end' }}>
-          <FormField t={t} label="IP address" value={ip} onChange={setIp} placeholder="192.168.1.50" mono />
-          <FormField t={t} label="Name (optional)" value={name} onChange={setName} placeholder="e.g. Garage BitAxe" />
-          <div>
-            <Label t={t} style={{ marginBottom: 6 }}>Type</Label>
-            <Select t={t} value={type} options={MANUAL_TYPES} onChange={v => setType(v as DiscoveredDevice['type'])} />
-          </div>
-          <button onClick={add} disabled={busy || !ip.trim()} style={{ ...btnStyle(t, 'primary'), opacity: busy || !ip.trim() ? 0.5 : 1, height: 38 }}>
-            <Plus size={14} /> Add
-          </button>
-        </div>
-      </Card>
-
-      <Card t={t} noPad>
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Label t={t}>Configured devices</Label>
-          <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{devices.length}</span>
-        </div>
-        {devices.length === 0 ? (
-          <div style={{ padding: '20px 16px', color: t.textMuted, fontSize: 13 }}>No devices yet — add one above or auto-discover.</div>
-        ) : devices.map((d, i) => (
-          <div key={`${d.list}:${d.ip}:${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 110px 40px', gap: 10, padding: '11px 16px', borderBottom: i === devices.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
-            <div style={{ fontWeight: 500 }}>{d.name}</div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{d.ip}</div>
-            <span style={{ fontSize: 10, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '2px 6px', borderRadius: 4, justifySelf: 'start' }}>{d.type}</span>
-            <button onClick={() => remove(d)} title="Remove" style={{ ...btnStyle(t, 'danger'), padding: '5px 8px', justifySelf: 'end' }}><Trash2 size={12} /></button>
-          </div>
-        ))}
-      </Card>
-    </>
+    </div>
   );
 }
 
