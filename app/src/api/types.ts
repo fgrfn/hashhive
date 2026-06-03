@@ -145,9 +145,11 @@ export interface AxeDevice {
   sharesAccepted?: number;
   sharesRejected?: number;
   stratumURL?: string;
+  stratumPort?: number;
   stratumUser?: string;
   stratumPassword?: string;
   fallbackStratumURL?: string;
+  fallbackStratumPort?: number;
   isUsingFallbackStratum?: number;
   uptimeSeconds?: number;
   miningPaused?: boolean;

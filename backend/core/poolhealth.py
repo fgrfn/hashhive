@@ -104,9 +104,24 @@ def _collect_pools(nm_results, axe_results) -> dict[str, int]:
                 continue
             if not d.get("_online", False):
                 continue
-            _add(d.get("stratumURL"))
+            _add(_axe_pool_url(d))
 
     return counts
+
+
+def _axe_pool_url(d: dict) -> str:
+    """AxeOS reports host and port separately — combine into host:port so the
+    pool is pingable (otherwise it has no port and is dropped from monitoring)."""
+    use_fb = bool(d.get("isUsingFallbackStratum"))
+    host = (d.get("fallbackStratumURL") if use_fb else d.get("stratumURL")) or d.get("stratumURL") or ""
+    port = (d.get("fallbackStratumPort") if use_fb else d.get("stratumPort")) or d.get("stratumPort")
+    host = str(host).strip()
+    if not host:
+        return ""
+    stripped = host.split("://")[-1]
+    if ":" in stripped:  # already has a port
+        return host
+    return f"{host}:{port}" if port else host
 
 
 async def check_pool_health(config: dict, nm_results, axe_results) -> list[dict]:

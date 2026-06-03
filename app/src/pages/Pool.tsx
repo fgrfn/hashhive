@@ -299,7 +299,12 @@ function PoolStatus() {
       map.set(key, s);
     };
     for (const d of axeDevices) {
-      const url = (d.isUsingFallbackStratum ? d.fallbackStratumURL : d.stratumURL) || d.stratumURL || '';
+      // AxeOS reports host and port separately — combine so the pool has a
+      // pingable host:port (NMMiner already reports the full URL with port).
+      const useFb = !!d.isUsingFallbackStratum;
+      const host = (useFb ? d.fallbackStratumURL : d.stratumURL) || d.stratumURL || '';
+      const port = (useFb ? d.fallbackStratumPort : d.stratumPort) ?? d.stratumPort;
+      const url = host && port && !host.includes('://') && !host.includes(':') ? `${host}:${port}` : host;
       add(url, !!d._online, d.sharesAccepted || 0, d.sharesRejected || 0);
     }
     for (const d of devices) {
