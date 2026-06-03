@@ -80,6 +80,21 @@ export function fmtProb(p: number | null | undefined): string {
   return `1 : ${Math.round(1 / p).toLocaleString()}`;
 }
 
+/** True if `current` firmware is strictly older than `latest`. Lenient: ignores
+ *  a 'v' prefix and non-numeric noise; returns false when either is unparseable
+ *  (mirrors the backend so we don't cry wolf on unknown version formats). */
+export function isFirmwareOutdated(current: string | undefined, latest: string | undefined): boolean {
+  const nums = (v: string | undefined) => (v ? (v.match(/\d+/g) || []).map(Number) : []);
+  const c = nums(current), l = nums(latest);
+  if (c.length === 0 || l.length === 0) return false;
+  const n = Math.max(c.length, l.length);
+  for (let i = 0; i < n; i++) {
+    const a = c[i] ?? 0, b = l[i] ?? 0;
+    if (a !== b) return a < b;
+  }
+  return false;
+}
+
 /** Case-insensitive match of a global search query against a device's name/hostname/ip.
  *  Empty/whitespace queries match everything. Used by the topbar global search. */
 export function matchesSearch(

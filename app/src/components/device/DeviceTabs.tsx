@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Label, Spinner, btnStyle } from '../primitives';
 import { AreaChart } from '../charts';
 import { FONT_MONO, type Theme } from '../../tokens';
-import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb } from '../../api';
+import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb, isFirmwareOutdated } from '../../api';
 import type { NMMinerDevice, AxeDevice, HealthData, ProbabilityResult } from '../../api';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, RotateCcw, ArrowUpCircle } from 'lucide-react';
 
 export function StatGrid({ t, stats }: { t: Theme; stats: [string, string, string?][] }) {
   return (
@@ -20,7 +20,20 @@ export function StatGrid({ t, stats }: { t: Theme; stats: [string, string, strin
   );
 }
 
-export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, prob }: {
+type FwLatest = Record<string, { version: string; html_url: string }>;
+
+function FirmwareUpdate({ t, current, family, fwLatest }: { t: Theme; current?: string; family: string; fwLatest?: FwLatest }) {
+  const latest = fwLatest?.[family];
+  if (!latest || !isFirmwareOutdated(current, latest.version)) return null;
+  return (
+    <a href={latest.html_url} target="_blank" rel="noreferrer"
+      style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}`, fontSize: 11, color: t.warning, textDecoration: 'none' }}>
+      <ArrowUpCircle size={13} /> Update available → v{latest.version}
+    </a>
+  );
+}
+
+export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, prob, fwLatest }: {
   t: Theme;
   nmDevice?: NMMinerDevice;
   axeDevice?: AxeDevice;
@@ -29,6 +42,7 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
   uptime: number | string | null;
   health: HealthData | null;
   prob: ProbabilityResult['devices'][number] | null;
+  fwLatest?: FwLatest;
 }) {
   const tempColor = temp != null ? (temp > 80 ? t.danger : temp > 70 ? t.warning : t.success) : t.text;
 
@@ -117,6 +131,7 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
                 </div>
               ))}
             </div>
+            <FirmwareUpdate t={t} current={axeDevice.version || axeDevice.axeOSVersion} family="axeos" fwLatest={fwLatest} />
           </Card>
         </div>
       )}
@@ -150,6 +165,7 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
                 </div>
               ))}
             </div>
+            <FirmwareUpdate t={t} current={nmDevice.version} family={nmDevice._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />
           </Card>
         </div>
       )}

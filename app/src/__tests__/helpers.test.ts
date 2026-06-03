@@ -94,3 +94,15 @@ describe('fmtProb', () => {
   it('formats a small-but-visible probability with more decimals', () => expect(fmtProb(0.001)).toBe('0.100%'));
   it('formats a tiny probability as full odds with separators', () => expect(fmtProb(0.00001)).toBe('1 : 100,000'));
 });
+
+import { isFirmwareOutdated } from '../api';
+
+describe('isFirmwareOutdated', () => {
+  it('flags an older version', () => expect(isFirmwareOutdated('2.0.02', '2.6.0')).toBe(true));
+  it('ignores a v prefix', () => expect(isFirmwareOutdated('v2.0.2', 'v2.6.0')).toBe(true));
+  it('compares numerically (nm2 vs patch)', () => expect(isFirmwareOutdated('0.4.1', '0.4.2')).toBe(true));
+  it('equal is not outdated', () => expect(isFirmwareOutdated('2.6.0', '2.6.0')).toBe(false));
+  it('newer is not outdated', () => expect(isFirmwareOutdated('2.7.0', '2.6.0')).toBe(false));
+  it('unparseable current → false', () => expect(isFirmwareOutdated('dev', '2.0')).toBe(false));
+  it('missing latest → false', () => expect(isFirmwareOutdated('2.0', undefined)).toBe(false));
+});

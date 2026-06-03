@@ -98,6 +98,9 @@ export const api = {
   },
   probability: () => get<ProbabilityResult>('/api/probability'),
   analytics: () => get<AnalyticsResult>('/api/analytics'),
+  firmware: {
+    latest: () => get<Record<string, { version: string; tag: string; html_url: string; repo: string }>>('/api/firmware/latest'),
+  },
   discovery: {
     scan: (opts?: { subnet?: string; extra_ips?: string }) => {
       const q = new URLSearchParams();
