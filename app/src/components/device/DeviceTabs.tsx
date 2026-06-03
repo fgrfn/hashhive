@@ -11,9 +11,9 @@ export function StatGrid({ t, stats }: { t: Theme; stats: [string, string, strin
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
       {stats.map(([label, value, color]) => (
-        <div key={label} style={{ padding: '10px 12px', background: t.surface2, borderRadius: 8 }}>
+        <div key={label} style={{ padding: '10px 12px', background: t.surface2, borderRadius: 8, minWidth: 0 }}>
           <div style={{ fontSize: 9, color: t.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{label}</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: color || t.text, fontFamily: FONT_MONO, marginTop: 3 }}>{value}</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: color || t.text, fontFamily: FONT_MONO, marginTop: 3, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value}</div>
         </div>
       ))}
     </div>
