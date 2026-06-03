@@ -66,6 +66,51 @@ async def get_axeos_info(ip: str):
         return data
 
 
+@router.get("/api/axeos/logs/{ip}")
+async def get_axeos_logs(ip: str, lines: int = Query(200, ge=1, le=1000)):
+    """Recent AxeOS device logs.
+
+    Tries the buffered HTTP endpoint first (newer AxeOS: GET /api/system/logs);
+    if that isn't available, briefly taps the live text WebSocket log stream
+    (ws://<ip>/api/ws) and collects whatever lines arrive in a short window.
+    """
+    _validate_device_ip(ip)
+
+    # 1) Buffered history over HTTP, when the firmware supports it.
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.get(f"http://{ip}/api/system/logs")
+            if resp.status_code == 200 and resp.text.strip():
+                log_lines = [ln for ln in resp.text.splitlines() if ln.strip()]
+                return {"logs": log_lines[-lines:], "source": "history"}
+    except Exception:
+        pass
+
+    # 2) Live WebSocket capture (plain-text lines).
+    try:
+        import websockets  # provided by uvicorn[standard]
+
+        collected: list[str] = []
+
+        async def _collect():
+            async with websockets.connect(f"ws://{ip}/api/ws", open_timeout=5, close_timeout=2) as ws:
+                async for msg in ws:
+                    text = msg.decode("utf-8", "replace") if isinstance(msg, (bytes, bytearray)) else str(msg)
+                    for ln in text.splitlines():
+                        if ln.strip():
+                            collected.append(ln)
+                    if len(collected) >= lines:
+                        break
+
+        try:
+            await asyncio.wait_for(_collect(), timeout=3.5)
+        except (asyncio.TimeoutError, Exception):
+            pass  # window elapsed or stream closed — return whatever we captured
+        return {"logs": collected[-lines:], "source": "live"}
+    except Exception as exc:
+        return {"logs": [], "source": "none", "error": str(exc)}
+
+
 @router.get("/api/axeos/config/{ip}")
 async def get_axeos_config_one(ip: str):
     """Return only the writeable config fields for a single AxeOS device."""
