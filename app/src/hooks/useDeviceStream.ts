@@ -1,10 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/app';
 import { api, getAxeStatus } from '../api';
-import type { AxeDevice } from '../api';
+import type { AxeDevice, DashboardData } from '../api';
 
 const BACKOFF_BASE = 1_000;
 const BACKOFF_MAX  = 30_000;
+
+/** Push a dashboard payload (WS frame or REST snapshot) into the store. Shared
+ *  by the live stream, the initial fetch, and the post-add refresh so a newly
+ *  added device shows up immediately instead of waiting for the next WS tick. */
+export function applyDashboardToStore(data: Partial<DashboardData>) {
+  const store = useAppStore.getState();
+  if (data.lottominer?.devices) store.setDevices(data.lottominer.devices);
+  if (data.axeos?.devices) {
+    store.setAxeDevices(data.axeos.devices.map((d: AxeDevice) => ({ ...d, status: getAxeStatus(d) })));
+  }
+  if (typeof data.unread_alerts === 'number') store.setUnreadAlerts(data.unread_alerts);
+  if (data.config) store.setSettings(data.config);
+  const nmOnline  = (data.lottominer?.devices || []).filter((d) => d._online !== false).length;
+  const axeOnline = (data.axeos?.devices || []).filter((d) => d._online !== false).length;
+  const nmTotal   = (data.lottominer?.devices || []).length;
+  const axeTotal  = (data.axeos?.devices || []).length;
+  store.setDeviceCounts(nmTotal + axeTotal, nmOnline + axeOnline);
+}
 
 export function useDeviceStream() {
   const store = useAppStore();
@@ -38,18 +56,7 @@ export function useDeviceStream() {
 
     ws.onmessage = (e) => {
       try {
-        const data = JSON.parse(e.data);
-        if (data.lottominer?.devices) store.setDevices(data.lottominer.devices);
-        if (data.axeos?.devices) {
-          store.setAxeDevices(data.axeos.devices.map((d: AxeDevice) => ({ ...d, status: getAxeStatus(d) })));
-        }
-        if (typeof data.unread_alerts === 'number') store.setUnreadAlerts(data.unread_alerts);
-        if (data.config) store.setSettings(data.config);
-        const nmOnline  = (data.lottominer?.devices  || []).filter((d: { _online?: boolean }) => d._online !== false).length;
-        const axeOnline = (data.axeos?.devices    || []).filter((d: { _online?: boolean }) => d._online !== false).length;
-        const nmTotal   = (data.lottominer?.devices  || []).length;
-        const axeTotal  = (data.axeos?.devices    || []).length;
-        store.setDeviceCounts(nmTotal + axeTotal, nmOnline + axeOnline);
+        applyDashboardToStore(JSON.parse(e.data));
       } catch { /* malformed WS frame — ignore */ }
     };
 
@@ -67,12 +74,7 @@ export function useDeviceStream() {
 
     connect();
 
-    api.dashboard().then(data => {
-      if (data.lottominer?.devices) store.setDevices(data.lottominer.devices);
-      if (data.axeos?.devices) store.setAxeDevices(data.axeos.devices.map(d => ({ ...d, status: getAxeStatus(d) })));
-      if (typeof data.unread_alerts === 'number') store.setUnreadAlerts(data.unread_alerts);
-      if (data.config) store.setSettings(data.config);
-    }).catch(() => {});
+    api.dashboard().then(applyDashboardToStore).catch(() => {});
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;

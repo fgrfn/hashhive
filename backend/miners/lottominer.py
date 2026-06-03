@@ -117,7 +117,10 @@ async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
         _validate_device_ip(ip)
         try:
             async with httpx.AsyncClient(timeout=8) as client:
-                resp = await client.post(f"http://{ip}{path}")
+                # NMMiner registers restart as a JSON-body handler — without an
+                # application/json Content-Type the POST handler doesn't match and
+                # the device replies 405. Send the documented empty body `{}`.
+                resp = await client.post(f"http://{ip}{path}", json={})
                 results.append({"ip": ip, "status": resp.status_code})
                 now = datetime.now(timezone.utc).isoformat()
                 _append_entry({

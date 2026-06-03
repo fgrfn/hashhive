@@ -124,3 +124,28 @@ def test_device_config_post_syncs_stored_name_to_hostname():
 
     saved = _asyncio.run(run())
     assert saved["cfg"]["lottominer_devices"][0]["name"] == "garage-nm"
+
+
+def test_fanout_restart_sends_json_body():
+    """NMMiner restart needs an application/json body or it replies 405 — the
+    POST must include json={} so httpx sets the Content-Type."""
+    import asyncio
+    from unittest.mock import patch
+    from miners import lottominer as lm
+
+    calls = []
+
+    async def run():
+        client = AsyncMock()
+
+        async def _post(url, json=None):
+            calls.append((url, json))
+            return _resp(200, {})
+        client.post = _post
+        with patch("miners.lottominer.httpx.AsyncClient") as M:
+            M.return_value.__aenter__.return_value = client
+            return await lm.lottominer_fanout("restart", ["192.168.1.50"])
+
+    res = asyncio.run(run())
+    assert res[0]["status"] == 200
+    assert calls == [("http://192.168.1.50/api/system/restart", {})]
