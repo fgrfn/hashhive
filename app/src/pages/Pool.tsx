@@ -285,6 +285,7 @@ function PoolStatus() {
   const { theme: t } = useThemeStore();
   const { devices, axeDevices } = useAppStore();
   const [pings, setPings] = useState<Record<string, number | null>>({});
+  const [serverHealth, setServerHealth] = useState<Record<string, { up: boolean; latency_ms: number | null }>>({});
 
   // Aggregate per active pool URL across all configured miners.
   const stats: PoolStat[] = (() => {
@@ -316,14 +317,26 @@ function PoolStatus() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats.map(s => s.url).join(',')]);
 
+  // Server-side health: HashHive's background monitor pings each in-use pool and
+  // alerts on outages. Poll it so the badge reflects the same source as alerts.
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.pools.health()
+      .then(list => { if (alive) setServerHealth(Object.fromEntries(list.map(h => [h.url, { up: h.up, latency_ms: h.latency_ms }]))); })
+      .catch(() => {});
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
   if (stats.length === 0) {
     return <Card t={t}><div style={{ color: t.textMuted, fontSize: 13, padding: '8px 0' }}>No pool data yet — connect miners to a pool to see live status here.</div></Card>;
   }
 
   return (
     <Card t={t} noPad>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 90px 90px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-        {['Pool', 'Devices', 'Accepted', 'Rejected', 'Accept %', 'Ping'].map((c, i) => (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 110px 110px 90px 90px 90px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
+        {['Pool', 'Health', 'Accepted', 'Rejected', 'Accept %', 'Ping', 'Devices'].map((c, i) => (
           <Label key={c} t={t} style={{ textAlign: i === 0 ? 'left' : 'right' }}>{c}</Label>
         ))}
       </div>
@@ -331,16 +344,20 @@ function PoolStatus() {
         const total = s.accepted + s.rejected;
         const pct = total > 0 ? (s.accepted / total) * 100 : null;
         const ping = pings[s.url];
+        const health = serverHealth[s.url];
         return (
-          <div key={s.url} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 90px 90px', gap: 10, padding: '12px 16px', borderBottom: i === stats.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
+          <div key={s.url} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 110px 110px 90px 90px 90px', gap: 10, padding: '12px 16px', borderBottom: i === stats.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}>
             <div style={{ fontFamily: FONT_MONO, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url}</div>
-            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: s.online === s.devices ? t.success : s.online > 0 ? t.warning : t.danger }}>{s.online}/{s.devices}</div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: health === undefined ? t.textMuted : health.up ? t.success : t.danger }}>
+              {health === undefined ? '—' : health.up ? '● up' : '● down'}
+            </div>
             <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: t.success }}>{s.accepted.toLocaleString()}</div>
             <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: s.rejected > 0 ? t.danger : t.textMuted }}>{s.rejected.toLocaleString()}</div>
             <div style={{ textAlign: 'right', fontFamily: FONT_MONO }}>{pct != null ? `${pct.toFixed(1)}%` : '—'}</div>
             <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: ping == null ? t.danger : ping < 100 ? t.success : ping < 300 ? t.warning : t.danger }}>
               {ping === undefined ? '…' : ping == null ? 'down' : `${ping} ms`}
             </div>
+            <div style={{ textAlign: 'right', fontFamily: FONT_MONO, color: s.online === s.devices ? t.success : s.online > 0 ? t.warning : t.danger }}>{s.online}/{s.devices}</div>
           </div>
         );
       })}
