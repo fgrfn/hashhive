@@ -30,10 +30,23 @@ export function Pool() {
 
 function PoolLibrary() {
   const { theme: t } = useThemeStore();
+  const { devices, axeDevices } = useAppStore();
   const [fetched, setFetched] = useState(false);
   const [pools, setPools] = useState<PoolPreset[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<PoolPreset | null>(null);
+  const [pushingId, setPushingId] = useState<string | null>(null);
+
+  const pushToAll = async (pool: PoolPreset) => {
+    const ips = [...devices.map(d => d.ip || ''), ...axeDevices.map(d => d._ip || '')].filter(Boolean);
+    if (ips.length === 0) { toast('No devices configured', 'error'); return; }
+    if (!window.confirm(`Push pool "${pool.name || pool.url}" to all ${ips.length} miner(s)?`)) return;
+    setPushingId(pool.id);
+    const results = await Promise.allSettled(ips.map(ip => api.pools.pushToDevice(ip, pool)));
+    setPushingId(null);
+    const ok = results.filter(r => r.status === 'fulfilled').length;
+    toast(`Pushed to ${ok}/${ips.length} miner${ips.length !== 1 ? 's' : ''}${ok < ips.length ? ' — some failed' : ''}`, ok ? undefined : 'error');
+  };
 
   useEffect(() => {
     api.pools.list().then(setPools).catch(() => {}).finally(() => setFetched(true));
@@ -81,7 +94,8 @@ function PoolLibrary() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
           {pools.map(p => (
-            <PoolCard key={p.id} t={t} pool={p} onEdit={() => setEditing(p)} onDelete={() => deletePool(p.id)} />
+            <PoolCard key={p.id} t={t} pool={p} onEdit={() => setEditing(p)} onDelete={() => deletePool(p.id)}
+              onPush={() => pushToAll(p)} pushing={pushingId === p.id} />
           ))}
         </div>
       )}
@@ -93,7 +107,7 @@ function PoolLibrary() {
   );
 }
 
-function PoolCard({ t, pool: p, onEdit, onDelete }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void }) {
+function PoolCard({ t, pool: p, onEdit, onDelete, onPush, pushing }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void; onPush: () => void; pushing: boolean }) {
   const wallet = p.wallet || p.worker || '—';
   return (
     <Card t={t}>
@@ -119,7 +133,7 @@ function PoolCard({ t, pool: p, onEdit, onDelete }: { t: Theme; pool: PoolPreset
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={onEdit} style={{ ...btnStyle(t), fontSize: 11 }}><Edit size={11} /> Edit</button>
-        <button style={{ ...btnStyle(t), fontSize: 11 }}><Send size={11} /> Push to miners</button>
+        <button onClick={onPush} disabled={pushing} style={{ ...btnStyle(t), fontSize: 11, opacity: pushing ? 0.6 : 1 }}><Send size={11} /> {pushing ? 'Pushing…' : 'Push to miners'}</button>
         <button onClick={onDelete} style={{ ...btnStyle(t, 'danger'), fontSize: 11, marginLeft: 'auto' }}><Trash2 size={11} /></button>
       </div>
     </Card>

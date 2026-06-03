@@ -45,3 +45,17 @@ def test_hashrate_hours_filters_old_samples():
     save_json(_stats_file(_today()), samples)
     res = asyncio.run(get_hashrate_stats(days=1, hours=1))
     assert [s["gh"] for s in res] == [2.0]
+
+
+def test_append_device_samples_records_nmminer():
+    """NMMiner devices (keyed by _ip, hashrate in GH/s) must get per-device
+    samples too, so their detail page shows the 24h hashrate chart."""
+    import core.stats as cs
+    cs._last_dev_sample_ts = 0.0  # bypass the 1-per-minute rate limit
+    nm = {"_ip": "10.0.0.50", "hashrate": 0.0042, "temp": 48}
+    axe = {"_ip": "10.0.0.60", "hashRate": 1300.0, "temp": 55, "power": 15.0}
+    cs._append_device_samples([axe, nm])
+    from core import _dev_stats_file, _today, load_json
+    data = load_json(_dev_stats_file(_today()), {})
+    assert "10.0.0.50" in data and data["10.0.0.50"][-1]["gh"] == 0.0042
+    assert "10.0.0.60" in data and data["10.0.0.60"][-1]["gh"] == 1300.0
