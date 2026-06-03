@@ -9,6 +9,8 @@ import type { AxeDevice } from '../api';
 import { Zap, Pause, Play, RotateCcw, Lightbulb, Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
+import { useFirmwareLatest } from '../hooks/useFirmwareLatest';
+import { FwBadge } from '../components/FirmwareBadge';
 
 /** Writeable AxeOS config (matches the backend CONFIG_FIELDS whitelist). */
 interface AxeConfig {
@@ -23,6 +25,7 @@ export function AxeOS() {
   const { theme: t } = useThemeStore();
   const { axeDevices, wsStatus, globalSearch } = useAppStore();
   const navigate = useNavigate();
+  const fwLatest = useFirmwareLatest();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [selected, setSelected] = useState(new Set<string>());
   const [statusFilter, setStatusFilter] = useState('all');
@@ -128,7 +131,7 @@ export function AxeOS() {
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <AxeMobileCard key={d._ip || ''} t={t} d={d} onAction={doAction} onNavigate={navigate} onConfigure={setEditIp} />
+            <AxeMobileCard key={d._ip || ''} t={t} d={d} onAction={doAction} onNavigate={navigate} onConfigure={setEditIp} fwLatest={fwLatest} />
           ))}
         </div>
       ) : (
@@ -191,7 +194,10 @@ export function AxeOS() {
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{uptime}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : (d.rssi ?? 0) > -65 ? t.success : (d.rssi ?? 0) > -80 ? t.warning : t.danger }}>{rssi}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || d.axeOSVersion || '—'}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center' }}>
+                {d.version || d.axeOSVersion || '—'}
+                <FwBadge t={t} current={d.version || d.axeOSVersion} family="axeos" fwLatest={fwLatest} />
+              </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 <button title="Configure" onClick={() => setEditIp(ip)} style={{ ...btnStyle(t), padding: '3px 5px' }}><SettingsIcon size={11} /></button>
                 {d._online && (
@@ -337,7 +343,7 @@ function AxeSection({ t, label, children }: { t: Theme; label: string; children:
   );
 }
 
-function AxeMobileCard({ t, d, onAction, onNavigate, onConfigure }: { t: Theme; d: AxeDevice; onAction: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => void; onNavigate: (path: string) => void; onConfigure: (ip: string) => void }) {
+function AxeMobileCard({ t, d, onAction, onNavigate, onConfigure, fwLatest }: { t: Theme; d: AxeDevice; onAction: (ip: string, action: 'pause' | 'resume' | 'restart' | 'identify') => void; onNavigate: (path: string) => void; onConfigure: (ip: string) => void; fwLatest: Record<string, { version: string; html_url: string }> }) {
   const ip = d._ip || '';
   const name = d._name || d.hostname || ip;
   const status = d.status || (d._online ? 'online' : 'offline');
@@ -361,7 +367,7 @@ function AxeMobileCard({ t, d, onAction, onNavigate, onConfigure }: { t: Theme; 
         <AxeKv t={t} label="Uptime" value={fmtUptime(d.uptimeSeconds)} />
         <AxeKv t={t} label="Shares A/R" value={fmtShares(d.sharesAccepted, d.sharesRejected)} />
         <AxeKv t={t} label="RSSI" value={fmtRssi(d.rssi)} />
-        <AxeKv t={t} label="Version" value={d.version || d.axeOSVersion || '—'} />
+        <AxeKv t={t} label="Version" value={d.version || d.axeOSVersion || '—'} badge={<FwBadge t={t} current={d.version || d.axeOSVersion} family="axeos" fwLatest={fwLatest} />} />
         <AxeKv t={t} label="ASIC" value={d.ASICModel || '—'} />
       </div>
       <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
@@ -381,11 +387,11 @@ function AxeMobileCard({ t, d, onAction, onNavigate, onConfigure }: { t: Theme; 
   );
 }
 
-function AxeKv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
+function AxeKv({ t, label, value, color, badge }: { t: Theme; label: string; value: string; color?: string; badge?: React.ReactNode }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text }}>{value}</div>
+      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text, display: 'flex', alignItems: 'center' }}>{value}{badge}</div>
     </div>
   );
 }

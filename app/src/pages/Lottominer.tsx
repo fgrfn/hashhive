@@ -9,11 +9,14 @@ import type { NMMinerConfig, NMMinerDevice } from '../api';
 import { Cpu, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
+import { useFirmwareLatest } from '../hooks/useFirmwareLatest';
+import { FwBadge } from '../components/FirmwareBadge';
 import type { NmAction } from '../api';
 
 export function Lottominer() {
   const { theme: t } = useThemeStore();
   const navigate = useNavigate();
+  const fwLatest = useFirmwareLatest();
   const { devices, wsStatus, globalSearch } = useAppStore();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [editDevice, setEditDevice] = useState<string | null>(null);
@@ -144,7 +147,7 @@ export function Lottominer() {
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <NmMobileCard key={d.ip} t={t} d={d} onConfigure={openEdit} onAction={doAction} onNavigate={navigate} />
+            <NmMobileCard key={d.ip} t={t} d={d} onConfigure={openEdit} onAction={doAction} onNavigate={navigate} fwLatest={fwLatest} />
           ))}
         </div>
       ) : (
@@ -203,7 +206,10 @@ export function Lottominer() {
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{uptime}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : Number(d.rssi ?? d.wifi_rssi) > -65 ? t.success : Number(d.rssi ?? d.wifi_rssi) > -80 ? t.warning : t.danger }}>{rssi}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || '—'}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center' }}>
+                {d.version || '—'}
+                <FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />
+              </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {d._type === 'axehub' ? (
                   <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, alignSelf: 'center' }} title="Configure AxeHub pools from the Pools page">—</span>
@@ -354,7 +360,7 @@ export function Lottominer() {
   );
 }
 
-function NmMobileCard({ t, d, onConfigure, onAction, onNavigate }: { t: Theme; d: NMMinerDevice; onConfigure: (ip: string) => void; onAction: (ip: string, action: NmAction) => void; onNavigate: (path: string) => void }) {
+function NmMobileCard({ t, d, onConfigure, onAction, onNavigate, fwLatest }: { t: Theme; d: NMMinerDevice; onConfigure: (ip: string) => void; onAction: (ip: string, action: NmAction) => void; onNavigate: (path: string) => void; fwLatest: Record<string, { version: string; html_url: string }> }) {
   const status = getNmStatus(d);
   const hr = getHashrate(d);
   const temp = getTemp(d);
@@ -383,7 +389,7 @@ function NmMobileCard({ t, d, onConfigure, onAction, onNavigate }: { t: Theme; d
         <NmKv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
         <NmKv t={t} label="Shares A/R" value={fmtShares(d.shares_ok, d.shares_err)} />
         <NmKv t={t} label="RSSI" value={fmtRssi(d.rssi ?? d.wifi_rssi)} />
-        <NmKv t={t} label="Version" value={d.version || '—'} />
+        <NmKv t={t} label="Version" value={d.version || '—'} badge={<FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />} />
       </div>
       <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
         {d._type !== 'axehub' && (
@@ -395,11 +401,11 @@ function NmMobileCard({ t, d, onConfigure, onAction, onNavigate }: { t: Theme; d
   );
 }
 
-function NmKv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
+function NmKv({ t, label, value, color, badge }: { t: Theme; label: string; value: string; color?: string; badge?: React.ReactNode }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text }}>{value}</div>
+      <div style={{ fontFamily: FONT_MONO, fontWeight: 600, color: color ?? t.text, display: 'flex', alignItems: 'center' }}>{value}{badge}</div>
     </div>
   );
 }
