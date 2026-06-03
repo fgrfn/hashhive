@@ -58,6 +58,7 @@ function NewGroupModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void
 export function GroupsPage() {
   const { theme: t } = useThemeStore();
   const navigate = useNavigate();
+  const { devices, axeDevices } = useAppStore();
   const [fetched, setFetched] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -65,6 +66,16 @@ export function GroupsPage() {
   useEffect(() => {
     api.groups.list().then(setGroups).catch(() => {}).finally(() => setFetched(true));
   }, []);
+
+  // The list endpoint doesn't compute member counts, so derive them here from
+  // the live device store (real-time online status), keyed by IP.
+  const onlineIps = new Set<string>();
+  for (const d of devices) { const ip = d.ip || ''; if (ip && d._online !== false && d.status !== 'offline') onlineIps.add(ip); }
+  for (const d of axeDevices) { const ip = d._ip || ''; if (ip && d._online && d.status !== 'offline') onlineIps.add(ip); }
+  const groupStats = (g: Group) => {
+    const members = (g.devices ?? g.deviceIps ?? []).filter(Boolean);
+    return { members, total: members.length, online: members.filter(ip => onlineIps.has(ip)).length };
+  };
 
   if (!fetched) {
     return (
@@ -92,14 +103,15 @@ export function GroupsPage() {
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         <KpiSm t={t} label="Groups" value={String(groups.length)} color={t.accent} />
-        <KpiSm t={t} label="Devices" value={String(groups.reduce((a, g) => a + (g.total || 0), 0))} color={t.success} />
+        <KpiSm t={t} label="Devices" value={String(groups.reduce((a, g) => a + groupStats(g).total, 0))} color={t.success} />
         <div style={{ flex: 1 }} />
         <button onClick={() => setCreateOpen(true)} style={{ ...btnStyle(t, 'primary'), padding: '8px 12px' }}><Plus size={13} /> New group</button>
       </div>
       {createOpen && <NewGroupModal t={t} onClose={() => setCreateOpen(false)} onCreate={g => setGroups(gs => [...gs, g])} />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
         {groups.map(g => {
-          const onlinePct = g.total ? ((g.online || 0) / g.total) * 100 : 0;
+          const { members, total, online } = groupStats(g);
+          const onlinePct = total ? (online / total) * 100 : 0;
           const color = g.color || t.accent;
           return (
             <Card key={g.id} t={t} style={{ cursor: 'pointer', transition: 'border-color .15s' }}
@@ -116,18 +128,18 @@ export function GroupsPage() {
                 {(g.alerts || 0) > 0 && <Pill t={t} sev="warning">{g.alerts} alert{(g.alerts || 0) > 1 ? 's' : ''}</Pill>}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <StatBox t={t} label="Online" value={`${g.online || 0}/${g.total || 0}`} color={onlinePct === 100 ? t.success : onlinePct > 50 ? t.warning : t.danger} />
-                <StatBox t={t} label="Devices" value={String(g.total || 0)} color={t.text} />
+                <StatBox t={t} label="Online" value={`${online}/${total}`} color={total === 0 ? t.textMuted : onlinePct === 100 ? t.success : onlinePct > 50 ? t.warning : t.danger} />
+                <StatBox t={t} label="Devices" value={String(total)} color={t.text} />
               </div>
               <div style={{ height: 4, background: t.surface2, borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ width: `${onlinePct}%`, height: '100%', background: color }} />
               </div>
-              {(g.deviceIps || []).length > 0 && (
+              {members.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                  {(g.deviceIps || []).slice(0, 4).map(ip => (
+                  {members.slice(0, 4).map(ip => (
                     <span key={ip} style={{ padding: '3px 8px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 10, fontFamily: FONT_MONO, color: t.textMuted }}>{ip}</span>
                   ))}
-                  {(g.deviceIps || []).length > 4 && <span style={{ padding: '3px 8px', fontSize: 10, fontFamily: FONT_MONO, color: t.textDim }}>+{(g.deviceIps || []).length - 4}</span>}
+                  {members.length > 4 && <span style={{ padding: '3px 8px', fontSize: 10, fontFamily: FONT_MONO, color: t.textDim }}>+{members.length - 4}</span>}
                 </div>
               )}
             </Card>
