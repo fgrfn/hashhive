@@ -6,7 +6,7 @@ import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, T
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus, matchesSearch } from '../api';
 import type { NMMinerConfig, NMMinerDevice } from '../api';
-import { Edit3, Search, RotateCcw } from 'lucide-react';
+import { Cpu, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
 import type { NmAction } from '../api';
@@ -66,28 +66,35 @@ export function Lottominer() {
     setSelected(new Set());
   };
 
+  const doAction = async (ip: string, action: NmAction) => {
+    try {
+      await api.lottominer.batchAction([ip], action);
+      toast(`${action} sent to ${ip}`);
+    } catch {
+      toast(`${action} failed for ${ip}`, 'error');
+    }
+  };
+
   const mobile = useMobile();
-  const cols = ['', 'IP', 'Name', 'Status', 'Hashrate', 'Temp', 'Pool', 'Worker', 'Uptime', 'Best Diff', 'Last Diff', 'RSSI', 'Shares A/R', 'Version', 'Actions'];
-  const colWidths = ['28px', '110px', '1fr', '90px', '110px', '70px', '130px', '130px', '70px', '80px', '80px', '75px', '70px', '80px', '60px'];
 
   if (loading) {
-    return mobile ? (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} t={t}><SkeletonRow t={t} cols={['80px', '120px', '60px', '80px']} /></Card>
-        ))}
-      </div>
-    ) : (
+    return (
       <Card t={t} noPad>
-        <div style={{ padding: '12px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-          <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12 }}>
-            {cols.map(c => <Label key={c} t={t}>{c}</Label>)}
-          </div>
-        </div>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <SkeletonRow key={i} t={t} cols={['100px', '120px', '70px', '80px', '50px', '140px', '140px', '60px', '70px', '40px']} />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonRow key={i} t={t} cols={['20px', '120px', '80px', '70px', '90px', '60px', '60px', '70px', '60px']} />
         ))}
       </Card>
+    );
+  }
+
+  if (devices.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 60, color: t.textMuted }}>
+        <Cpu size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+        <div style={{ fontSize: 16, fontWeight: 600, color: t.text, marginBottom: 6 }}>No NMMiner devices</div>
+        <div style={{ fontSize: 13, marginBottom: 14 }}>Discover them on your network or add one by IP.</div>
+        <button onClick={() => navigate('/discovery')} style={{ ...btnStyle(t, 'primary'), fontSize: 13 }}>+ Add devices</button>
+      </div>
     );
   }
 
@@ -105,30 +112,18 @@ export function Lottominer() {
   const online = filtered.filter(d => getNmStatus(d) === 'online').length;
 
   return (
-    <>
-      <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 10, fontFamily: FONT_MONO, textTransform: 'uppercase', letterSpacing: '0.06em' }}>NMMiner</div>
-      {/* Filter bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+    <div>
+      {/* Stats header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 100 }}>
-            <Label t={t}>Hashrate</Label>
-            <div style={{ fontSize: 20, fontWeight: 700, color: t.info, fontFamily: FONT_MONO, marginTop: 4 }}>
-              {fmtHashrate(totalHr)}
-            </div>
-          </div>
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', minWidth: 80 }}>
-            <Label t={t}>Online</Label>
-            <div style={{ fontSize: 20, fontWeight: 700, color: t.success, fontFamily: FONT_MONO, marginTop: 4 }}>
-              {online}/{filtered.length}
-            </div>
-          </div>
+          <KpiSm t={t} label="Hashrate" value={fmtHashrate(totalHr)} color={t.info} />
+          <KpiSm t={t} label="Online" value={`${online}/${filtered.length}`} color={t.success} />
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8 }}>
-            <Search size={13} style={{ color: t.textMuted }} />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter…" style={{ background: 'transparent', border: 'none', outline: 'none', color: t.text, fontSize: 12, fontFamily: FONT_MONO, width: 140 }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, fontFamily: FONT_MONO }}>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter…" style={{ background: 'transparent', border: 'none', outline: 'none', color: t.text, fontSize: 12, fontFamily: FONT_MONO, width: 160 }} />
           </div>
-          {(['all', 'online', 'warning', 'offline'] as const).map(f => (
+          {['all', 'online', 'warning', 'offline'].map(f => (
             <button key={f} onClick={() => setStatusFilter(f)} style={{ ...btnStyle(t), padding: '4px 10px', fontSize: 11, background: statusFilter === f ? t.accentGlow : 'transparent', color: statusFilter === f ? t.accent : t.textMuted }}>
               {f[0].toUpperCase() + f.slice(1)}
             </button>
@@ -136,7 +131,7 @@ export function Lottominer() {
         </div>
       </div>
 
-      {/* Bulk action bar */}
+      {/* Bulk bar */}
       {selected.size > 0 && (
         <div style={{ background: t.accentGlow, border: `1px solid ${t.accent}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 13, color: t.accent, fontWeight: 600 }}>{selected.size} selected</div>
@@ -146,35 +141,33 @@ export function Lottominer() {
         </div>
       )}
 
-      {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 48, color: t.textMuted }}>
-          <Search size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 4 }}>No devices match</div>
-          <div style={{ fontSize: 13 }}>Try a different name, IP, or status filter.</div>
-        </div>
-      )}
-
       {mobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(d => (
-            <NmMobileCard key={d.ip} t={t} d={d} selected={selected.has(d.ip || '')} onToggle={() => toggleSelect(d.ip || '')} onEdit={() => openEdit(d.ip || '')} onOpen={() => navigate(`/devices/${d.ip || ''}`)} />
+            <NmMobileCard key={d.ip} t={t} d={d} onConfigure={openEdit} onAction={doAction} onNavigate={navigate} />
           ))}
         </div>
-      ) : filtered.length > 0 && (
+      ) : (
       <div style={{ overflowX: 'auto' }}>
       <Card t={t} noPad style={{ width: 'max-content', minWidth: '100%' }}>
-        <div style={{ padding: '10px 18px', background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-          <div style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, alignItems: 'center' }}>
-            <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d.ip || ''))); }} style={{ accentColor: t.info }} /></div>
-            {cols.slice(1).map(c => <Label key={c} t={t}>{c}</Label>)}
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 90px 110px 70px 85px 80px 80px 80px 65px 70px 80px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
+          <div><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={() => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(d => d.ip || ''))); }} style={{ accentColor: t.info }} /></div>
+          <Label t={t}>Name / IP</Label>
+          <Label t={t}>Status</Label>
+          <Label t={t}>Hashrate</Label>
+          <Label t={t}>Temp</Label>
+          <Label t={t}>Best Diff</Label>
+          <Label t={t}>Last Diff</Label>
+          <Label t={t}>Uptime</Label>
+          <Label t={t}>Shares A/R</Label>
+          <Label t={t}>RSSI</Label>
+          <Label t={t}>Version</Label>
+          <Label t={t}>Actions</Label>
         </div>
         {filtered.map((d, i) => {
           const status = getNmStatus(d);
           const hr = getHashrate(d);
           const temp = getTemp(d);
-          const pool = d.pool ?? d.stratumURL ?? '—';
-          const worker = d.worker ?? d.stratumUser ?? '—';
           const uptime = fmtUptime(d.uptime);
           const best = fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff);
           const lastDiff = fmtBestDiff(d.lastDiff ?? d.lastShare);
@@ -183,54 +176,47 @@ export function Lottominer() {
           const ip = d.ip || '';
           const name = d.name ?? d.hostname ?? ip;
           return (
-            <div key={ip} style={{ display: 'grid', gridTemplateColumns: colWidths.join(' '), gap: 12, padding: '12px 18px', borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13 }}
+            <div key={ip || i} style={{ display: 'grid', gridTemplateColumns: '28px 1.4fr 90px 110px 70px 85px 80px 80px 80px 65px 70px 80px', gap: 10, padding: '11px 16px', borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 12 }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.surface2}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
             >
               <div onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(ip)} onChange={() => toggleSelect(ip)} style={{ accentColor: t.info }} />
               </div>
-              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted, cursor: 'pointer' }}>{ip}</div>
-              <div onClick={() => navigate(`/devices/${ip}`)} style={{ fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-                {d._type === 'axehub' && (
-                  <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>AxeHub</span>
-                )}
+              <div onClick={() => navigate(`/devices/${ip}`)} style={{ cursor: 'pointer' }}>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                  {d._type === 'axehub' && (
+                    <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>AxeHub</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+                {d._type && d._type !== 'axehub' && <div style={{ fontSize: 9, color: t.info, fontFamily: FONT_MONO, textTransform: 'uppercase' }}>{d._type}</div>}
               </div>
               <StatusPill t={t} status={status} />
-              <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>
-                {fmtHashrate(hr)}
-              </div>
+              <div style={{ fontFamily: FONT_MONO, fontWeight: 600 }}>{fmtHashrate(hr)}</div>
               <div style={{ fontFamily: FONT_MONO, color: temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success }}>
                 {temp != null ? `${temp}°C` : '—'}
               </div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pool}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{worker}</div>
+              <div style={{ fontFamily: FONT_MONO, color: t.honey, fontSize: 11 }}>{best}</div>
+              <div style={{ fontFamily: FONT_MONO, color: t.honey, fontSize: 11 }}>{lastDiff}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{uptime}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.honey }}>{best}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.honey }}>{lastDiff}</div>
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : Number(d.rssi ?? d.wifi_rssi) > -65 ? t.success : Number(d.rssi ?? d.wifi_rssi) > -80 ? t.warning : t.danger }}>{rssi}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 11 }}>{shares}</div>
+              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: rssi === '—' ? t.textMuted : Number(d.rssi ?? d.wifi_rssi) > -65 ? t.success : Number(d.rssi ?? d.wifi_rssi) > -80 ? t.warning : t.danger }}>{rssi}</div>
               <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.textMuted }}>{d.version || '—'}</div>
-              {d._type === 'axehub' ? (
-                <div style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO }} title="Configure AxeHub pools from the Pools page">—</div>
-              ) : (
-                <button onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '5px 8px', fontSize: 11 }}>
-                  <Edit3 size={12} />
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 4 }}>
+                {d._type === 'axehub' ? (
+                  <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, alignSelf: 'center' }} title="Configure AxeHub pools from the Pools page">—</span>
+                ) : (
+                  <button title="Configure" onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '3px 5px' }}><SettingsIcon size={11} /></button>
+                )}
+                <button title="Restart" onClick={() => doAction(ip, 'restart')} style={{ ...btnStyle(t), padding: '3px 5px' }}><RotateCcw size={11} /></button>
+              </div>
             </div>
           );
         })}
       </Card>
       </div>
-      )}
-
-      {devices.length === 0 && (
-        <div style={{ padding: '20px', color: t.textMuted, fontSize: 13, textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: 10 }}>
-          <div style={{ marginBottom: 12 }}>No NMMiner devices yet.</div>
-          <button onClick={() => navigate('/discovery')} style={{ ...btnStyle(t, 'primary'), fontSize: 13 }}>+ Add devices</button>
-        </div>
       )}
 
       {editDevice && config && (
@@ -364,58 +350,52 @@ export function Lottominer() {
           </div>
         </Modal>
       )}
-    </>
+    </div>
   );
 }
 
-function NmMobileCard({ t, d, selected, onToggle, onEdit, onOpen }: { t: Theme; d: NMMinerDevice; selected: boolean; onToggle: () => void; onEdit: () => void; onOpen: () => void }) {
+function NmMobileCard({ t, d, onConfigure, onAction, onNavigate }: { t: Theme; d: NMMinerDevice; onConfigure: (ip: string) => void; onAction: (ip: string, action: NmAction) => void; onNavigate: (path: string) => void }) {
   const status = getNmStatus(d);
   const hr = getHashrate(d);
   const temp = getTemp(d);
   const ip = d.ip || '';
   const name = d.name ?? d.hostname ?? ip;
-  const pool = d.pool ?? d.stratumURL ?? '—';
-  const worker = d.worker ?? d.stratumUser ?? '—';
   return (
-    <Card t={t} style={{ background: selected ? t.accentGlow : undefined, borderColor: selected ? t.accent : undefined }}>
+    <Card t={t}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <input type="checkbox" checked={selected} onChange={onToggle} style={{ accentColor: t.info, marginTop: 3 }} />
-          <div onClick={onOpen} style={{ cursor: 'pointer' }}>
-            <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-              {name}
-              {d._type === 'axehub' && (
-                <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>AxeHub</span>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+        <div onClick={() => onNavigate(`/devices/${ip}`)} style={{ cursor: 'pointer', flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+            {d._type === 'axehub' && (
+              <span style={{ fontSize: 9, color: t.accent, fontFamily: FONT_MONO, background: t.accentGlow, padding: '1px 5px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>AxeHub</span>
+            )}
           </div>
+          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{ip}</div>
+          {d._type && d._type !== 'axehub' && <div style={{ fontSize: 10, color: t.info, fontFamily: FONT_MONO, textTransform: 'uppercase' }}>{d._type}</div>}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <StatusPill t={t} status={status} />
-          {d._type !== 'axehub' && (
-            <button onClick={onEdit} style={{ ...btnStyle(t), padding: '4px 7px' }}><Edit3 size={12} /></button>
-          )}
-        </div>
+        <StatusPill t={t} status={status} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-        <Kv t={t} label="Hashrate" value={fmtHashrate(hr)} />
-        <Kv t={t} label="Temp" value={temp != null ? `${temp}°C` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
-        <Kv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
-        <Kv t={t} label="Best Diff" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />
-        <Kv t={t} label="Last Diff" value={fmtBestDiff(d.lastDiff ?? d.lastShare)} color={t.honey} />
-        <Kv t={t} label="RSSI" value={fmtRssi(d.rssi ?? d.wifi_rssi)} />
-        <Kv t={t} label="Shares A/R" value={fmtShares(d.shares_ok, d.shares_err)} />
-        <Kv t={t} label="Version" value={d.version || '—'} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 10 }}>
+        <NmKv t={t} label="Hashrate" value={fmtHashrate(hr)} />
+        <NmKv t={t} label="Temp" value={temp != null ? `${temp}°C` : '—'} color={temp == null ? t.textMuted : temp > 70 ? t.danger : temp > 65 ? t.warning : t.success} />
+        <NmKv t={t} label="Best Diff" value={fmtBestDiff(d.bestShare ?? d.best_share ?? d.bestDiff)} color={t.honey} />
+        <NmKv t={t} label="Last Diff" value={fmtBestDiff(d.lastDiff ?? d.lastShare)} color={t.honey} />
+        <NmKv t={t} label="Uptime" value={fmtUptime(d.uptime)} />
+        <NmKv t={t} label="Shares A/R" value={fmtShares(d.shares_ok, d.shares_err)} />
+        <NmKv t={t} label="RSSI" value={fmtRssi(d.rssi ?? d.wifi_rssi)} />
+        <NmKv t={t} label="Version" value={d.version || '—'} />
       </div>
-      <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.border}`, fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {pool} · {worker}
+      <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+        {d._type !== 'axehub' && (
+          <button onClick={() => onConfigure(ip)} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><SettingsIcon size={11} /> Configure</button>
+        )}
+        <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>
       </div>
     </Card>
   );
 }
 
-function Kv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
+function NmKv({ t, label, value, color }: { t: Theme; label: string; value: string; color?: string }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
@@ -424,6 +404,17 @@ function Kv({ t, label, value, color }: { t: Theme; label: string; value: string
   );
 }
 
+
+function KpiSm({ t, label, value, unit, color }: { t: Theme; label: string; value: string; unit?: string; color: string }) {
+  return (
+    <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 14px' }}>
+      <Label t={t}>{label}</Label>
+      <div style={{ fontSize: 20, fontWeight: 700, color, fontFamily: FONT_MONO, marginTop: 4 }}>
+        {value} {unit && <span style={{ fontSize: 11, color: t.textMuted, fontWeight: 400 }}>{unit}</span>}
+      </div>
+    </div>
+  );
+}
 
 function Section({ t, label, children }: { t: Theme; label: string; children: React.ReactNode }) {
   return (
