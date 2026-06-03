@@ -43,7 +43,6 @@ export const api = {
   device: {
     logs:    (ip: string)              => get<string[] | { logs: string[] }>(`/api/device/${ip}/logs`),
     exec:    (ip: string, cmd: string) => post<{ output?: string; result?: string; error?: string }>(`/api/device/${ip}/exec`, { cmd }),
-    restart: (ip: string)              => post(`/api/device/${ip}/restart`),
   },
   templates: {
     list:   ()                                                                       => get<DeviceTemplate[]>('/api/templates'),

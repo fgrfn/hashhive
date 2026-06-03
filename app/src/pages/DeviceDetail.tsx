@@ -94,9 +94,12 @@ export function DeviceDetail() {
           <button style={{ ...btnStyle(t), fontSize: 12 }}
             onClick={() => {
               setActionError(null);
+              // NMMiner / AxeHub restart goes through the lottominer batch
+              // endpoint (routes by family); api.device.restart has no backend
+              // route and returned 405.
               const call = isAxe
                 ? api.axeos.action(ip!, 'restart')
-                : api.device.restart(ip!);
+                : api.lottominer.batchAction([ip!], 'restart');
               call.catch(e => setActionError(String(e)));
             }}>
             <RefreshCw size={12} /> Restart
