@@ -7,6 +7,7 @@ import { api } from '../api';
 import type { DiscoveredDevice, AppSettings } from '../api';
 import { Wifi, Radio, Search, CheckCircle, Radar, Plus, Trash2 } from 'lucide-react';
 import { toast } from '../store/toast';
+import { applyDashboardToStore } from '../hooks/useDeviceStream';
 
 const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   bitaxe: 'BitAxe',
@@ -110,6 +111,9 @@ function DiscoverTab({ t, settings, setSettings }: { t: Theme; settings: AppSett
       const res = await api.discovery.add(devicesToAdd);
       toast(`Added ${res.count} device${res.count !== 1 ? 's' : ''}`);
       try { setSettings(await api.settings.get()); } catch { /* keep going */ }
+      // Pull a fresh dashboard snapshot so the new devices appear in the
+      // overview right away instead of waiting for the next WS broadcast.
+      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
       const addedIps = new Set(res.added.map(d => d.ip));
       setResult({ ...result, found: result.found.filter(d => !addedIps.has(d.ip)) });
       setSelected(new Set());
@@ -244,6 +248,8 @@ function ManualTab({ t, settings, setSettings }: { t: Theme; settings: AppSettin
         toast(`Added ${TYPE_LABEL[type]} ${trimmed}`);
         setIp(''); setName('');
         try { setSettings(await api.settings.get()); } catch { /* keep going */ }
+        // Refresh the overview immediately so the new device is visible at once.
+        try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
       } else {
         toast('Device already added or invalid IP', 'error');
       }
@@ -264,6 +270,8 @@ function ManualTab({ t, settings, setSettings }: { t: Theme; settings: AppSettin
     try {
       const updated = await api.settings.save(s);
       setSettings(updated);
+      // Reflect the removal in the overview without waiting for the next tick.
+      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
       toast(`Removed ${d.ip}`);
     } catch {
       toast('Failed to remove device', 'error');
