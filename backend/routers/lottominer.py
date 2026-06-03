@@ -16,6 +16,7 @@ from core import (
     _append_entry,
     _validate_device_ip,
     load_json,
+    save_json,
 )
 # Lottominer device logic lives in the miners/ driver package. Re-exported here
 # so existing importers (dashboard, notifications) keep working.
@@ -238,6 +239,19 @@ async def post_lottominer_device_config(data: dict):
             if weather:
                 await client.post(f"http://{device_ip}/api/setting/weather", json=weather)
             hostname = data.get("Hostname") or device_ip
+            # Keep HashHive's stored label in sync with the device hostname so the
+            # new name shows up after the next refresh (the device itself may only
+            # apply the hostname on its next restart, but the UI follows right away).
+            new_name = (data.get("Hostname") or "").strip()
+            if new_name:
+                config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+                changed = False
+                for dev in config.get("lottominer_devices", []):
+                    if isinstance(dev, dict) and dev.get("ip") == device_ip and dev.get("name") != new_name:
+                        dev["name"] = new_name
+                        changed = True
+                if changed:
+                    save_json(CONFIG_FILE, config)
             now = datetime.now(timezone.utc).isoformat()
             _append_entry({
                 "id": f"lottominer:{device_ip}:config_saved:{now}",

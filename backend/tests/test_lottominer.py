@@ -93,3 +93,34 @@ def test_device_config_post_routes_fields_to_correct_endpoints():
     assert posts["setting/weather"] == ["WeatherCity", "WeatherLat", "WeatherTempUnit"]
     # "bogus" never reaches any endpoint
     assert all("bogus" not in keys for keys in posts.values())
+
+
+def test_device_config_post_syncs_stored_name_to_hostname():
+    """Changing the Hostname in the config modal updates HashHive's stored
+    device label so the new name shows after the next refresh."""
+    import asyncio as _asyncio
+    from unittest.mock import patch
+    from routers import lottominer as lm
+
+    cfg = {"lottominer_devices": [{"ip": "192.168.1.50", "name": "old-name"}]}
+
+    async def run():
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=_resp(200, {}))
+        saved = {}
+
+        def _load(_path, _default):
+            return cfg
+
+        def _save(_path, data):
+            saved["cfg"] = data
+
+        with patch("routers.lottominer.httpx.AsyncClient") as M, \
+             patch("routers.lottominer.load_json", _load), \
+             patch("routers.lottominer.save_json", _save):
+            M.return_value.__aenter__.return_value = client
+            await lm.post_lottominer_device_config({"ip": "192.168.1.50", "Hostname": "garage-nm"})
+        return saved
+
+    saved = _asyncio.run(run())
+    assert saved["cfg"]["lottominer_devices"][0]["name"] == "garage-nm"
