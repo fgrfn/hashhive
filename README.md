@@ -138,44 +138,12 @@ Stop-ScheduledTask    -TaskName "HashHive"
 Unregister-ScheduledTask -TaskName "HashHive" -Confirm:$false
 ```
 
----
-
-## GitHub Actions
-
-| Workflow | Trigger | What it does |
-|---|---|---|
-| **Secret Scan** | Every push / PR | `gitleaks` scans the entire Git history for API keys, tokens and passwords |
-| **Release Please** | Push to `main` | Analyses commits; opens/updates a release PR with a `CHANGELOG.md` + `version.txt` bump |
-| **Release** | `v*` tag (after the release PR is merged) | Docker build → push to GHCR; GitHub Release with a `docker run` snippet |
-
-### Triggering a release
-
-Write commits following [Conventional Commits](https://www.conventionalcommits.org/):
-
-| Prefix | Version bump |
-|---|---|
-| `feat: ...` | Minor (`1.0.0 → 1.1.0`) |
-| `fix: ...` | Patch (`1.0.0 → 1.0.1`) |
-| `feat!: ...` | Major (`1.0.0 → 2.0.0`) |
-| `chore:`, `docs:` | no release |
-
-Once the release PR is merged, the image is available:
-
 ```bash
 docker pull ghcr.io/fgrfn/hashhive:latest
 ```
 
 ---
 
-## Version
-
-The app version lives in [`version.txt`](version.txt) and is bumped automatically by Release Please.
-
-- **Backend** reads `version.txt` at startup and exposes it at `/api/health`
-- **Frontend** shows the version in the sidebar (loaded from `/api/health`)
-- **Docker image** includes `version.txt` in the build context
-
----
 
 ## Stack
 
