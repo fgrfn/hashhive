@@ -106,3 +106,23 @@ describe('isFirmwareOutdated', () => {
   it('unparseable current → false', () => expect(isFirmwareOutdated('dev', '2.0')).toBe(false));
   it('missing latest → false', () => expect(isFirmwareOutdated('2.0', undefined)).toBe(false));
 });
+
+import { scaleHashrateSeries } from '../api';
+
+describe('scaleHashrateSeries', () => {
+  it('keeps AxeOS-scale values in GH/s', () => {
+    expect(scaleHashrateSeries([1300, 0, 1280]).unit).toBe('GH/s');
+  });
+  it('scales NMMiner ~1 MH/s to MH/s', () => {
+    const r = scaleHashrateSeries([0.001, 0, 0.00104]);
+    expect(r.unit).toBe('MH/s');
+    expect(r.data[0]).toBeCloseTo(1.0);
+    expect(r.data[2]).toBeCloseTo(1.04);
+  });
+  it('scales sub-MH/s to kH/s', () => {
+    const r = scaleHashrateSeries([0.0005, 0.0003]);
+    expect(r.unit).toBe('kH/s');
+    expect(r.data[0]).toBeCloseTo(500);
+  });
+  it('all-zero stays GH/s', () => expect(scaleHashrateSeries([0, 0]).unit).toBe('GH/s'));
+});

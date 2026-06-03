@@ -80,6 +80,17 @@ export function fmtProb(p: number | null | undefined): string {
   return `1 : ${Math.round(1 / p).toLocaleString()}`;
 }
 
+/** Scale a GH/s series to a readable unit for charting. Tiny ESP-miner values
+ *  (NMMiner ~0.001 GH/s) become MH/s (or kH/s), so the axis reads "1.0 MH/s"
+ *  instead of "0.001 GH/s"; AxeOS-scale values stay in GH/s. */
+export function scaleHashrateSeries(ghs: number[]): { data: number[]; unit: string } {
+  const max = ghs.reduce((m, v) => Math.max(m, v || 0), 0);
+  if (max <= 0 || max >= 1) return { data: ghs, unit: 'GH/s' };
+  if (max >= 0.001) return { data: ghs.map(v => (v || 0) * 1_000), unit: 'MH/s' };
+  return { data: ghs.map(v => (v || 0) * 1_000_000), unit: 'kH/s' };
+}
+
+
 /** True if `current` firmware is strictly older than `latest`. Lenient: ignores
  *  a 'v' prefix and non-numeric noise; returns false when either is unparseable
  *  (mirrors the backend so we don't cry wolf on unknown version formats). */

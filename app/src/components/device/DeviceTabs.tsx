@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Label, Spinner, btnStyle } from '../primitives';
 import { AreaChart } from '../charts';
 import { FONT_MONO, type Theme } from '../../tokens';
-import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb, isFirmwareOutdated } from '../../api';
+import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb, isFirmwareOutdated, scaleHashrateSeries } from '../../api';
 import type { NMMinerDevice, AxeDevice, HealthData, ProbabilityResult } from '../../api';
 import { AlertTriangle, RotateCcw, ArrowUpCircle } from 'lucide-react';
 
@@ -93,12 +93,15 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
         </Card>
       )}
 
-      {health && health.hashrate_series && health.hashrate_series.length > 0 && (
-        <Card t={t} style={{ marginTop: 14 }}>
-          <Label t={t} style={{ marginBottom: 10 }}>Hashrate · last 24h</Label>
-          <AreaChart t={t} data={health.hashrate_series} accent={t.accent} h={160} unit="GH/s" />
-        </Card>
-      )}
+      {health && health.hashrate_series && health.hashrate_series.length > 0 && (() => {
+        const hr = scaleHashrateSeries(health.hashrate_series);
+        return (
+          <Card t={t} style={{ marginTop: 14 }}>
+            <Label t={t} style={{ marginBottom: 10 }}>Hashrate · last 24h ({hr.unit})</Label>
+            <AreaChart t={t} data={hr.data} accent={t.accent} h={160} unit={hr.unit} />
+          </Card>
+        );
+      })()}
 
       {axeDevice && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
@@ -180,12 +183,15 @@ export function ChartsTab({ t, health }: { t: Theme; ip?: string; health: Health
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {health.hashrate_series && health.hashrate_series.length > 0 && (
-        <Card t={t}>
-          <Label t={t} style={{ marginBottom: 10 }}>Hashrate (GH/s)</Label>
-          <AreaChart t={t} data={health.hashrate_series} accent={t.accent} h={180} unit="GH/s" />
-        </Card>
-      )}
+      {health.hashrate_series && health.hashrate_series.length > 0 && (() => {
+        const hr = scaleHashrateSeries(health.hashrate_series);
+        return (
+          <Card t={t}>
+            <Label t={t} style={{ marginBottom: 10 }}>Hashrate ({hr.unit})</Label>
+            <AreaChart t={t} data={hr.data} accent={t.accent} h={180} unit={hr.unit} />
+          </Card>
+        );
+      })()}
       {health.temp_series && health.temp_series.length > 0 && (
         <Card t={t}>
           <Label t={t} style={{ marginBottom: 10 }}>Temperature (°C)</Label>
