@@ -133,7 +133,6 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
     Shared by the HTTP endpoint and the background loop.
     """
     local_ip, auto_subnet = _local_ip_and_subnet()
-    manual = bool(subnet)
     subnet = (subnet or auto_subnet).strip().rstrip(".")
     if not subnet:
         return {"local_ip": "", "found": [], "method": "error", "error": "Could not determine local subnet"}
@@ -151,11 +150,12 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
     candidates.discard(local_ip)
     candidates |= _parse_extra_ips(extra_ips)
 
-    # Fallback: if ARP is sparse (or a subnet was explicitly requested), scan the full /24
-    use_full_scan = manual or len(candidates) < 4
-    if use_full_scan:
-        candidates.update(f"{subnet}.{i}" for i in range(1, 255))
-        candidates.discard(local_ip)
+    # Always probe the full /24. ARP/mDNS alone miss devices the host hasn't
+    # recently talked to and that don't advertise mDNS (common for NMMiner),
+    # which is why some only showed up when added by direct IP. ARP still
+    # supplies MACs and mDNS still supplies names below.
+    candidates.update(f"{subnet}.{i}" for i in range(1, 255))
+    candidates.discard(local_ip)
 
     mdns_ips = await mdns_task
     for ip in mdns_ips:
@@ -190,7 +190,7 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
         "arp_count": len(arp_ips),
         "mdns_count": len(mdns_ips),
         "probed": len(candidates),
-        "method": "full_scan" if use_full_scan else "arp+mdns",
+        "method": "full_scan",
         "found": found,
     }
 
