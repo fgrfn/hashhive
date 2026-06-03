@@ -198,6 +198,12 @@ generalised from a single BitAxe to the whole fleet:
 
 ---
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for what's shipped and what's planned.
+
+---
+
 ## License
 
 [MIT](LICENSE)
