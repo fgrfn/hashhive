@@ -46,6 +46,11 @@ shift. Open an issue or PR to propose changes.
 - **Flapping protection (extend)** — apply the offline-grace style debounce to
   other toggling alerts (e.g. `pool_lost`/`pool_connected`). *Per-type
   mute/snooze and burst de-dup already shipped.*
+- **Group management fixes** — (1) groups can't be edited after creation (no way
+  to rename / change colour / description / assigned pool); add an edit dialog.
+  (2) the Groups overview card shows `0/0` online and `0` devices even when
+  members are assigned — the list endpoint doesn't populate `total` / `online` /
+  `deviceIps`, so the card reads them as 0.
 
 ### Later
 - **Live shares feed** — a per-poll activity feed derived from accepted/rejected
