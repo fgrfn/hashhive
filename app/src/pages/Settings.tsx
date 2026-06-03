@@ -124,6 +124,21 @@ export function Settings() {
                 <Input t={t} value={String(localSettings.electricity_kwh_price || 0)} onChange={v => upd({ electricity_kwh_price: Number(v) })} mono type="number" style={{ width: 100 }} />
               </SettingRow>
             </Card>
+            <Card t={t} style={{ marginTop: 14 }}>
+              <SettingRow t={t} label="Price ticker" desc="Show live coin prices in the top bar.">
+                <Toggle t={t} on={localSettings.market?.enabled ?? true} onChange={v => upd({ market: { ...(localSettings.market || {}), enabled: v } })} />
+              </SettingRow>
+              <SettingRow t={t} label="Coins" desc="CoinGecko IDs, comma-separated (e.g. bitcoin, bitcoin-cash, digibyte).">
+                <Input t={t} value={(localSettings.market?.coins || ['bitcoin']).join(', ')}
+                  onChange={v => upd({ market: { ...(localSettings.market || {}), coins: v.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) } })}
+                  mono style={{ width: 280 }} placeholder="bitcoin, bitcoin-cash" />
+              </SettingRow>
+              <SettingRow t={t} label="Currency" desc="Fiat currency for prices." last>
+                <Input t={t} value={(localSettings.market?.currency || 'usd')}
+                  onChange={v => upd({ market: { ...(localSettings.market || {}), currency: v.trim().toLowerCase() } })}
+                  mono style={{ width: 90 }} placeholder="usd" />
+              </SettingRow>
+            </Card>
           </div>
         )}
 

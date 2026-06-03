@@ -221,26 +221,32 @@ async def get_market_prices():
     import time
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
     market = config.get("market", {})
-    coin_id = (market.get("coin_id") or "bitcoin").strip().lower()
-    currency = (market.get("currency") or "eur").strip().lower()
+    enabled = bool(market.get("enabled", True))
+    # Support a list of coins; fall back to the legacy single coin_id.
+    coins = market.get("coins") or ([market.get("coin_id")] if market.get("coin_id") else ["bitcoin"])
+    coins = [str(c).strip().lower() for c in coins if str(c).strip()][:10] or ["bitcoin"]
+    currency = (market.get("currency") or "usd").strip().lower()
+    base = {"coins": coins, "currency": currency, "enabled": enabled}
+    if not enabled:
+        return {**base, "prices": {}}
     now = time.time()
     cached = _price_cache
-    if now - cached["ts"] < 300 and cached["data"]:
-        return cached["data"]
+    if now - cached["ts"] < 300 and cached["data"] and cached["data"].get("_key") == (tuple(coins), currency):
+        return {**cached["data"], **base}
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(
                 "https://api.coingecko.com/api/v3/simple/price",
-                params={"ids": coin_id, "vs_currencies": currency},
+                params={"ids": ",".join(coins), "vs_currencies": currency, "include_24hr_change": "true"},
             )
             resp.raise_for_status()
             data = resp.json()
         _price_cache["ts"] = now
-        _price_cache["data"] = {"prices": data, "coin_id": coin_id, "currency": currency}
-        return _price_cache["data"]
+        _price_cache["data"] = {"prices": data, "_key": (tuple(coins), currency)}
+        return {"prices": data, **base}
     except Exception as e:
         from fastapi import HTTPException
         # Return stale cache rather than error
         if cached["data"]:
-            return cached["data"]
+            return {**cached["data"], **base}
         raise HTTPException(status_code=503, detail=f"Price fetch failed: {e}")
