@@ -145,6 +145,8 @@ export function GroupDetail() {
   const { devices, axeDevices } = useAppStore();
   const [group, setGroup] = useState<Group | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [pick, setPick] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.groups.list().then(gs => setGroup(gs.find(g => g.id === id) || null)).catch(() => {});
@@ -178,6 +180,20 @@ export function GroupDetail() {
     } catch {
       toast('Failed to remove device', 'error');
     }
+  };
+
+  const addMembers = async (toAdd: string[]) => {
+    if (!group || toAdd.length === 0) return;
+    const next = Array.from(new Set([...memberIps(group), ...toAdd]));
+    try {
+      const updated = await api.groups.update(group.id, { devices: next });
+      setGroup({ ...group, ...updated, devices: next, deviceIps: next });
+      toast(`Added ${toAdd.length} device${toAdd.length !== 1 ? 's' : ''}`);
+    } catch {
+      toast('Failed to add devices', 'error');
+    }
+    setShowAdd(false);
+    setPick(new Set());
   };
 
   if (!group) {
@@ -222,9 +238,12 @@ export function GroupDetail() {
         <div style={{ fontSize: 11, color: t.textMuted, marginTop: 8 }}>Pause/Resume apply to AxeOS devices; Restart applies to AxeOS and NMMiner.</div>
       </Card>
       <Card t={t} noPad>
-        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Label t={t}>Devices in this group</Label>
-          <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{groupDevices.length} devices</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: t.textMuted }}>{groupDevices.length} devices</span>
+            <button onClick={() => { setPick(new Set()); setShowAdd(true); }} style={{ ...btnStyle(t, 'primary'), fontSize: 12, padding: '6px 10px' }}><Plus size={13} /> Add devices</button>
+          </div>
         </div>
         {groupDevices.length === 0 ? (
           <div style={{ padding: '24px 18px', color: t.textMuted, fontSize: 13 }}>No devices in this group yet.</div>
@@ -244,6 +263,41 @@ export function GroupDetail() {
           </div>
         ))}
       </Card>
+
+      {showAdd && (() => {
+        const available = allDevices.filter(d => d.ip && !ips.includes(d.ip));
+        return (
+          <Modal t={t} title="Add devices to group" onClose={() => setShowAdd(false)} width={460}>
+            {available.length === 0 ? (
+              <div style={{ color: t.textMuted, fontSize: 13, padding: '8px 0' }}>All configured devices are already in this group.</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
+                  {available.map(d => {
+                    const sel = pick.has(d.ip);
+                    return (
+                      <label key={d.ip} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: `1px solid ${sel ? t.accent : t.border}`, background: sel ? t.accentGlow : t.surface, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={sel} onChange={() => setPick(prev => { const s = new Set(prev); if (s.has(d.ip)) s.delete(d.ip); else s.add(d.ip); return s; })} style={{ accentColor: t.accent }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</div>
+                          <div style={{ fontSize: 11, color: t.textMuted, fontFamily: FONT_MONO }}>{d.ip}</div>
+                        </div>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: d.status === 'online' ? t.success : t.danger }}>{d.status}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, marginTop: 12, borderTop: `1px solid ${t.border}` }}>
+                  <button onClick={() => setShowAdd(false)} style={btnStyle(t)}>Cancel</button>
+                  <button onClick={() => addMembers(Array.from(pick))} disabled={pick.size === 0} style={{ ...btnStyle(t, 'primary'), opacity: pick.size === 0 ? 0.5 : 1 }}>
+                    Add {pick.size || ''} device{pick.size !== 1 ? 's' : ''}
+                  </button>
+                </div>
+              </>
+            )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
