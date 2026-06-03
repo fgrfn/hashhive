@@ -5,8 +5,9 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, fmtRssi, fmtShares, matchesSearch } from '../api';
-import type { AxeDevice } from '../api';
-import { Zap, Pause, Play, RotateCcw, Lightbulb, Settings as SettingsIcon } from 'lucide-react';
+import type { AxeDevice, AppSettings } from '../api';
+import { Zap, Pause, Play, RotateCcw, Trash2, Lightbulb, Settings as SettingsIcon } from 'lucide-react';
+import { applyDashboardToStore } from '../hooks/useDeviceStream';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
 import { useFirmwareLatest } from '../hooks/useFirmwareLatest';
@@ -23,7 +24,7 @@ interface AxeConfig {
 
 export function AxeOS() {
   const { theme: t } = useThemeStore();
-  const { axeDevices, wsStatus, globalSearch } = useAppStore();
+  const { axeDevices, settings, setSettings, wsStatus, globalSearch } = useAppStore();
   const navigate = useNavigate();
   const fwLatest = useFirmwareLatest();
   const loading = useDataReady(wsStatus !== 'connecting');
@@ -69,6 +70,24 @@ export function AxeOS() {
       toast(`${action} sent to ${ips.length} device${ips.length !== 1 ? 's' : ''}`);
     } catch {
       toast(`Batch ${action} failed`, 'error');
+    }
+    setSelected(new Set());
+  };
+
+  // Remove selected devices from HashHive's config (the miners keep running).
+  const removeSelected = async () => {
+    const ips = Array.from(selected);
+    if (!ips.length) return;
+    const n = ips.length;
+    if (!window.confirm(`Remove ${n} device${n !== 1 ? 's' : ''} from HashHive? The miner${n !== 1 ? 's' : ''} keep${n === 1 ? 's' : ''} running — this only stops monitoring ${n !== 1 ? 'them' : 'it'} here.`)) return;
+    const s: AppSettings = { ...(settings || {}) };
+    s.axeos_devices = (s.axeos_devices || []).filter(d => !ips.includes(d.ip));
+    try {
+      setSettings(await api.settings.save(s));
+      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
+      toast(`Removed ${n} device${n !== 1 ? 's' : ''}`);
+    } catch {
+      toast('Failed to remove devices', 'error');
     }
     setSelected(new Set());
   };
@@ -124,6 +143,7 @@ export function AxeOS() {
           <button onClick={() => doBulkAction('resume')} style={{ ...btnStyle(t), fontSize: 12 }}><Play size={13} /> Resume</button>
           <button onClick={() => doBulkAction('restart')} style={{ ...btnStyle(t), fontSize: 12 }}><RotateCcw size={13} /> Restart</button>
           <button onClick={() => setBulkFreqOpen(true)} style={{ ...btnStyle(t), fontSize: 12 }}>Freq / Voltage</button>
+          <button onClick={removeSelected} style={{ ...btnStyle(t, 'danger'), fontSize: 12 }}><Trash2 size={13} /> Remove</button>
           <button onClick={() => setSelected(new Set())} style={{ ...btnStyle(t), padding: 6 }}>✕</button>
         </div>
       )}

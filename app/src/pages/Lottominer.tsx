@@ -5,8 +5,9 @@ import { useAppStore } from '../store/app';
 import { Card, Label, StatusPill, SkeletonRow, useDataReady, Modal, FormField, Toggle, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtUptime, fmtBestDiff, fmtHashrate, fmtRssi, fmtShares, getHashrate, getTemp, getNmStatus, matchesSearch } from '../api';
-import type { NMMinerConfig, NMMinerDevice } from '../api';
-import { Cpu, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
+import type { NMMinerConfig, NMMinerDevice, AppSettings } from '../api';
+import { Cpu, RotateCcw, Trash2, Settings as SettingsIcon } from 'lucide-react';
+import { applyDashboardToStore } from '../hooks/useDeviceStream';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
 import { useFirmwareLatest } from '../hooks/useFirmwareLatest';
@@ -17,7 +18,7 @@ export function Lottominer() {
   const { theme: t } = useThemeStore();
   const navigate = useNavigate();
   const fwLatest = useFirmwareLatest();
-  const { devices, wsStatus, globalSearch } = useAppStore();
+  const { devices, settings, setSettings, wsStatus, globalSearch } = useAppStore();
   const loading = useDataReady(wsStatus !== 'connecting');
   const [editDevice, setEditDevice] = useState<string | null>(null);
   const [config, setConfig] = useState<NMMinerConfig | null>(null);
@@ -65,6 +66,26 @@ export function Lottominer() {
       toast(`${action} sent to ${ips.length} device${ips.length !== 1 ? 's' : ''}`);
     } catch {
       toast(`Batch ${action} failed`, 'error');
+    }
+    setSelected(new Set());
+  };
+
+  // Remove selected devices from HashHive's config (the miners keep running).
+  const removeSelected = async () => {
+    const ips = Array.from(selected);
+    if (!ips.length) return;
+    const n = ips.length;
+    if (!window.confirm(`Remove ${n} device${n !== 1 ? 's' : ''} from HashHive? The miner${n !== 1 ? 's' : ''} keep${n === 1 ? 's' : ''} running — this only stops monitoring ${n !== 1 ? 'them' : 'it'} here.`)) return;
+    const s: AppSettings = { ...(settings || {}) };
+    s.lottominer_devices = (s.lottominer_devices || []).filter(d => !ips.includes(d.ip));
+    s.axehub_devices = (s.axehub_devices || []).filter(d => !ips.includes(d.ip));
+    if (s.lottominer_master && ips.includes(s.lottominer_master)) s.lottominer_master = '';
+    try {
+      setSettings(await api.settings.save(s));
+      try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
+      toast(`Removed ${n} device${n !== 1 ? 's' : ''}`);
+    } catch {
+      toast('Failed to remove devices', 'error');
     }
     setSelected(new Set());
   };
@@ -140,6 +161,7 @@ export function Lottominer() {
           <div style={{ fontSize: 13, color: t.accent, fontWeight: 600 }}>{selected.size} selected</div>
           <div style={{ flex: 1 }} />
           <button onClick={() => doBulkAction('restart')} style={{ ...btnStyle(t), fontSize: 12 }}><RotateCcw size={13} /> Restart</button>
+          <button onClick={removeSelected} style={{ ...btnStyle(t, 'danger'), fontSize: 12 }}><Trash2 size={13} /> Remove</button>
           <button onClick={() => setSelected(new Set())} style={{ ...btnStyle(t), padding: 6 }}>✕</button>
         </div>
       )}
