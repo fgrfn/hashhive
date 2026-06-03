@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
-import { Card, Label, Pill, SkeletonCard, EmptyState, Modal, FormField, btnStyle } from '../components/primitives';
+import { Card, Label, Pill, SkeletonCard, EmptyState, Modal, FormField, Select, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
 import type { Group } from '../api';
-import { Grid3x3, Plus, ArrowLeft, Power, Pause, Play, Globe, X } from 'lucide-react';
+import { Grid3x3, Plus, ArrowLeft, Power, Pause, Play, Globe, X, Pencil } from 'lucide-react';
+import type { PoolPreset } from '../api';
 import { toast } from '../store/toast';
 
 const PRESET_COLORS = ['#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
@@ -21,7 +22,7 @@ function NewGroupModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const g = await api.groups.create({ name: name.trim(), description: desc, color }) as Group;
+      const g = await api.groups.create({ name: name.trim(), desc, color } as Partial<Group>) as Group;
       toast(`Group "${g.name}" created`);
       onCreate(g);
       onClose();
@@ -48,6 +49,57 @@ function NewGroupModal({ t, onClose, onCreate }: { t: Theme; onClose: () => void
           <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
           <button onClick={submit} disabled={!name.trim() || saving} style={{ ...btnStyle(t, 'primary'), opacity: !name.trim() || saving ? 0.6 : 1 }}>
             {saving ? 'Creating…' : 'Create group'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function EditGroupModal({ t, group, onClose, onSaved }: { t: Theme; group: Group; onClose: () => void; onSaved: (g: Group) => void }) {
+  const [name, setName] = useState(group.name || '');
+  const [desc, setDesc] = useState(group.desc ?? group.description ?? '');
+  const [color, setColor] = useState(group.color || PRESET_COLORS[0]);
+  const [poolId, setPoolId] = useState(group.poolId || '');
+  const [pools, setPools] = useState<PoolPreset[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { api.pools.list().then(setPools).catch(() => {}); }, []);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await api.groups.update(group.id, { name: name.trim(), desc, color, poolId } as Partial<Group>) as Group;
+      toast('Group updated');
+      onSaved({ ...group, ...updated, name: name.trim(), desc, description: desc, color, poolId });
+    } catch {
+      toast('Failed to update group', 'error');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Modal t={t} title="Edit group" onClose={onClose} width={420}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <FormField t={t} label="Name" value={name} onChange={setName} placeholder="e.g. Living room miners" />
+        <FormField t={t} label="Description (optional)" value={desc} onChange={setDesc} placeholder="Short note" />
+        <div>
+          <Label t={t} style={{ marginBottom: 6 }}>Pool for group push (optional)</Label>
+          <Select t={t} value={poolId} options={[['', '— none —'], ...pools.map(p => [p.id, p.name || p.url] as [string, string])]} onChange={setPoolId} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Color</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {PRESET_COLORS.map(c => (
+              <div key={c} onClick={() => setColor(c)} style={{ width: 26, height: 26, borderRadius: 6, background: c, cursor: 'pointer', border: color === c ? `2px solid ${t.text}` : '2px solid transparent', boxSizing: 'border-box' }} />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+          <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
+          <button onClick={submit} disabled={!name.trim() || saving} style={{ ...btnStyle(t, 'primary'), opacity: !name.trim() || saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -159,6 +211,7 @@ export function GroupDetail() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [pick, setPick] = useState<Set<string>>(new Set());
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     api.groups.list().then(gs => setGroup(gs.find(g => g.id === id) || null)).catch(() => {});
@@ -235,9 +288,10 @@ export function GroupDetail() {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 24, fontWeight: 700 }}>{group.name}</div>
-          {group.description && <div style={{ fontSize: 12, color: t.textMuted }}>{group.description}</div>}
+          {(group.desc ?? group.description) && <div style={{ fontSize: 12, color: t.textMuted }}>{group.desc ?? group.description}</div>}
         </div>
-        <button style={{ ...btnStyle(t, 'danger') }} onClick={() => { api.groups.delete(group.id).then(() => navigate('/groups')).catch(() => {}); }}>Delete</button>
+        <button style={{ ...btnStyle(t) }} onClick={() => setEditOpen(true)}><Pencil size={13} /> Edit</button>
+        <button style={{ ...btnStyle(t, 'danger') }} onClick={() => { if (window.confirm(`Delete group "${group.name}"? Devices are not affected.`)) api.groups.delete(group.id).then(() => navigate('/groups')).catch(() => {}); }}>Delete</button>
       </div>
       <Card t={t} style={{ marginBottom: 14 }}>
         <Label t={t} style={{ marginBottom: 10 }}>Group actions</Label>
@@ -310,6 +364,11 @@ export function GroupDetail() {
           </Modal>
         );
       })()}
+
+      {editOpen && (
+        <EditGroupModal t={t} group={group} onClose={() => setEditOpen(false)}
+          onSaved={g => { setGroup(prev => prev ? { ...prev, ...g } : g); setEditOpen(false); }} />
+      )}
     </div>
   );
 }
