@@ -74,7 +74,8 @@ export function DeviceDetail() {
           <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
             <StatusPill t={t} status={status} />
             <Pill t={t} sev="info">{deviceType}</Pill>
-            <span style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.textMuted }}>{ip}</span>
+            <a href={`http://${ip}`} target="_blank" rel="noreferrer" title="Open the device's web UI"
+              style={{ fontSize: 11, fontFamily: FONT_MONO, color: t.accent, textDecoration: 'none', borderBottom: `1px dashed ${t.border}` }}>{ip} ↗</a>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
