@@ -44,6 +44,8 @@ _RULE_CATALOG: list[tuple] = [
     ("online",             "online",             "Device back online",    "info",     None,                    "",     "device recovered"),
     ("pool_connected",     "pool-connected",     "Pool reconnected",      "info",     None,                    "",     "pool connection restored"),
     ("fallback_recovered", "fallback-recovered", "Primary pool recovered", "info",    None,                    "",     "back on primary pool"),
+    ("pool_unreachable",   "pool-unreachable",   "Pool unreachable",      "critical", None,                    "",     "pool not reachable from HashHive"),
+    ("pool_reachable",     "pool-reachable",     "Pool reachable again",  "info",     None,                    "",     "pool reachable from HashHive"),
 ]
 _RULE_BY_KIND = {r[0]: r for r in _RULE_CATALOG}
 

@@ -455,6 +455,14 @@ async def check_alerts(
             f" (was {_fmt_diff(global_prev_best)}{prev_label}) 🏅"
         ))
 
+    # ── Server-side pool health (monitors pools the fleet actually uses) ──────
+    try:
+        from core.poolhealth import check_pool_health  # lazy import to avoid cycles
+        pool_alerts = await check_pool_health(config, nmminer_data, axeos_data)
+        new_alerts.extend(a for a in pool_alerts if _type_enabled(a.get("kind", "")))
+    except Exception:
+        pass
+
     # ── Persist state & history ───────────────────────────────────────────────
     save_json(DEVICE_STATE_FILE, current_state)
 
@@ -514,6 +522,8 @@ _KIND_LABEL = {
     "new_best_diff":     "New Best Difficulty",
     "block_found":       "⚡ BLOCK FOUND",
     "rssi_low":          "Weak WiFi Signal",
+    "pool_unreachable":  "Pool Unreachable",
+    "pool_reachable":    "Pool Reachable",
 }
 
 

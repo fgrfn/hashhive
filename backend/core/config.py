@@ -52,6 +52,8 @@ DEFAULT_CONFIG: dict = {
         "new-best-diff": False,
         "block-found": True,
         "rssi-low": True,
+        "pool-unreachable": True,
+        "pool-reachable": False,
     },
     "weekly_summary": {
         "enabled": False,

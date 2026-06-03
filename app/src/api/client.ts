@@ -78,6 +78,7 @@ export const api = {
     delete:       (id: string)                         => del(`/api/pools/${id}`),
     pushToDevice: (ip: string, pool: Partial<PoolPreset>) => post(`/api/pools/push/${ip}`, pool),
     ping:         (target: string)                     => get<{ target: string; latency_ms: number | null }>(`/api/pools/ping?target=${encodeURIComponent(target)}`),
+    health:       ()                                   => get<Array<{ url: string; up: boolean; latency_ms: number | null; devices: number; since: string }>>('/api/pools/health'),
   },
   wallets: {
     list:   ()                                => get<Wallet[]>('/api/wallets'),

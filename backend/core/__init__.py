@@ -23,7 +23,7 @@ from .paths import (
     KEEP_DAYS,
 )
 from .version import _resolve_version, APP_VERSION
-from .state import _startup_time, _price_cache, _low_hr_since
+from .state import _startup_time, _price_cache, _low_hr_since, _pool_health, _pool_last_check
 from .jsonio import load_json, save_json
 from .config import (
     DEFAULT_CONFIG,
@@ -80,7 +80,7 @@ __all__ = [
     "DISCORD_DASHBOARD_STATE_FILE", "FRONTEND_DIR",
     "_SESSIONS_FILE", "MAX_ENTRIES_PER_DAY", "KEEP_DAYS",
     "_resolve_version", "APP_VERSION",
-    "_startup_time", "_price_cache", "_low_hr_since",
+    "_startup_time", "_price_cache", "_low_hr_since", "_pool_health", "_pool_last_check",
     "load_json", "save_json",
     "DEFAULT_CONFIG", "LoginRequest", "PatchDeviceRequest", "AxeConfigBatchRequest",
     "AxeActionBatchRequest", "NmActionBatchRequest",

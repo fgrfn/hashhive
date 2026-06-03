@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
-from core import CONFIG_FILE, DEFAULT_CONFIG, _validate_device_ip, load_json, save_json
+from core import CONFIG_FILE, DEFAULT_CONFIG, _pool_health, _validate_device_ip, load_json, save_json
 from miners.axehub import set_axehub_pool
 from miners.lottominer import ensure_stratum_scheme
 
@@ -40,6 +40,23 @@ async def ping_pool(target: str = Query(..., description="host:port or stratum+t
     except Exception:
         return {"target": f"{host}:{port}", "latency_ms": None}
 
+
+
+@router.get("/api/pools/health")
+async def pool_health():
+    """Return the server-monitored health of pools the fleet actually uses."""
+    out = []
+    for url, entry in _pool_health.items():
+        if not url or not isinstance(entry, dict):
+            continue
+        out.append({
+            "url": url,
+            "up": entry.get("up"),
+            "latency_ms": entry.get("latency_ms"),
+            "devices": entry.get("devices"),
+            "since": entry.get("since"),
+        })
+    return out
 
 
 def _presets(config: dict) -> list[dict]:
