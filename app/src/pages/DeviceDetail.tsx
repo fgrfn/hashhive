@@ -6,15 +6,8 @@ import { Pill, StatusPill, btnStyle } from '../components/primitives';
 import { FONT_MONO } from '../tokens';
 import { api, getHashrate } from '../api';
 import type { HealthData, ProbabilityResult } from '../api';
-import { ArrowLeft, Cpu, Activity, Zap, Settings, RefreshCw, Play, Pause } from 'lucide-react';
-import { OverviewTab, ChartsTab, PowerCurveTab, ConfigTab } from '../components/device/DeviceTabs';
-
-const TABS = [
-  { id: 'overview', label: 'Overview', Icon: Activity },
-  { id: 'charts', label: 'Charts', Icon: Activity },
-  { id: 'power', label: 'Power curve', Icon: Zap },
-  { id: 'config', label: 'Config', Icon: Settings },
-];
+import { ArrowLeft, Cpu, Activity, FileText, Zap, Settings, RefreshCw, Play, Pause } from 'lucide-react';
+import { OverviewTab, ChartsTab, LogsTab, PowerCurveTab, ConfigTab } from '../components/device/DeviceTabs';
 
 export function DeviceDetail() {
   const { ip } = useParams<{ ip: string }>();
@@ -30,6 +23,15 @@ export function DeviceDetail() {
   const axeDevice = axeDevices.find(d => d._ip === ip);
   const isAxe = !!axeDevice && !nmDevice;
   const devProb = prob?.devices.find(d => d.ip === ip) ?? null;
+
+  // Logs come from the AxeOS HTTP/WebSocket log endpoints; NMMiner exposes none.
+  const TABS = [
+    { id: 'overview', label: 'Overview', Icon: Activity },
+    { id: 'charts', label: 'Charts', Icon: Activity },
+    ...(isAxe ? [{ id: 'logs', label: 'Logs', Icon: FileText }] : []),
+    { id: 'power', label: 'Power curve', Icon: Zap },
+    { id: 'config', label: 'Config', Icon: Settings },
+  ];
 
   useEffect(() => {
     if (ip) api.health(ip).then(setHealth).catch(() => {});
@@ -117,6 +119,7 @@ export function DeviceDetail() {
 
       {tab === 'overview' && <OverviewTab t={t} nmDevice={nmDevice} axeDevice={axeDevice} hr={hr} temp={temp} uptime={uptime} health={health} prob={devProb} />}
       {tab === 'charts' && <ChartsTab t={t} ip={ip!} health={health} />}
+      {tab === 'logs' && isAxe && <LogsTab t={t} ip={ip!} />}
       {tab === 'power' && <PowerCurveTab t={t} ip={ip!} axeDevice={axeDevice} />}
       {tab === 'config' && <ConfigTab t={t} ip={ip!} nmDevice={nmDevice} axeDevice={axeDevice} />}
     </div>

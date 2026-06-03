@@ -1,11 +1,11 @@
 // Per-tab views for the device detail page (extracted from DeviceDetail.tsx).
-import React, { useState } from 'react';
-import { Card, Label, btnStyle } from '../primitives';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Label, Spinner, btnStyle } from '../primitives';
 import { AreaChart } from '../charts';
 import { FONT_MONO, type Theme } from '../../tokens';
 import { api, fmtUptime, fmtHashrate, fmtBestDiff, fmtProb } from '../../api';
 import type { NMMinerDevice, AxeDevice, HealthData, ProbabilityResult } from '../../api';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 export function StatGrid({ t, stats }: { t: Theme; stats: [string, string, string?][] }) {
   return (
@@ -186,6 +186,81 @@ export function ChartsTab({ t, health }: { t: Theme; ip?: string; health: Health
         <div style={{ color: t.textMuted, fontSize: 13, padding: '24px 0' }}>No historical data available yet.</div>
       )}
     </div>
+  );
+}
+
+export function LogsTab({ t, ip }: { t: Theme; ip: string }) {
+  const [logs, setLogs] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d = await api.axeos.logs(ip);
+      setLogs(d.logs || []);
+      setSource(d.source || '');
+      if (d.error) setError(d.error);
+    } catch {
+      setError('Failed to fetch logs');
+      setLogs([]);
+    }
+    setLoading(false);
+  }, [ip]);
+
+  // Fetch on mount without a synchronous setState in the effect body.
+  useEffect(() => {
+    let active = true;
+    api.axeos.logs(ip).then(d => {
+      if (!active) return;
+      setLogs(d.logs || []);
+      setSource(d.source || '');
+      setError(d.error || null);
+      setLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setError('Failed to fetch logs');
+      setLogs([]);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [ip]);
+
+  // `live` means we briefly tapped the device's WebSocket stream (a snapshot of
+  // recent lines), `history` means the firmware served a buffered log file.
+  const sourceLabel = source === 'history' ? 'buffered history'
+    : source === 'live' ? 'live snapshot' : '';
+
+  return (
+    <Card t={t} noPad>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Label t={t}>Device log</Label>
+          {sourceLabel && <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, background: t.surface2, padding: '1px 6px', borderRadius: 4 }}>{sourceLabel}</span>}
+          <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted }}>{logs.length} lines</span>
+        </div>
+        <button onClick={load} disabled={loading} style={{ ...btnStyle(t), fontSize: 11, padding: '4px 10px' }}>
+          {loading ? <Spinner t={t} size={12} /> : <RotateCcw size={12} />} Refresh
+        </button>
+      </div>
+      <div style={{ maxHeight: 480, overflowY: 'auto', padding: '12px 16px', fontFamily: FONT_MONO, fontSize: 11, lineHeight: 1.7 }}>
+        {loading && logs.length === 0 ? (
+          <div style={{ color: t.textMuted }}>Fetching logs…</div>
+        ) : error && logs.length === 0 ? (
+          <div style={{ color: t.textMuted }}>{error} — the device may not expose logs over HTTP/WebSocket.</div>
+        ) : logs.length === 0 ? (
+          <div style={{ color: t.textMuted }}>No log lines captured.</div>
+        ) : logs.map((line, i) => {
+          const isError = /error|fail|err\b/i.test(line);
+          const isWarn = /warn/i.test(line);
+          return (
+            <div key={i} style={{ color: isError ? t.danger : isWarn ? t.warning : t.textMuted, marginBottom: 2, wordBreak: 'break-all' }}>{line}</div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

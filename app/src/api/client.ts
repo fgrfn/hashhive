@@ -39,6 +39,7 @@ export const api = {
     configOne:   (ip: string, cfg: Record<string, unknown>)      => patch<AxeActionResponse>(`/api/axeos/config/${ip}`, cfg),
     configOne1:  (ip: string)                                     => get<Record<string, unknown>>(`/api/axeos/config/${ip}`),
     scan:        ()                                               => get<AxeDevice[]>('/api/axeos/scan'),
+    logs:        (ip: string)                                     => get<{ logs: string[]; source: string; error?: string }>(`/api/axeos/logs/${ip}`),
   },
   templates: {
     list:   ()                                                                       => get<DeviceTemplate[]>('/api/templates'),
