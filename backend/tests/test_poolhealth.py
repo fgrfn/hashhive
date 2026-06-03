@@ -109,3 +109,17 @@ def test_offline_devices_and_stale_pruning():
     # Now no devices use pool A → it gets pruned.
     _run([], [], latency=10.0)
     assert "a.pool.io:3333" not in _pool_health
+
+
+def test_axe_pool_url_combines_host_and_port():
+    from core.poolhealth import _axe_pool_url, _collect_pools
+    # bare host + separate port → combined
+    assert _axe_pool_url({"stratumURL": "bch.hmpool.io", "stratumPort": 3333}) == "bch.hmpool.io:3333"
+    # already has a port → unchanged
+    assert _axe_pool_url({"stratumURL": "eu.pool.io:3337"}) == "eu.pool.io:3337"
+    # fallback active → uses fallback host/port
+    assert _axe_pool_url({"isUsingFallbackStratum": 1, "fallbackStratumURL": "fb.io",
+                          "fallbackStratumPort": 4444, "stratumURL": "p.io", "stratumPort": 3333}) == "fb.io:4444"
+    # an AxeOS device with a port-less stratumURL is now monitored (was dropped before)
+    counts = _collect_pools([], [{"_online": True, "stratumURL": "bch.hmpool.io", "stratumPort": 3333}])
+    assert counts == {"bch.hmpool.io:3333": 1}
