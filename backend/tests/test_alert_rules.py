@@ -61,3 +61,31 @@ def test_threshold_on_thresholdless_rule_rejected():
         assert False, "expected HTTPException"
     except HTTPException as exc:
         assert exc.status_code == 400
+
+
+def test_snooze_set_and_clear():
+    from datetime import datetime, timezone
+    # Snooze temp_high for 60 min → rule shows a future snoozed_until.
+    asyncio.run(update_alert_rule("temp_high", {"snooze_minutes": 60}))
+    rules = asyncio.run(get_alert_rules())
+    r = next(x for x in rules if x["kind"] == "temp_high")
+    assert r["snoozed_until"] is not None
+    assert datetime.fromisoformat(r["snoozed_until"]) > datetime.now(timezone.utc)
+    # Clear it.
+    asyncio.run(update_alert_rule("temp_high", {"snooze_minutes": 0}))
+    rules = asyncio.run(get_alert_rules())
+    r = next(x for x in rules if x["kind"] == "temp_high")
+    assert r["snoozed_until"] is None
+
+
+def test_expired_snooze_is_not_reported():
+    from datetime import datetime, timezone, timedelta
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    config.setdefault("alert_snooze", {})["temp_high"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=1)
+    ).isoformat()
+    from core import save_json
+    save_json(CONFIG_FILE, config)
+    rules = asyncio.run(get_alert_rules())
+    r = next(x for x in rules if x["kind"] == "temp_high")
+    assert r["snoozed_until"] is None  # past timestamp → treated as not snoozed

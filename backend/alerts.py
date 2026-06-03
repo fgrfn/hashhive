@@ -165,11 +165,25 @@ async def check_alerts(
     grace_seconds: float = float(config.get("offline_grace_minutes", 2)) * 60
     cooldown_seconds: float = float(config.get("alert_cooldown_minutes", 30)) * 60
 
-    # Build a fast lookup: kind (underscore) → enabled bool
+    # Build a fast lookup: kind (underscore) → enabled bool.
+    # A kind is suppressed if it's disabled OR temporarily snoozed (mute until a
+    # timestamp). Snooze is keyed by the underscore kind in config["alert_snooze"].
     _at_cfg = config.get("alert_types", {})
+    _snooze_cfg = config.get("alert_snooze", {})
+    _now = datetime.now(timezone.utc)
+
+    def _snoozed(kind: str) -> bool:
+        until = _snooze_cfg.get(kind)
+        if not until:
+            return False
+        try:
+            return datetime.fromisoformat(until) > _now
+        except (ValueError, TypeError):
+            return False
+
     def _type_enabled(kind: str) -> bool:
         key = kind.replace("_", "-")
-        return bool(_at_cfg.get(key, True))  # default: enabled
+        return bool(_at_cfg.get(key, True)) and not _snoozed(kind)  # default: enabled
 
     current_state: dict = {}
     new_alerts: list[dict] = []

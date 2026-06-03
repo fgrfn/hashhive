@@ -137,6 +137,27 @@ function AlertRules() {
     });
   };
 
+  const snooze = async (r: AlertRule, minutes: number) => {
+    await api.alerts.updateRule(r.kind, { snooze_minutes: minutes }).catch(() => {});
+    api.alerts.rules().then(setRules).catch(() => {});
+  };
+
+  // Compact per-rule snooze control: pick a duration to mute, or resume now.
+  const snoozeControl = (r: AlertRule) => (
+    <select
+      value=""
+      onChange={e => { const v = Number(e.target.value); if (e.target.value !== '') snooze(r, v); }}
+      style={{ background: t.surface2, border: `1px solid ${r.snoozed_until ? t.warning : t.border}`, borderRadius: 6, color: r.snoozed_until ? t.warning : t.textMuted, fontSize: 11, padding: '4px 6px', fontFamily: FONT_MONO, maxWidth: '100%' }}
+      title={r.snoozed_until ? `Muted until ${new Date(r.snoozed_until).toLocaleString()}` : 'Mute this alert temporarily'}
+    >
+      <option value="">{r.snoozed_until ? `muted · ${new Date(r.snoozed_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Snooze…'}</option>
+      <option value="60">1 hour</option>
+      <option value="240">4 hours</option>
+      <option value="1440">24 hours</option>
+      {r.snoozed_until && <option value="0">Resume now</option>}
+    </select>
+  );
+
   const startEdit = (r: AlertRule) => { setEditing(r.kind); setDraft(String(r.threshold ?? '')); };
 
   const saveEdit = async (r: AlertRule) => {
@@ -196,22 +217,24 @@ function AlertRules() {
                 <div>{renderThreshold(r)}</div>
                 <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}× · 24h</span>
               </div>
+              <div style={{ marginTop: 8 }}>{snoozeControl(r)}</div>
             </Card>
           ))}
         </div>
       ) : (
       <Card t={t} noPad>
-        <div style={{ display: 'grid', gridTemplateColumns: '50px 1.5fr 1.4fr 0.9fr 100px 90px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
-          <span /><span>Rule</span><span>Condition</span><span>Severity</span><span>Threshold</span><span>Fired 24h</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '50px 1.4fr 1.3fr 0.8fr 95px 70px 120px', gap: 10, padding: '10px 16px', background: t.surface2, borderBottom: `1px solid ${t.border}`, fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT_MONO, fontWeight: 600 }}>
+          <span /><span>Rule</span><span>Condition</span><span>Severity</span><span>Threshold</span><span>Fired 24h</span><span>Snooze</span>
         </div>
         {rules.map((r, i) => (
-          <div key={r.kind} style={{ display: 'grid', gridTemplateColumns: '50px 1.5fr 1.4fr 0.9fr 100px 90px', gap: 10, padding: '14px 16px', borderBottom: i === rules.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, opacity: r.enabled ? 1 : 0.55 }}>
+          <div key={r.kind} style={{ display: 'grid', gridTemplateColumns: '50px 1.4fr 1.3fr 0.8fr 95px 70px 120px', gap: 10, padding: '14px 16px', borderBottom: i === rules.length - 1 ? 'none' : `1px solid ${t.border}`, alignItems: 'center', fontSize: 13, opacity: r.enabled ? 1 : 0.55 }}>
             <Toggle t={t} on={r.enabled} onChange={v => toggle(r, v)} size="sm" />
             <div style={{ fontWeight: 600 }}>{r.label}</div>
             <div style={{ fontSize: 12, fontFamily: FONT_MONO, color: t.accent }}>{r.condition}</div>
             <Pill t={t} sev={r.severity === 'critical' ? 'critical' : r.severity === 'info' ? 'info' : 'warning'}>{r.severity}</Pill>
             <div>{renderThreshold(r)}</div>
             <div style={{ fontFamily: FONT_MONO, color: r.fired24h > 0 ? t.warning : t.textMuted }}>{r.fired24h}×</div>
+            <div>{snoozeControl(r)}</div>
           </div>
         ))}
       </Card>

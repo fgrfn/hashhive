@@ -55,6 +55,9 @@ DEFAULT_CONFIG: dict = {
         "pool-unreachable": True,
         "pool-reachable": False,
     },
+    # Temporary per-alert-type mute: { "<kind>": "<iso-until>" }. Past entries
+    # are treated as expired (ignored). Set via the Alerts → Rules snooze control.
+    "alert_snooze": {},
     "weekly_summary": {
         "enabled": False,
         "day": "monday",
