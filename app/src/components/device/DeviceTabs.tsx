@@ -36,11 +36,9 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
     ['Hashrate', fmtHashrate(hr), t.accent],
     ['Chip temp', temp != null ? `${temp}°C` : '—', tempColor],
     ['Uptime', uptime != null ? fmtUptime(typeof uptime === 'string' ? parseInt(uptime) : uptime) : '—'],
-    ['Pool', nmDevice.stratumURL || nmDevice.pool || '—'],
-    ['Worker', nmDevice.stratumUser || nmDevice.worker || '—'],
-    ['Best share', fmtBestDiff(nmDevice.bestShare ?? nmDevice.best_share ?? nmDevice.bestDiff)],
     ['Accepted', String(nmDevice.shares_ok ?? '—'), t.success],
     ['Rejected', String(nmDevice.shares_err ?? '—'), nmDevice.shares_err ? t.danger : t.text],
+    ['Best diff', fmtBestDiff(nmDevice.bestShare ?? nmDevice.best_share ?? nmDevice.bestDiff)],
     ['Version', nmDevice.version || '—'],
   ] : [];
 
@@ -112,6 +110,39 @@ export function OverviewTab({ t, nmDevice, axeDevice, hr, temp, uptime, health, 
               {[
                 ['Board', axeDevice.boardVersion || '—'],
                 ['Firmware', axeDevice.version || axeDevice.axeOSVersion || '—'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: t.textMuted }}>{k}</span>
+                  <span>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {nmDevice && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+          <Card t={t}>
+            <Label t={t} style={{ marginBottom: 8 }}>Network</Label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontFamily: FONT_MONO }}>
+              {[
+                ['Pool', nmDevice.stratumURL ?? nmDevice.pool ?? '—'],
+                ['Worker', nmDevice.stratumUser ?? nmDevice.worker ?? '—'],
+                ['RSSI', (nmDevice.rssi ?? nmDevice.wifi_rssi) != null ? `${nmDevice.rssi ?? nmDevice.wifi_rssi} dBm` : '—'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: t.textMuted }}>{k}</span>
+                  <span style={{ color: t.text, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card t={t}>
+            <Label t={t} style={{ marginBottom: 8 }}>Firmware</Label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontFamily: FONT_MONO }}>
+              {[
+                ['Firmware', nmDevice.version || '—'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: t.textMuted }}>{k}</span>
