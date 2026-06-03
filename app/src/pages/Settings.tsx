@@ -10,7 +10,7 @@ import { api } from '../api';
 import type { AppSettings } from '../api';
 import { toast } from '../store/toast';
 import { useMobile } from '../hooks/useWindowWidth';
-import { BackupSection, SectionHeader, SettingRow, SecuritySection, AutoSaveHint } from '../components/settings/SettingsParts';
+import { BackupSection, SectionHeader, SettingRow, SecuritySection } from '../components/settings/SettingsParts';
 
 const SECTIONS = [
   { id: 'general',       label: 'General',            Icon: SettingsIcon },
@@ -28,7 +28,6 @@ export function Settings() {
   const { theme: t, dark, toggleDark, personality, setPersonality, density, setDensity } = useThemeStore();
   const { settings, setSettings } = useAppStore();
   const [section, setSection] = useState(params.section || 'general');
-  const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings || {});
   const latestSettings = useRef(localSettings);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -46,16 +45,15 @@ export function Settings() {
   }, [settings]);
 
   const save = useCallback(async () => {
-    setSaving(true);
     try {
       const updated = await api.settings.save(latestSettings.current);
       // Update the store WITHOUT re-seeding local state (initialized guard stays
       // set), so an in-flight save can't wipe fields edited since it started.
       setSettings(updated);
+      toast('Saved');
     } catch {
       toast('Failed to save settings', 'error');
     }
-    setSaving(false);
   }, [setSettings]);
 
   // Every edit (text fields and toggles alike) patches local state, keeps the
@@ -104,7 +102,6 @@ export function Settings() {
                 <Input t={t} value={String(localSettings.alert_cooldown_minutes || 30)} onChange={v => upd({ alert_cooldown_minutes: Number(v) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
             </Card>
-            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -127,7 +124,6 @@ export function Settings() {
                 <Input t={t} value={String(localSettings.electricity_kwh_price || 0)} onChange={v => upd({ electricity_kwh_price: Number(v) })} mono type="number" style={{ width: 100 }} />
               </SettingRow>
             </Card>
-            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -167,7 +163,6 @@ export function Settings() {
                 </>
               ); })()}
             </Card>
-            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 
@@ -205,8 +200,6 @@ export function Settings() {
             <DiscordDashboardCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
 
             <DiscordBotCard t={t} localSettings={localSettings} upd={upd} updToggle={updToggle} />
-
-            <AutoSaveHint t={t} saving={saving} />
           </div>
         )}
 

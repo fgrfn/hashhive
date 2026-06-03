@@ -1,12 +1,12 @@
 // Shared Settings building blocks (extracted from pages/Settings.tsx).
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/app';
-import { Card, Label, Toggle, Input, Spinner, btnStyle } from '../primitives';
+import { Card, Label, Toggle, Input, btnStyle } from '../primitives';
 import { FONT_MONO, type Theme } from '../../tokens';
 import { api } from '../../api';
 import type { AppSettings } from '../../api';
 import { toast } from '../../store/toast';
-import { Download, Upload, Check, Trash2, AlertTriangle } from 'lucide-react';
+import { Download, Upload, Trash2, AlertTriangle } from 'lucide-react';
 
 export function BackupSection({ t }: { t: Theme }) {
   const { setSettings } = useAppStore();
@@ -252,18 +252,6 @@ export function SecuritySection({ t, localSettings, updToggle }: {
           </div>
         )}
       </Card>
-    </div>
-  );
-}
-
-/** Auto-save status line. Settings persist automatically on change, so there is
- *  no Save button — this just reflects state. */
-export function AutoSaveHint({ t, saving }: { t: Theme; saving: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 14, fontSize: 12, color: t.textMuted, fontFamily: FONT_MONO }}>
-      {saving
-        ? <><Spinner t={t} size={12} /> Saving…</>
-        : <><Check size={12} color={t.success} /> Changes save automatically</>}
     </div>
   );
 }
