@@ -10,6 +10,7 @@ from core import (
     _stats_file,
     _validate_device_ip,
     load_json,
+    sane_ghs,
 )
 
 router = APIRouter()
@@ -38,11 +39,17 @@ async def get_hashrate_stats(
                 except Exception:
                     pass
         result.sort(key=lambda s: s.get("ts", ""))
-        return result
+        return _drop_bad(result)
     for i in range(days - 1, -1, -1):
         date_str = (now_utc - timedelta(days=i)).strftime("%Y-%m-%d")
         result.extend(load_json(_stats_file(date_str), []))
-    return result
+    return _drop_bad(result)
+
+
+def _drop_bad(samples: list) -> list:
+    """Filter out samples with an implausible hashrate (bad firmware readings
+    recorded before sanitization) so they don't wreck the chart axis."""
+    return [s for s in samples if sane_ghs(s.get("gh", 0)) is not None]
 
 
 @router.get("/api/stats/device")

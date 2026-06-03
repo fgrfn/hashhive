@@ -59,3 +59,26 @@ def test_append_device_samples_records_nmminer():
     data = load_json(_dev_stats_file(_today()), {})
     assert "10.0.0.50" in data and data["10.0.0.50"][-1]["gh"] == 0.0042
     assert "10.0.0.60" in data and data["10.0.0.60"][-1]["gh"] == 1300.0
+
+
+def test_sane_ghs_filters_implausible():
+    from core import sane_ghs
+    assert sane_ghs(0.00104) == 0.00104   # tiny NMMiner value kept
+    assert sane_ghs(1300) == 1300.0       # a BitAxe kept
+    assert sane_ghs(0) == 0.0             # zero kept (not None)
+    assert sane_ghs(3_000_000) is None    # 3 PH/s spike dropped
+    assert sane_ghs(-1) is None
+    assert sane_ghs(None) is None
+    assert sane_ghs("x") is None
+
+
+def test_device_samples_skip_implausible_hashrate():
+    import core.stats as cs
+    cs._last_dev_sample_ts = 0.0
+    bad = {"_ip": "10.0.0.99", "hashrate": 3_000_000}   # bogus spike
+    good = {"_ip": "10.0.0.98", "hashrate": 0.0042}
+    cs._append_device_samples([bad, good])
+    from core import _dev_stats_file, _today, load_json
+    data = load_json(_dev_stats_file(_today()), {})
+    assert "10.0.0.99" not in data        # spike skipped
+    assert "10.0.0.98" in data
