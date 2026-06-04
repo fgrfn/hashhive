@@ -35,13 +35,36 @@ def ensure_stratum_scheme(url: str) -> str:
     return f"stratum+tcp://{url}"
 
 
+# An ESP32 lottominer realistically does ~10 H/s … ~5 MH/s. Different NMMiner
+# firmwares report miner.hashRate in inconsistent units (GH/s, MH/s, kH/s), and
+# we treat the value as GH/s. Anything above this generous ceiling (50 MH/s) is
+# therefore mis-scaled, so we divide it down by 1000s into a sane range.
+_ESP32_MAX_GHS = 0.05
+
+
+def _plausible_ghs(hr):
+    """Normalize a NMMiner hashRate to GH/s, scaling down implausible values that
+    were reported in a smaller unit (kH/s / MH/s) but assumed to be GH/s."""
+    try:
+        v = float(hr)
+    except (TypeError, ValueError):
+        return hr
+    if v <= 0:
+        return v
+    for _ in range(4):  # cover up to GH/s mislabeled as H/s
+        if v <= _ESP32_MAX_GHS:
+            break
+        v /= 1000.0
+    return v
+
+
 def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
     """Map a NMMiner /api/system/info snapshot to the unified device dict."""
     identity = data.get("identity", {}) if isinstance(data, dict) else {}
     miner = data.get("miner", {}) if isinstance(data, dict) else {}
     stratum = data.get("stratum", {}) if isinstance(data, dict) else {}
     temps = data.get("temps", {}) if isinstance(data, dict) else {}
-    hr = miner.get("hashRate")  # GH/s
+    hr = _plausible_ghs(miner.get("hashRate"))  # normalized to GH/s
     temp = temps.get("asic")
     if temp is None:
         temp = temps.get("vcore")
