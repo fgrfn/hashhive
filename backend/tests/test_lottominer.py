@@ -168,3 +168,33 @@ def test_normalize_info_normalizes_hashrate():
             "miner": {"hashRate": 10140}, "stratum": {}, "temps": {}}
     d = _normalize_info("10.0.0.1", "nm", None, info)
     assert abs(d["GHs"] - 0.01014) < 1e-9   # not 10140 GH/s
+
+
+def test_normalize_info_real_nmminer_v2():
+    """Real GET /api/system/info from firmware v2.0.02 (ESP32, ~1.04 MH/s).
+
+    This firmware reports hashRate correctly in GH/s as a tiny float, so the
+    plausibility heuristic must leave it untouched (it's below the ceiling)."""
+    info = {
+        "identity": {"hwModel": "NMMiner", "hostName": "NMMiner5_688FB8",
+                     "fwVersion": "v2.0.02", "rssi": -71},
+        "miner": {"hashRate": 0.001042244, "sAccepted": 1, "sRejected": 0,
+                  "uptimeSeconds": 536, "uptimeEver": 117536,
+                  "lastDiff": "0.4469 ", "bestDiffEver": "13.340 "},
+        "stratum": {"url": "eu.digi.hmpool.io:3337",
+                    "user": "dgb1qgadc953sk6dj8a87yz6keu5qy5zs3wuc27kvl0"},
+        "temps": {"vcore": None, "asic": None},
+    }
+    d = _normalize_info("10.10.40.92", "nm5", None, info)
+    # hashRate is already GH/s and below the ceiling → passed through unchanged
+    assert d["GHs"] == 0.001042244
+    assert d["GHs5s"] == 0.001042244
+    assert d["hashrate"] == 0.001042244
+    assert d["online"] is True and d["_online"] is True
+    assert d["hostname"] == "NMMiner5_688FB8"
+    assert d["version"] == "v2.0.02"
+    assert d["pool"] == "eu.digi.hmpool.io:3337"
+    assert d["shares_ok"] == 1 and d["shares_err"] == 0
+    assert d["rssi"] == -71
+    # No temp sensor reported by this variant → temp stays None
+    assert d["temp"] is None
