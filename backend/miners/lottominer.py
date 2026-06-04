@@ -35,23 +35,24 @@ def ensure_stratum_scheme(url: str) -> str:
     return f"stratum+tcp://{url}"
 
 
-# An ESP32 lottominer realistically does ~10 H/s … ~5 MH/s. Different NMMiner
-# firmwares report miner.hashRate in inconsistent units (GH/s, MH/s, kH/s), and
-# we treat the value as GH/s. Anything above this generous ceiling (50 MH/s) is
-# therefore mis-scaled, so we divide it down by 1000s into a sane range.
-_ESP32_MAX_GHS = 0.05
+# An ESP32 lottominer realistically does ~10 H/s today and grows to ~1–2 MH/s.
+# Different NMMiner firmwares report miner.hashRate in inconsistent units (GH/s,
+# MH/s, kH/s, even H/s) while we treat the value as GH/s. Anything above this
+# ceiling (5 MH/s — comfortably above the real ~2 MH/s max) is therefore
+# mis-scaled, so we divide it down by 1000s into a sane range.
+_ESP32_MAX_GHS = 0.005  # 5 MH/s
 
 
 def _plausible_ghs(hr):
     """Normalize a NMMiner hashRate to GH/s, scaling down implausible values that
-    were reported in a smaller unit (kH/s / MH/s) but assumed to be GH/s."""
+    were reported in a smaller unit (H/s / kH/s / MH/s) but assumed to be GH/s."""
     try:
         v = float(hr)
     except (TypeError, ValueError):
         return hr
     if v <= 0:
         return v
-    for _ in range(4):  # cover up to GH/s mislabeled as H/s
+    for _ in range(4):  # cover GH/s … H/s mislabels
         if v <= _ESP32_MAX_GHS:
             break
         v /= 1000.0
