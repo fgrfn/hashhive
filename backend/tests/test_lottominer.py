@@ -153,12 +153,14 @@ def test_fanout_restart_sends_json_body():
 
 def test_plausible_ghs_scales_misreported_units():
     from miners.lottominer import _plausible_ghs
-    # Firmware that reports ~10 MH/s as 10140 (kH/s-ish) assumed GH/s → scaled down
-    assert abs(_plausible_ghs(10140) - 0.01014) < 1e-9      # 10.14 MH/s
-    assert _plausible_ghs(5000) == 0.005                     # 5 MH/s
-    assert _plausible_ghs(5) == 0.005                        # 5 "GH/s" → 5 MH/s
-    # Correct tiny GH/s values are left untouched
-    assert _plausible_ghs(0.00104) == 0.00104               # 1.04 MH/s
+    # 10140 (looks like H/s for a ~10 kH/s device) assumed GH/s -> scaled down to a
+    # plausible ESP32 value (ceiling is 5 MH/s).
+    assert abs(_plausible_ghs(10140) - 0.00001014) < 1e-12   # 10.14 kH/s
+    assert _plausible_ghs(2000) == 0.002                      # 2000 kH/s -> 2 MH/s
+    assert _plausible_ghs(2_000_000) == 0.002                 # 2 MH/s in H/s -> 2 MH/s
+    # Correct tiny GH/s values (<= 5 MH/s) are left untouched
+    assert _plausible_ghs(0.00104) == 0.00104                # 1.04 MH/s
+    assert _plausible_ghs(0.002) == 0.002                    # 2 MH/s reported as GH/s
     assert _plausible_ghs(0) == 0.0
     assert _plausible_ghs(None) is None
 
@@ -167,4 +169,4 @@ def test_normalize_info_normalizes_hashrate():
     info = {"identity": {"hostName": "nm", "fwVersion": "0.1.0"},
             "miner": {"hashRate": 10140}, "stratum": {}, "temps": {}}
     d = _normalize_info("10.0.0.1", "nm", None, info)
-    assert abs(d["GHs"] - 0.01014) < 1e-9   # not 10140 GH/s
+    assert abs(d["GHs"] - 0.00001014) < 1e-12   # not 10140 GH/s
