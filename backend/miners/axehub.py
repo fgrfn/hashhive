@@ -62,6 +62,7 @@ def _normalize_axehub(ip: str, name: str, temp_max, data: dict) -> dict:
         "_ip": ip, "_name": name, "_type": "axehub", "_online": True, "_temp_max": temp_max,
         "ip": ip,
         "name": name,
+        "model": "NerdMiner-AxeHub",
         "hostname": device.get("hostname") or name,
         "GHs": ghs, "GHs5s": ghs, "hashrate": ghs,
         "temp": hardware.get("temp_board_c"),

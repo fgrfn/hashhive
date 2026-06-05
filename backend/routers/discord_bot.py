@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import httpx
 
 from core import CONFIG_FILE, DEFAULT_CONFIG, load_json
+from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
 from routers.axeos import _fetch_axeos_device
 from routers.dashboard import _parse_nm_shares
 from routers.lottominer import _fetch_lottominer_safe
@@ -69,24 +70,29 @@ async def collect_devices() -> list[dict]:
     dashboard so the numbers match.
     """
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
+    wroom_devices = config.get("wroomminer_devices", [])
     axeos_devices = config.get("axeos_devices", [])
-    has_nm = bool(master or nm_devices)
+    has_nm = bool(nm_devices)
+    has_wroom = bool(wroom_devices)
 
     async with httpx.AsyncClient(timeout=10) as client:
         coros = []
         if has_nm:
-            coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+            coros.append(_fetch_lottominer_safe(client, nm_devices))
+        if has_wroom:
+            coros.append(_fetch_wroomminer_safe(client, wroom_devices))
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
         results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
 
     idx = 0
     nm_data = {"devices": []}
-    if has_nm:
-        first = results[0] if results else {}
-        nm_data = first if isinstance(first, dict) else {"devices": []}
-        idx = 1
+    for has_family in (has_nm, has_wroom):
+        if has_family and idx < len(results):
+            res = results[idx]
+            if isinstance(res, dict):
+                nm_data["devices"] = list(nm_data.get("devices", [])) + list(res.get("devices", []))
+            idx += 1
     axeos_results = [r for r in results[idx:] if isinstance(r, dict)]
 
     devices: list[dict] = []

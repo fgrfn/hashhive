@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from core import CONFIG_FILE, DEFAULT_CONFIG, _pool_health, _validate_device_ip, load_json, save_json
 from miners.axehub import set_axehub_pool
+from miners.wroomminer import set_wroomminer_pool
 from miners.lottominer import ensure_stratum_scheme
 
 router = APIRouter()
@@ -129,7 +130,6 @@ async def push_pool_to_device(ip: str, pool: dict):
     _validate_device_ip(ip)
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
 
-    nm_master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
     axe_devices = config.get("axeos_devices", [])
 
@@ -137,15 +137,21 @@ async def push_pool_to_device(ip: str, pool: dict):
     is_axehub = any(
         (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("axehub_devices", [])
     )
-    is_nm = (ip == nm_master) or any(
+    is_wroom = any(
+        (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("wroomminer_devices", [])
+    )
+    is_nm = any(
         (d.get("ip") == ip if isinstance(d, dict) else d == ip) for d in nm_devices
     )
 
-    if not is_axe and not is_axehub and not is_nm:
+    if not is_axe and not is_axehub and not is_wroom and not is_nm:
         raise HTTPException(status_code=404, detail=f"Device {ip} not found in config")
 
     if is_axehub:
         return await set_axehub_pool(ip, pool)
+
+    if is_wroom:
+        return await set_wroomminer_pool(ip, pool)
 
     wallet = pool.get("wallet") or pool.get("worker", "")
     password = pool.get("password") or "x"

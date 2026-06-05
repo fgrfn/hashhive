@@ -9,29 +9,41 @@ from .paths import ALERT_HISTORY_FILE, CONFIG_FILE, LOGS_DIR, MAX_ENTRIES_PER_DA
 
 
 def _migrate_config() -> None:
-    """Rename legacy NMMiner config keys to the generalized 'lottominer' keys.
+    """Migrate legacy NMMiner/Lottominer config keys.
 
     NMMiner support was generalized into a 'Lottominer' category; older configs
-    used nmminer_master / nmminer_devices. Migrate them in place once on start so
-    existing deployments keep their devices.
+    used nmminer_master / nmminer_devices, later lottominer_master. The dedicated
+    "master" device was dropped — any configured master IP is folded into
+    ``lottominer_devices`` as a standalone device so existing deployments keep it.
+    Migrations run in place once on start.
     """
     if not CONFIG_FILE.exists():
         return
     try:
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         changed = False
-        if "nmminer_master" in config and "lottominer_master" not in config:
-            config["lottominer_master"] = config.pop("nmminer_master")
-            changed = True
-        elif "nmminer_master" in config:
-            config.pop("nmminer_master")
-            changed = True
+        # Legacy device-list rename: nmminer_devices -> lottominer_devices.
         if "nmminer_devices" in config and "lottominer_devices" not in config:
             config["lottominer_devices"] = config.pop("nmminer_devices")
             changed = True
         elif "nmminer_devices" in config:
             config.pop("nmminer_devices")
             changed = True
+        # Fold any legacy master (nmminer_master / lottominer_master) into the
+        # device list, then drop the obsolete key.
+        for master_key in ("nmminer_master", "lottominer_master"):
+            if master_key not in config:
+                continue
+            master_ip = str(config.pop(master_key) or "").strip()
+            changed = True
+            if not master_ip:
+                continue
+            devices = config.setdefault("lottominer_devices", [])
+            already = any(
+                (d.get("ip") if isinstance(d, dict) else d) == master_ip for d in devices
+            )
+            if not already:
+                devices.append({"ip": master_ip, "name": master_ip})
         if changed:
             save_json(CONFIG_FILE, config)
     except Exception:

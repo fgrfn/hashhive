@@ -22,7 +22,9 @@ router = APIRouter()
 async def health():
     uptime = (datetime.now(timezone.utc) - _startup_time).total_seconds()
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    nm_count = len(config.get("lottominer_devices", []))
+    nm_count = (len(config.get("lottominer_devices", []))
+                + len(config.get("wroomminer_devices", []))
+                + len(config.get("axehub_devices", [])))
     ax_count = len(config.get("axeos_devices", []))
     return {
         "status": "ok",

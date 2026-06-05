@@ -101,9 +101,9 @@ def _device_type_for_ip(ip: str, config: dict) -> str:
     """Resolve which miner family an IP belongs to from the saved config."""
     if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("axeos_devices", [])):
         return "axeos"
-    if ip == config.get("lottominer_master") or any(
-        (d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("lottominer_devices", [])
-    ):
+    if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("wroomminer_devices", [])):
+        return "wroomminer"
+    if any((d.get("ip") if isinstance(d, dict) else d) == ip for d in config.get("lottominer_devices", [])):
         return "lottominer"
     return "unknown"
 

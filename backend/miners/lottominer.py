@@ -72,6 +72,7 @@ def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
         "_ip": ip, "_name": name, "_type": "lottominer", "_online": True, "_temp_max": temp_max,
         "ip": ip,
         "name": name,
+        "model": identity.get("model") or identity.get("hwModel") or "NMMiner",
         "hostname": identity.get("hostName") or name,
         "GHs": hr, "GHs5s": hr, "hashrate": hr,
         "temp": temp,
@@ -95,15 +96,11 @@ def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
 
 async def fetch_lottominer_safe(
     client: httpx.AsyncClient,
-    master: str,
     nm_devices: list | None = None,
 ) -> dict:
     """Poll each configured NMMiner via GET /api/system/info (devices are standalone)."""
     seen: set[str] = set()
     targets: list[dict] = []
-    if master:
-        targets.append({"ip": master, "name": master})
-        seen.add(master)
     for d in (nm_devices or []):
         ip = d.get("ip") if isinstance(d, dict) else d
         if ip and ip not in seen:
@@ -111,7 +108,7 @@ async def fetch_lottominer_safe(
             targets.append({"ip": ip, "name": (d.get("name") if isinstance(d, dict) else "") or ip,
                             "temp_max": d.get("temp_max") if isinstance(d, dict) else None})
     if not targets:
-        return {"devices": [], "_error": "no Lottominer configured"}
+        return {"devices": []}
 
     results: list[dict] = []
 
@@ -195,7 +192,7 @@ class LottominerDriver(MinerDriver):
 
     async def poll(self) -> dict:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            return await fetch_lottominer_safe(client, self.host, None)
+            return await fetch_lottominer_safe(client, [{"ip": self.host, "name": self.host}])
 
     async def restart(self) -> bool:
         res = await lottominer_fanout("restart", [self.host])

@@ -5,6 +5,7 @@ on:
     tags:
       - "v*"
     branches:
+      - main
       - dev
 
 permissions:
@@ -26,12 +27,18 @@ jobs:
         id: ver
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # Version tag: publish :<version> + :latest and create a GitHub Release.
             VERSION="${GITHUB_REF_NAME#v}"
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
             echo "tag=v${VERSION}"    >> $GITHUB_OUTPUT
             echo "${VERSION}" > version.txt
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
+            # main push: publish the moving :latest image, no release.
+            echo "version=latest" >> $GITHUB_OUTPUT
+            echo "tag=latest"     >> $GITHUB_OUTPUT
+            echo "latest" > version.txt
           else
-            # Branch push (dev): publish a moving :dev image, no release.
+            # dev push: publish the moving :dev image, no release.
             echo "version=dev" >> $GITHUB_OUTPUT
             echo "tag=dev"     >> $GITHUB_OUTPUT
             echo "dev" > version.txt
