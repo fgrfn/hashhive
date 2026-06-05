@@ -85,7 +85,9 @@ export interface DashboardData {
 
 export interface NMMinerDevice {
   ip: string;
-  _type?: 'lottominer' | 'axehub';
+  _type?: 'lottominer' | 'wroomminer' | 'axehub';
+  model?: string;
+  legacy?: boolean;
   name?: string;
   hostname?: string;
   status?: 'online' | 'offline' | 'warning';

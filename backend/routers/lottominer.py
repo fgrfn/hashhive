@@ -26,6 +26,7 @@ from miners.lottominer import (  # noqa: F401
     ensure_stratum_scheme,
     fetch_lottominer_safe as _fetch_lottominer_safe,
     lottominer_fanout,
+    probe_lottominer as _probe_lottominer,
 )
 from miners.wroomminer import (  # noqa: F401
     WROOM_ACTION_MAP as _WROOM_ACTION_MAP,
@@ -63,25 +64,19 @@ async def scan_lottominer_devices():
     sem = asyncio.Semaphore(60)
 
     limits = httpx.Limits(max_connections=60, max_keepalive_connections=0)
-    async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
+    async with httpx.AsyncClient(timeout=2.0, limits=limits) as client:
         async def _probe(ip: str):
             async with sem:
-                try:
-                    resp = await client.get(f"http://{ip}/probe")
-                    if resp.status_code != 200:
-                        return
-                    data = resp.json()
-                    if not isinstance(data, dict):
-                        return
-                    if str(data.get("model", "")).lower() == "nmminer" or ("hr" in data and "ver" in data):
-                        found.append({
-                            "ip": ip,
-                            "role": "device",
-                            "device_count": 1,
-                            "devices": [{"ip": ip, "name": data.get("hostname") or f"NMMiner ({ip})"}],
-                        })
-                except Exception:
-                    pass
+                # Reuse the driver probe so this picks up firmware that only
+                # serves /api/system/info (e.g. v2.0.02), not just /probe.
+                rec = await _probe_lottominer(ip, client)
+                if rec:
+                    found.append({
+                        "ip": ip,
+                        "role": "device",
+                        "device_count": 1,
+                        "devices": [{"ip": ip, "name": rec.get("name") or f"NMMiner ({ip})"}],
+                    })
 
         await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
 
