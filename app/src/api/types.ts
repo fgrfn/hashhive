@@ -4,10 +4,11 @@ export interface OkResponse { ok?: boolean; status?: string }
 
 export interface DiscoveredDevice {
   ip: string;
-  type: 'bitaxe' | 'nerdaxe' | 'lottominer_master' | 'lottominer_device' | 'axehub_device';
+  type: 'bitaxe' | 'nerdaxe' | 'lottominer_device' | 'wroomminer_device' | 'axehub_device';
   name: string;
   discovered_via: 'arp' | 'mdns' | 'scan';
   asic?: string;
+  model?: string;
   hashrate?: number | string;
   temp?: number;
   version?: string;
@@ -262,8 +263,8 @@ export interface HealthData {
 }
 
 export interface AppSettings {
-  lottominer_master?: string;
   lottominer_devices?: Array<{ ip: string; name?: string }>;
+  wroomminer_devices?: Array<{ ip: string; name?: string }>;
   axehub_devices?: Array<{ ip: string; name?: string }>;
   axeos_devices?: Array<{ ip: string; name: string; type: string }>;
   refresh_interval?: number;

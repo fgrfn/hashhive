@@ -14,6 +14,8 @@ from core import (
     load_json,
     save_json,
 )
+from miners.axehub import axehub_fanout
+from miners.wroomminer import wroomminer_fanout
 from routers.axeos import axeos_fanout
 from routers.lottominer import lottominer_fanout
 from routers.pools import push_pool_to_device
@@ -81,9 +83,6 @@ def _split_by_type(ips: list[str], config: dict) -> tuple[list[str], list[str]]:
     """Split a list of device IPs into (axeos_ips, lottominer_ips) using the config."""
     axe = {_ip_of(d) for d in config.get("axeos_devices", [])}
     nm = {_ip_of(d) for d in config.get("lottominer_devices", [])}
-    master = config.get("lottominer_master", "")
-    if master:
-        nm.add(master)
     axe_ips = [ip for ip in ips if ip in axe]
     nm_ips = [ip for ip in ips if ip in nm]
     return axe_ips, nm_ips
@@ -122,8 +121,17 @@ async def group_action(group_id: str, request: Request):
         axe_ips, nm_ips = _split_by_type(ips, config)
         if axe_ips:
             results += await axeos_fanout(action, axe_ips)
-        if nm_ips and action == "restart":
-            results += await lottominer_fanout("restart", nm_ips)
+        if action == "restart":
+            wroom_set = {_ip_of(d) for d in config.get("wroomminer_devices", [])}
+            axehub_set = {_ip_of(d) for d in config.get("axehub_devices", [])}
+            wroom_ips = [ip for ip in ips if ip in wroom_set]
+            axehub_ips = [ip for ip in ips if ip in axehub_set]
+            if nm_ips:
+                results += await lottominer_fanout("restart", nm_ips)
+            if wroom_ips:
+                results += await wroomminer_fanout("restart", wroom_ips)
+            if axehub_ips:
+                results += await axehub_fanout("restart", axehub_ips)
     else:
         raise HTTPException(status_code=400, detail="Unsupported action")
 

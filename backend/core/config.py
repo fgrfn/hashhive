@@ -3,8 +3,8 @@
 from pydantic import BaseModel, field_validator
 
 DEFAULT_CONFIG: dict = {
-    "lottominer_master": "",
     "lottominer_devices": [],
+    "wroomminer_devices": [],
     "axehub_devices": [],
     "axeos_devices": [],
     "refresh_interval": 30,

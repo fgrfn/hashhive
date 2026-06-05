@@ -21,7 +21,7 @@ def _empty_config() -> dict:
     return {
         "axeos_devices": [],
         "lottominer_devices": [],
-        "lottominer_master": "",
+        "wroomminer_devices": [],
     }
 
 
@@ -30,12 +30,12 @@ def test_add_sorts_devices_by_type():
     added = _add_devices_to_config(config, [
         {"ip": "192.168.1.10", "type": "bitaxe", "name": "axe1"},
         {"ip": "192.168.1.11", "type": "nerdaxe", "name": "axe2"},
-        {"ip": "192.168.1.12", "type": "lottominer_master", "name": "master"},
+        {"ip": "192.168.1.12", "type": "wroomminer_device", "name": "wroom1"},
         {"ip": "192.168.1.13", "type": "lottominer_device", "name": "nmdev"},
     ])
     assert len(added) == 4
     assert {d["ip"] for d in config["axeos_devices"]} == {"192.168.1.10", "192.168.1.11"}
-    assert config["lottominer_master"] == "192.168.1.12"
+    assert config["wroomminer_devices"][0]["ip"] == "192.168.1.12"
     assert config["lottominer_devices"][0]["ip"] == "192.168.1.13"
 
 

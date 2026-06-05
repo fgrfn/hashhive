@@ -12,9 +12,9 @@ import { applyDashboardToStore } from '../hooks/useDeviceStream';
 const TYPE_LABEL: Record<DiscoveredDevice['type'], string> = {
   bitaxe: 'BitAxe',
   nerdaxe: 'NerdAxe',
-  lottominer_master: 'Lottominer Master',
-  lottominer_device: 'Lottominer Device',
-  axehub_device: 'AxeHub',
+  lottominer_device: 'NMMiner',
+  wroomminer_device: 'WroomMiner',
+  axehub_device: 'NerdMiner-AxeHub',
 };
 
 const VIA_ICON: Record<DiscoveredDevice['discovered_via'], React.ReactNode> = {
@@ -27,9 +27,9 @@ const VIA_ICON: Record<DiscoveredDevice['discovered_via'], React.ReactNode> = {
 const MANUAL_TYPES: [DiscoveredDevice['type'], string][] = [
   ['bitaxe', 'BitAxe'],
   ['nerdaxe', 'NerdAxe'],
-  ['lottominer_master', 'Lottominer Master'],
-  ['lottominer_device', 'Lottominer Device'],
-  ['axehub_device', 'AxeHub'],
+  ['lottominer_device', 'NMMiner'],
+  ['wroomminer_device', 'WroomMiner'],
+  ['axehub_device', 'NerdMiner-AxeHub'],
 ];
 
 interface ConfiguredDevice { ip: string; name: string; type: string; list: keyof AppSettings; }
@@ -39,8 +39,8 @@ function configuredDevices(s: AppSettings | null): ConfiguredDevice[] {
   if (!s) return [];
   const out: ConfiguredDevice[] = [];
   for (const d of s.axeos_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: d.type || 'bitaxe', list: 'axeos_devices' });
-  if (s.lottominer_master) out.push({ ip: s.lottominer_master, name: `Master (${s.lottominer_master})`, type: 'lottominer_master', list: 'lottominer_master' });
   for (const d of s.lottominer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'lottominer', list: 'lottominer_devices' });
+  for (const d of s.wroomminer_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'wroomminer', list: 'wroomminer_devices' });
   for (const d of s.axehub_devices || []) out.push({ ip: d.ip, name: d.name || d.ip, type: 'axehub', list: 'axehub_devices' });
   return out;
 }
@@ -141,12 +141,8 @@ export function Discovery() {
 
   const remove = async (d: ConfiguredDevice) => {
     const s: AppSettings = { ...(settings || {}) };
-    if (d.list === 'lottominer_master') {
-      s.lottominer_master = '';
-    } else {
-      const arr = (s[d.list] as Array<{ ip: string }> | undefined) || [];
-      (s as Record<string, unknown>)[d.list] = arr.filter(x => x.ip !== d.ip);
-    }
+    const arr = (s[d.list] as Array<{ ip: string }> | undefined) || [];
+    (s as Record<string, unknown>)[d.list] = arr.filter(x => x.ip !== d.ip);
     try {
       const updated = await api.settings.save(s);
       setSettings(updated);

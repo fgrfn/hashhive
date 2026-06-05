@@ -78,8 +78,8 @@ export function Lottominer() {
     if (!window.confirm(`Remove ${n} device${n !== 1 ? 's' : ''} from HashHive? The miner${n !== 1 ? 's' : ''} keep${n === 1 ? 's' : ''} running — this only stops monitoring ${n !== 1 ? 'them' : 'it'} here.`)) return;
     const s: AppSettings = { ...(settings || {}) };
     s.lottominer_devices = (s.lottominer_devices || []).filter(d => !ips.includes(d.ip));
+    s.wroomminer_devices = (s.wroomminer_devices || []).filter(d => !ips.includes(d.ip));
     s.axehub_devices = (s.axehub_devices || []).filter(d => !ips.includes(d.ip));
-    if (s.lottominer_master && ips.includes(s.lottominer_master)) s.lottominer_master = '';
     try {
       setSettings(await api.settings.save(s));
       try { applyDashboardToStore(await api.dashboard()); } catch { /* keep going */ }
@@ -233,10 +233,10 @@ export function Lottominer() {
                 <FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                {d._type === 'axehub' ? (
-                  <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, alignSelf: 'center' }} title="Configure AxeHub pools from the Pools page">—</span>
-                ) : (
+                {d._type === 'lottominer' ? (
                   <button title="Configure" onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '3px 5px' }}><SettingsIcon size={11} /></button>
+                ) : (
+                  <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, alignSelf: 'center' }} title="Configure pools from the Pools page">—</span>
                 )}
                 <button title="Restart" onClick={() => doAction(ip, 'restart')} style={{ ...btnStyle(t), padding: '3px 5px' }}><RotateCcw size={11} /></button>
               </div>
@@ -414,7 +414,7 @@ function NmMobileCard({ t, d, onConfigure, onAction, onNavigate, fwLatest }: { t
         <NmKv t={t} label="Version" value={d.version || '—'} badge={<FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />} />
       </div>
       <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
-        {d._type !== 'axehub' && (
+        {d._type === 'lottominer' && (
           <button onClick={() => onConfigure(ip)} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><SettingsIcon size={11} /> Configure</button>
         )}
         <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>
