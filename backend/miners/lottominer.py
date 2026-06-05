@@ -11,6 +11,7 @@ Docs: https://github.com/NMminer1024/NMMiner/blob/main/docs/api-reference.md
 """
 
 import asyncio
+import re
 from datetime import datetime, timezone
 
 import httpx
@@ -94,6 +95,120 @@ def _normalize_info(ip: str, name: str, temp_max, data: dict) -> dict:
     }
 
 
+# ── Legacy NMMiner (v1.8.x "swarm" firmware) ──────────────────────────────────
+# Old firmware predates /probe and /api/system/info; it serves GET /swarm with a
+# summary + devices[] list whose values are pre-formatted strings. Parsing logic
+# mirrors the official NMController_web controller.
+_HR_UNITS = {"H/S": 1, "KH/S": 1e3, "MH/S": 1e6, "GH/S": 1e9, "TH/S": 1e12, "PH/S": 1e15}
+_DIFF_SUFFIX = {"": 1, "K": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "P": 1e15}
+
+
+def _swarm_hashrate_ghs(s):
+    """Parse a swarm hashRate string like ``"1.0045MH/s"`` to GH/s."""
+    if isinstance(s, (int, float)):
+        return float(s) / 1e9
+    if not isinstance(s, str):
+        return None
+    m = re.fullmatch(r"\s*([\d.]+)\s*([KMGTP]?H/s)\s*", s, re.IGNORECASE)
+    if not m:
+        try:
+            return float(s) / 1e9
+        except ValueError:
+            return None
+    return float(m.group(1)) * _HR_UNITS.get(m.group(2).upper(), 1) / 1e9
+
+
+def _parse_diff_token(tok: str):
+    m = re.fullmatch(r"\s*([\d.]+)\s*([KMGTP]?)\s*", tok, re.IGNORECASE)
+    if not m:
+        return None
+    return float(m.group(1)) * _DIFF_SUFFIX.get(m.group(2).upper(), 1)
+
+
+def _swarm_diff(s):
+    """Parse a diff string. Handles the dual ``"0.016 /3.282K"`` (session/best)
+    form by returning the larger value, and single ``"0.001 "`` values."""
+    if s is None or isinstance(s, (int, float)):
+        return s
+    vals = [v for v in (_parse_diff_token(p) for p in str(s).split("/")) if v is not None]
+    return max(vals) if vals else None
+
+
+def _swarm_uptime_seconds(s):
+    """Parse the ``"000d 00:00:09/263d 22:30:09"`` (current/total) uptime to the
+    current uptime in seconds."""
+    if s is None:
+        return None
+    cur = str(s).split("/")[0].strip()
+    m = re.fullmatch(r"(\d+)d\s+(\d{1,2}):(\d{2}):(\d{2})", cur)
+    if not m:
+        return None
+    d, h, mi, sec = (int(x) for x in m.groups())
+    return d * 86400 + h * 3600 + mi * 60 + sec
+
+
+def _swarm_shares(s):
+    """Parse ``"rejected/accepted/rate%"`` -> ``(accepted, rejected)`` (matching
+    the dashboard's NMMiner share convention)."""
+    if not isinstance(s, str):
+        return (None, None)
+    parts = s.split("/")
+    if len(parts) >= 2:
+        try:
+            return (int(parts[1]), int(parts[0]))
+        except ValueError:
+            return (None, None)
+    return (None, None)
+
+
+def _swarm_int(s):
+    try:
+        return int(float(s))
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_swarm(master_ip: str, master_name, temp_max, sd: dict) -> dict:
+    """Map one entry of a legacy ``/swarm`` ``devices[]`` list to the unified dict.
+
+    A swarm master can report several workers; each carries its own ``ip``.
+    """
+    sd = sd if isinstance(sd, dict) else {}
+    worker_ip = sd.get("ip") or master_ip
+    name = master_name if worker_ip == master_ip else (sd.get("boardType") or worker_ip)
+    ghs = _swarm_hashrate_ghs(sd.get("hashRate"))
+    acc, rej = _swarm_shares(sd.get("share"))
+    temp_raw = sd.get("temp")
+    temp = None if str(temp_raw).strip().upper() in ("", "N/A", "NONE") else _swarm_int(temp_raw)
+    best = _swarm_diff(sd.get("bestDiff"))
+    return {
+        "_ip": worker_ip, "_name": name, "_type": "lottominer", "_online": True,
+        "_temp_max": temp_max, "_legacy": True,
+        "ip": worker_ip,
+        "name": name,
+        "model": "NMMiner",
+        "legacy": True,
+        "hostname": sd.get("boardType") or name,
+        "GHs": ghs, "GHs5s": ghs, "hashrate": ghs,
+        "temp": temp,
+        "pool": sd.get("pool", ""),
+        "stratumURL": sd.get("pool", ""),
+        "worker": "",
+        "stratumUser": "",
+        "uptime": _swarm_uptime_seconds(sd.get("uptime")),
+        "bestDiff": best,
+        "bestShare": best,
+        "lastDiff": _swarm_diff(sd.get("lastDiff")),
+        "version": sd.get("version", ""),
+        "shares_ok": acc,
+        "shares_err": rej,
+        "rssi": _swarm_int(sd.get("rssi")),
+        "wifi_rssi": _swarm_int(sd.get("rssi")),
+        "online": True,
+        "status": "online",
+    }
+
+
 async def fetch_lottominer_safe(
     client: httpx.AsyncClient,
     nm_devices: list | None = None,
@@ -114,14 +229,29 @@ async def fetch_lottominer_safe(
 
     async def _one(dev: dict):
         ip = dev["ip"]
+        # New firmware (v2.x): per-device GET /api/system/info.
         try:
             r = await client.get(f"http://{ip}/api/system/info")
             r.raise_for_status()
             results.append(_normalize_info(ip, dev.get("name", ip), dev.get("temp_max"), r.json()))
+            return
         except Exception:
-            results.append({"_ip": ip, "_name": dev.get("name", ip), "_type": "lottominer",
-                            "_online": False, "_temp_max": dev.get("temp_max"),
-                            "ip": ip, "hostname": dev.get("name", ip), "online": False, "status": "offline"})
+            pass
+        # Legacy firmware (v1.8.x): GET /swarm returns a summary + devices[] list.
+        try:
+            r = await client.get(f"http://{ip}/swarm")
+            r.raise_for_status()
+            data = r.json()
+            swarm_devs = data.get("devices") if isinstance(data, dict) else None
+            if swarm_devs:
+                for sd in swarm_devs:
+                    results.append(_normalize_swarm(ip, dev.get("name", ip), dev.get("temp_max"), sd))
+                return
+        except Exception:
+            pass
+        results.append({"_ip": ip, "_name": dev.get("name", ip), "_type": "lottominer",
+                        "_online": False, "_temp_max": dev.get("temp_max"), "model": "NMMiner",
+                        "ip": ip, "hostname": dev.get("name", ip), "online": False, "status": "offline"})
 
     await asyncio.gather(*[_one(d) for d in targets])
     return {"devices": results}
@@ -163,12 +293,12 @@ async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
 async def probe_lottominer(ip: str, client: httpx.AsyncClient) -> dict | None:
     """Discovery probe: detect a NMMiner.
 
-    Tries the lightweight ``/probe`` endpoint first (older firmware), then falls
-    back to the canonical ``/api/system/info`` — newer firmware (e.g. v2.0.02)
-    does not serve ``/probe`` (or changed its shape), but always exposes
-    ``/api/system/info`` with ``identity.hwModel == "NMMiner"``.
+    Tries three endpoints, newest first, so every firmware generation is found:
+    ``/probe`` (older v1.x/v2.x fast path) → ``/api/system/info`` (v2.x firmware
+    without ``/probe``, e.g. v2.0.02) → ``/swarm`` (legacy v1.8.x swarm firmware,
+    which serves neither of the first two).
     """
-    # Fast path: NMMiner's lightweight /probe endpoint.
+    # Stage 1: NMMiner's lightweight /probe endpoint.
     try:
         resp = await client.get(f"http://{ip}/probe", timeout=2.0)
         if resp.status_code == 200:
@@ -189,30 +319,49 @@ async def probe_lottominer(ip: str, client: httpx.AsyncClient) -> dict | None:
     except Exception:
         pass
 
-    # Fallback: identify via /api/system/info (the endpoint used for polling).
+    # Stage 2: identify via /api/system/info (the endpoint used for polling).
     try:
         resp = await client.get(f"http://{ip}/api/system/info", timeout=2.0)
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        if not isinstance(data, dict):
-            return None
-        identity = data.get("identity") or {}
-        model = str(identity.get("model") or identity.get("hwModel") or "").lower()
-        # Require an explicit NMMiner marker so this never grabs an AxeOS device
-        # or a WroomMiner (whose compat shim reports model "WroomMiner").
-        if "nmminer" not in model:
-            return None
-        return {
-            "ip": ip,
-            "type": "lottominer_device",
-            "name": identity.get("hostName") or f"NMMiner ({ip})",
-            "model": "NMMiner",
-            "device_count": 1,
-            "version": identity.get("fwVersion", ""),
-        }
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict):
+                identity = data.get("identity") or {}
+                model = str(identity.get("model") or identity.get("hwModel") or "").lower()
+                # Require an explicit NMMiner marker so this never grabs an AxeOS
+                # device or a WroomMiner (compat shim reports model "WroomMiner").
+                if "nmminer" in model:
+                    return {
+                        "ip": ip,
+                        "type": "lottominer_device",
+                        "name": identity.get("hostName") or f"NMMiner ({ip})",
+                        "model": "NMMiner",
+                        "device_count": 1,
+                        "version": identity.get("fwVersion", ""),
+                    }
     except Exception:
-        return None
+        pass
+
+    # Stage 3: legacy v1.8.x swarm firmware — GET /swarm (summary + devices[]).
+    try:
+        resp = await client.get(f"http://{ip}/swarm", timeout=2.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "summary" in data and isinstance(data.get("devices"), list):
+                devs = data["devices"]
+                ver = devs[0].get("version", "") if devs else ""
+                return {
+                    "ip": ip,
+                    "type": "lottominer_device",
+                    "name": f"NMMiner ({ip})",
+                    "model": "NMMiner",
+                    "legacy": True,
+                    "device_count": len(devs) or 1,
+                    "version": ver,
+                }
+    except Exception:
+        pass
+
+    return None
 
 
 class LottominerDriver(MinerDriver):

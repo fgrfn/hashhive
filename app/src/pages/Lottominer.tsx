@@ -233,7 +233,7 @@ export function Lottominer() {
                 <FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                {d._type === 'lottominer' ? (
+                {d._type === 'lottominer' && !d.legacy ? (
                   <button title="Configure" onClick={() => openEdit(ip)} style={{ ...btnStyle(t), padding: '3px 5px' }}><SettingsIcon size={11} /></button>
                 ) : (
                   <span style={{ fontSize: 10, color: t.textMuted, fontFamily: FONT_MONO, alignSelf: 'center' }} title="Configure pools from the Pools page">—</span>
@@ -414,7 +414,7 @@ function NmMobileCard({ t, d, onConfigure, onAction, onNavigate, fwLatest }: { t
         <NmKv t={t} label="Version" value={d.version || '—'} badge={<FwBadge t={t} current={d.version} family={d._type === 'axehub' ? 'axehub' : 'lottominer'} fwLatest={fwLatest} />} />
       </div>
       <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
-        {d._type === 'lottominer' && (
+        {d._type === 'lottominer' && !d.legacy && (
           <button onClick={() => onConfigure(ip)} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><SettingsIcon size={11} /> Configure</button>
         )}
         <button onClick={() => onAction(ip, 'restart')} style={{ ...btnStyle(t), fontSize: 11, flex: 1 }}><RotateCcw size={11} /> Restart</button>

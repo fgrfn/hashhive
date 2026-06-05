@@ -12,11 +12,32 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from miners.lottominer import LOTTO_ACTION_MAP, _normalize_info, probe_lottominer  # noqa: E402
+from miners.lottominer import (  # noqa: E402
+    LOTTO_ACTION_MAP,
+    _normalize_info,
+    _normalize_swarm,
+    _swarm_hashrate_ghs,
+    fetch_lottominer_safe,
+    probe_lottominer,
+)
 
 
 def _resp(status, payload):
-    return type("R", (), {"status_code": status, "json": lambda self: payload})()
+    return type("R", (), {"status_code": status, "json": lambda self: payload,
+                          "raise_for_status": lambda self: None})()
+
+
+# Real GET /swarm from legacy NMMiner firmware v1.8.10 (board "dev kitc32").
+_SWARM = {
+    "summary": {"totalWorkers": 1, "totalHashRate": "1.0045M", "bestDiff": "0.0160 "},
+    "devices": [{
+        "ip": "10.10.30.225", "boardType": "dev kitc32", "hashRate": "1.0045MH/s",
+        "share": "0/2/100.0%", "pool": "pool.nerdminers.org:3333", "netDiff": "139.0T",
+        "poolDiff": "0.001 ", "lastDiff": "0.001 ", "bestDiff": "0.016 /3.282K",
+        "valid": "0", "temp": "N/A", "rssi": "-43", "freeHeap": "139.4",
+        "uptime": "000d 00:00:09/263d 22:30:09", "version": "v1.8.10", "lastseen": "Just now",
+    }],
+}
 
 
 def test_restart_uses_real_endpoint():
@@ -55,6 +76,56 @@ def test_probe_detects_nmminer_via_system_info_fallback():
     assert rec["name"] == "NMMiner5_688FB8"
     assert rec["model"] == "NMMiner"
     assert rec["version"] == "v2.0.02"
+
+
+def test_swarm_hashrate_parsing():
+    assert abs(_swarm_hashrate_ghs("1.0045MH/s") - 0.0010045) < 1e-12
+    assert abs(_swarm_hashrate_ghs("500kH/s") - 0.0005) < 1e-12   # 500 kH/s = 5e-4 GH/s
+    assert _swarm_hashrate_ghs("N/A") is None
+
+
+def test_normalize_swarm_real_v1():
+    d = _normalize_swarm("10.10.30.225", "old-nm", None, _SWARM["devices"][0])
+    assert d["_type"] == "lottominer" and d["legacy"] is True
+    assert d["model"] == "NMMiner" and d["version"] == "v1.8.10"
+    assert abs(d["GHs"] - 0.0010045) < 1e-12
+    assert d["shares_ok"] == 2 and d["shares_err"] == 0      # "0/2/100.0%" -> rej/acc
+    assert d["temp"] is None                                  # "N/A"
+    assert d["bestDiff"] == 3282.0                            # max of "0.016 /3.282K"
+    assert d["lastDiff"] == 0.001
+    assert d["uptime"] == 9                                   # "000d 00:00:09" -> 9s
+    assert d["rssi"] == -43
+    assert d["pool"] == "pool.nerdminers.org:3333"
+
+
+def test_probe_detects_legacy_swarm():
+    async def _get(url, **kwargs):
+        if url.endswith("/swarm"):
+            return _resp(200, _SWARM)
+        return _resp(404, {})
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=_get)
+    rec = asyncio.run(probe_lottominer("10.10.30.225", client))
+    assert rec and rec["type"] == "lottominer_device"
+    assert rec["legacy"] is True and rec["version"] == "v1.8.10"
+
+
+def test_fetch_polls_legacy_swarm_when_system_info_absent():
+    async def _get(url, **kwargs):
+        if url.endswith("/api/system/info"):
+            raise RuntimeError("404 not found")
+        if url.endswith("/swarm"):
+            return _resp(200, _SWARM)
+        raise RuntimeError("unexpected")
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=_get)
+    out = asyncio.run(fetch_lottominer_safe(client, [{"ip": "10.10.30.225", "name": "old-nm"}]))
+    assert len(out["devices"]) == 1
+    dev = out["devices"][0]
+    assert dev["online"] is True and dev["legacy"] is True
+    assert abs(dev["GHs"] - 0.0010045) < 1e-12
 
 
 def test_probe_fallback_ignores_wroomminer_compat_shim():
