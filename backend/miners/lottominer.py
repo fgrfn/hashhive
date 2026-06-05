@@ -161,25 +161,55 @@ async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
 
 
 async def probe_lottominer(ip: str, client: httpx.AsyncClient) -> dict | None:
-    """Discovery probe: detect a NMMiner via its /probe endpoint (model == NMMiner)."""
+    """Discovery probe: detect a NMMiner.
+
+    Tries the lightweight ``/probe`` endpoint first (older firmware), then falls
+    back to the canonical ``/api/system/info`` — newer firmware (e.g. v2.0.02)
+    does not serve ``/probe`` (or changed its shape), but always exposes
+    ``/api/system/info`` with ``identity.hwModel == "NMMiner"``.
+    """
+    # Fast path: NMMiner's lightweight /probe endpoint.
     try:
         resp = await client.get(f"http://{ip}/probe", timeout=2.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict):
+                is_nm = str(data.get("model", "")).lower() == "nmminer" or (
+                    "hr" in data and "ver" in data
+                )
+                if is_nm:
+                    return {
+                        "ip": ip,
+                        "type": "lottominer_device",
+                        "name": data.get("hostname") or f"NMMiner ({ip})",
+                        "model": "NMMiner",
+                        "device_count": 1,
+                        "version": data.get("ver", ""),
+                    }
+    except Exception:
+        pass
+
+    # Fallback: identify via /api/system/info (the endpoint used for polling).
+    try:
+        resp = await client.get(f"http://{ip}/api/system/info", timeout=2.0)
         if resp.status_code != 200:
             return None
         data = resp.json()
         if not isinstance(data, dict):
             return None
-        is_nm = str(data.get("model", "")).lower() == "nmminer" or (
-            "hr" in data and "ver" in data
-        )
-        if not is_nm:
+        identity = data.get("identity") or {}
+        model = str(identity.get("model") or identity.get("hwModel") or "").lower()
+        # Require an explicit NMMiner marker so this never grabs an AxeOS device
+        # or a WroomMiner (whose compat shim reports model "WroomMiner").
+        if "nmminer" not in model:
             return None
         return {
             "ip": ip,
             "type": "lottominer_device",
-            "name": data.get("hostname") or f"NMMiner ({ip})",
+            "name": identity.get("hostName") or f"NMMiner ({ip})",
+            "model": "NMMiner",
             "device_count": 1,
-            "version": data.get("ver", ""),
+            "version": identity.get("fwVersion", ""),
         }
     except Exception:
         return None

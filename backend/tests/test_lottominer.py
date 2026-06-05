@@ -37,6 +37,39 @@ def test_probe_rejects_non_nmminer():
     assert asyncio.run(probe_lottominer("192.168.1.51", client)) is None
 
 
+def test_probe_detects_nmminer_via_system_info_fallback():
+    """Firmware (e.g. v2.0.02) that doesn't serve /probe is still found via
+    /api/system/info (identity.hwModel == NMMiner)."""
+    async def _get(url, **kwargs):
+        if url.endswith("/probe"):
+            return _resp(404, {})
+        if url.endswith("/api/system/info"):
+            return _resp(200, {"identity": {"hwModel": "NMMiner", "hostName": "NMMiner5_688FB8",
+                                            "fwVersion": "v2.0.02"}})
+        return _resp(404, {})
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=_get)
+    rec = asyncio.run(probe_lottominer("10.10.40.92", client))
+    assert rec and rec["type"] == "lottominer_device"
+    assert rec["name"] == "NMMiner5_688FB8"
+    assert rec["model"] == "NMMiner"
+    assert rec["version"] == "v2.0.02"
+
+
+def test_probe_fallback_ignores_wroomminer_compat_shim():
+    """WroomMiner ships an /api/system/info compat shim (model "WroomMiner") —
+    the NMMiner fallback must not claim it."""
+    async def _get(url, **kwargs):
+        if url.endswith("/probe"):
+            return _resp(404, {})
+        return _resp(200, {"identity": {"model": "WroomMiner"}, "compatible_with": "HashHive"})
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=_get)
+    assert asyncio.run(probe_lottominer("10.10.40.93", client)) is None
+
+
 def test_normalize_info_maps_fields():
     info = {
         "identity": {"hwModel": "NMMiner", "hostName": "garage-nm", "fwVersion": "0.4.2", "rssi": -55},
