@@ -23,6 +23,7 @@ from core import (
     load_json,
 )
 from miners.axehub import fetch_axehub_safe as _fetch_axehub_safe
+from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
 
@@ -64,17 +65,20 @@ async def _dashboard_broadcast_loop():
             # history (the 24h charts), alerts and watchdogs would only run while
             # someone has the UI open — leaving sparse, misleading charts and
             # silent monitoring. Only the WS *broadcast* is gated on clients.
-            master = config.get("lottominer_master", "")
             nm_devices = config.get("lottominer_devices", [])
+            wroom_devices = config.get("wroomminer_devices", [])
             axehub_devices = config.get("axehub_devices", [])
             axeos_devices = config.get("axeos_devices", [])
-            has_nmminer = bool(master or nm_devices)
+            has_nmminer = bool(nm_devices)
+            has_wroom = bool(wroom_devices)
             has_axehub = bool(axehub_devices)
-            if has_nmminer or has_axehub or axeos_devices:
+            if has_nmminer or has_wroom or has_axehub or axeos_devices:
                 async with httpx.AsyncClient(timeout=10) as client:
                     coros = []
                     if has_nmminer:
-                        coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+                        coros.append(_fetch_lottominer_safe(client, nm_devices))
+                    if has_wroom:
+                        coros.append(_fetch_wroomminer_safe(client, wroom_devices))
                     if has_axehub:
                         coros.append(_fetch_axehub_safe(client, axehub_devices))
                     coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
@@ -85,10 +89,11 @@ async def _dashboard_broadcast_loop():
                     idx += 1
                 else:
                     nmminer_data = {"devices": []}
-                if has_axehub:
-                    nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
-                        list(results[idx].get("devices", []))
-                    idx += 1
+                for has_family in (has_wroom, has_axehub):
+                    if has_family:
+                        nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+                            list(results[idx].get("devices", []))
+                        idx += 1
                 axeos_results = list(results[idx:])
                 axeos_data = {"devices": axeos_results}
                 new_alerts: list = []
@@ -153,17 +158,20 @@ async def _dashboard_broadcast_loop():
 @router.get("/api/dashboard")
 async def get_dashboard():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
+    wroom_devices = config.get("wroomminer_devices", [])
     axehub_devices = config.get("axehub_devices", [])
     axeos_devices = config.get("axeos_devices", [])
-    has_nmminer = bool(master or nm_devices)
+    has_nmminer = bool(nm_devices)
+    has_wroom = bool(wroom_devices)
     has_axehub = bool(axehub_devices)
 
     async with httpx.AsyncClient(timeout=10) as client:
         coros: list = []
         if has_nmminer:
-            coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+            coros.append(_fetch_lottominer_safe(client, nm_devices))
+        if has_wroom:
+            coros.append(_fetch_wroomminer_safe(client, wroom_devices))
         if has_axehub:
             coros.append(_fetch_axehub_safe(client, axehub_devices))
         coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
@@ -177,10 +185,11 @@ async def get_dashboard():
     else:
         nmminer_data = {"devices": []}
 
-    if has_axehub:
-        nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
-            list(results[idx].get("devices", []))
-        idx += 1
+    for has_family in (has_wroom, has_axehub):
+        if has_family:
+            nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+                list(results[idx].get("devices", []))
+            idx += 1
 
     axeos_results = list(results[idx:])
 

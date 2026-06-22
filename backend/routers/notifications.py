@@ -12,6 +12,7 @@ from core import (
     _load_recent,
     load_json,
 )
+from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
 from routers.dashboard import _parse_nm_shares
@@ -120,25 +121,28 @@ async def _send_weekly_summary() -> None:
     shares_accepted: int = 0
     shares_rejected: int = 0
     try:
-        master = config.get("lottominer_master", "")
         nm_devices = config.get("lottominer_devices", [])
+        wroom_devices = config.get("wroomminer_devices", [])
         axeos_devices = config.get("axeos_devices", [])
-        has_nmminer = bool(master or nm_devices)
+        has_nmminer = bool(nm_devices)
+        has_wroom = bool(wroom_devices)
         async with httpx.AsyncClient(timeout=10) as client:
             coros = []
             if has_nmminer:
-                coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+                coros.append(_fetch_lottominer_safe(client, nm_devices))
+            if has_wroom:
+                coros.append(_fetch_wroomminer_safe(client, wroom_devices))
             coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
             results = await asyncio.gather(*coros, return_exceptions=True) if coros else []
         nmminer_devices = []
-        axeos_results = []
-        if has_nmminer and results:
-            nm_result = results[0]
-            if isinstance(nm_result, dict):
-                nmminer_devices = nm_result.get("devices", [])
-            axeos_results = list(results[1:])
-        else:
-            axeos_results = list(results)
+        idx = 0
+        for has_family in (has_nmminer, has_wroom):
+            if has_family and idx < len(results):
+                res = results[idx]
+                if isinstance(res, dict):
+                    nmminer_devices += res.get("devices", [])
+                idx += 1
+        axeos_results = list(results[idx:])
         for d in nmminer_devices:
             if isinstance(d, dict):
                 _acc, _rej = _parse_nm_shares(d)
@@ -158,7 +162,9 @@ async def _send_weekly_summary() -> None:
     share_acc_pct = f"{shares_accepted / shares_total * 100:.1f}%" if shares_total > 0 else "–"
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    nm_count = len(config.get("lottominer_devices", []))
+    nm_count = (len(config.get("lottominer_devices", []))
+                + len(config.get("wroomminer_devices", []))
+                + len(config.get("axehub_devices", [])))
     ax_count = len(config.get("axeos_devices", []))
 
     # ── Telegram ─────────────────────────────────────────────────────────────

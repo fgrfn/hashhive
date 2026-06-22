@@ -1,7 +1,7 @@
 """Unified auto-discovery: ARP table + mDNS + HTTP probing.
 
-Detects AxeOS (BitAxe/NerdAxe), NMMiner masters/devices and AxeHub
-(nerdminer-axehub) devices in one pass, can add discovered devices to the
+Detects AxeOS (BitAxe/NerdAxe) and the Lottominer-family devices — NMMiner,
+WroomMiner and NerdMiner-AxeHub — in one pass, can add discovered devices to the
 config, and runs an optional continuous background scan that notifies on new
 devices.
 """
@@ -226,12 +226,14 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
                 continue
             lst.append(_entry({"type": dtype}))
             added.append(d)
-        elif dtype == "lottominer_master":
-            if config.get("lottominer_master") != ip:
-                config["lottominer_master"] = ip
-                added.append(d)
         elif dtype == "lottominer_device":
             lst = config.setdefault("lottominer_devices", [])
+            if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
+                continue
+            lst.append(_entry({}))
+            added.append(d)
+        elif dtype == "wroomminer_device":
+            lst = config.setdefault("wroomminer_devices", [])
             if any((x.get("ip") if isinstance(x, dict) else x) == ip for x in lst):
                 continue
             lst.append(_entry({}))
@@ -245,7 +247,7 @@ def _add_devices_to_config(config: dict, devices: list[dict]) -> list[dict]:
     return added
 
 
-_DEVICE_LISTS = ("axeos_devices", "lottominer_devices", "axehub_devices")
+_DEVICE_LISTS = ("axeos_devices", "lottominer_devices", "wroomminer_devices", "axehub_devices")
 
 
 def reconcile_macs(config: dict, mac_to_ip: dict[str, str]) -> list[dict]:

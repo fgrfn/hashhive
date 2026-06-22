@@ -87,6 +87,7 @@ from core import (  # noqa: F401
     _bootstrap_auth as _bootstrap_auth_re,
 )
 
+from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
 from routers.dashboard import _dashboard_broadcast_loop
@@ -311,18 +312,28 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         # Send current data immediately on connect so the client doesn't wait
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-        master = config.get("lottominer_master", "")
         nm_devices = config.get("lottominer_devices", [])
+        wroom_devices = config.get("wroomminer_devices", [])
         axeos_devices = config.get("axeos_devices", [])
-        has_nmminer = bool(master or nm_devices)
+        has_nmminer = bool(nm_devices)
+        has_wroom = bool(wroom_devices)
         async with httpx.AsyncClient(timeout=10) as client:
             coros = []
             if has_nmminer:
-                coros.append(_fetch_lottominer_safe(client, master, nm_devices))
+                coros.append(_fetch_lottominer_safe(client, nm_devices))
+            if has_wroom:
+                coros.append(_fetch_wroomminer_safe(client, wroom_devices))
             coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
             results = await asyncio.gather(*coros) if coros else []
-        nmminer_data = results[0] if (has_nmminer and results) else {"devices": []}
-        axeos_results = list(results[1:]) if has_nmminer else list(results)
+        idx = 0
+        nmminer_data = results[idx] if (has_nmminer and results) else {"devices": []}
+        if has_nmminer:
+            idx += 1
+        if has_wroom and idx < len(results):
+            nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+                list(results[idx].get("devices", []))
+            idx += 1
+        axeos_results = list(results[idx:])
         axeos_data = {"devices": axeos_results}
         today_entries = _read_day(_today())
         unread = sum(1 for a in today_entries if not a.get("read", False))

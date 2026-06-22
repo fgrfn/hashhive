@@ -1,8 +1,12 @@
 """Miner driver registry.
 
 One module per supported family; ``DRIVERS`` maps a family name to its driver
-class. ``probe_all`` runs the discovery probes in the same order the unified
-scan used previously (AxeOS → Lottominer → AxeHub).
+class. ``probe_all`` runs the discovery probes in order
+(AxeOS → WroomMiner → NMMiner → AxeHub).
+
+The Lottominer category is an umbrella for ESP-based lottery/solo miners and
+covers several models, each with its own driver/native API: NMMiner
+(``lottominer``), WroomMiner (``wroomminer``) and NerdMiner-AxeHub (``axehub``).
 """
 
 from typing import Type
@@ -13,12 +17,14 @@ from .axehub import AxehubDriver, probe_axehub
 from .axeos import AxeosDriver, probe_axeos
 from .base import MinerDriver, PoolConfig
 from .lottominer import LottominerDriver, probe_lottominer
+from .wroomminer import WroomminerDriver, probe_wroomminer
 
 DRIVERS: dict[str, Type[MinerDriver]] = {
     "axeos": AxeosDriver,
     "bitaxe": AxeosDriver,
     "nerdaxe": AxeosDriver,
     "lottominer": LottominerDriver,
+    "wroomminer": WroomminerDriver,
     "axehub": AxehubDriver,
 }
 
@@ -40,6 +46,10 @@ async def probe_all(ip: str, client: httpx.AsyncClient) -> dict | None:
     """Probe an IP for any known miner family; first match wins."""
     return (
         await probe_axeos(ip, client)
+        # WroomMiner is probed before the looser NMMiner /probe heuristic: it
+        # ships an NMMiner-compat shim, but its strict /api/probe firmware check
+        # avoids misclassifying it (and never matches a real NMMiner).
+        or await probe_wroomminer(ip, client)
         or await probe_lottominer(ip, client)
         or await probe_axehub(ip, client)
     )
@@ -47,6 +57,6 @@ async def probe_all(ip: str, client: httpx.AsyncClient) -> dict | None:
 
 __all__ = [
     "MinerDriver", "PoolConfig", "DRIVERS", "get_driver", "driver_for_record", "probe_all",
-    "AxeosDriver", "LottominerDriver", "AxehubDriver",
-    "probe_axeos", "probe_lottominer", "probe_axehub",
+    "AxeosDriver", "LottominerDriver", "WroomminerDriver", "AxehubDriver",
+    "probe_axeos", "probe_lottominer", "probe_wroomminer", "probe_axehub",
 ]

@@ -38,11 +38,10 @@ def test_split_by_type():
     config = {
         "axeos_devices": [{"ip": "192.168.1.10"}],
         "lottominer_devices": [{"ip": "192.168.1.20"}],
-        "lottominer_master": "192.168.1.1",
     }
-    axe, nm = groups._split_by_type(["192.168.1.10", "192.168.1.20", "192.168.1.1"], config)
+    axe, nm = groups._split_by_type(["192.168.1.10", "192.168.1.20"], config)
     assert axe == ["192.168.1.10"]
-    assert set(nm) == {"192.168.1.20", "192.168.1.1"}
+    assert set(nm) == {"192.168.1.20"}
 
 
 def test_group_restart_dispatches_per_type():

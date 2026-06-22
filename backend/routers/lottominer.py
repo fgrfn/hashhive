@@ -26,6 +26,12 @@ from miners.lottominer import (  # noqa: F401
     ensure_stratum_scheme,
     fetch_lottominer_safe as _fetch_lottominer_safe,
     lottominer_fanout,
+    probe_lottominer as _probe_lottominer,
+)
+from miners.wroomminer import (  # noqa: F401
+    WROOM_ACTION_MAP as _WROOM_ACTION_MAP,
+    fetch_wroomminer_safe as _fetch_wroomminer_safe,
+    wroomminer_fanout,
 )
 
 router = APIRouter()
@@ -34,44 +40,9 @@ router = APIRouter()
 @router.get("/api/lottominer/swarm")
 async def get_lottominer_swarm():
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("lottominer_master", "")
     nm_devices = config.get("lottominer_devices", [])
     async with httpx.AsyncClient(timeout=10) as client:
-        return await _fetch_lottominer_safe(client, master, nm_devices)
-
-
-@router.get("/api/lottominer/config")
-async def get_lottominer_config():
-    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("lottominer_master", "")
-    if master:
-        async with httpx.AsyncClient(timeout=10) as client:
-            try:
-                resp = await client.get(f"http://{master}/config")
-                resp.raise_for_status()
-                return resp.json()
-            except Exception:
-                pass  # fall through to per-device queries
-    devices = config.get("lottominer_devices", [])
-    if not devices:
-        return {"configs": []}
-    configs = []
-    async with httpx.AsyncClient(timeout=5) as client:
-        async def _fetch_cfg(ip: str):
-            try:
-                r = await client.get(f"http://{ip}/config")
-                r.raise_for_status()
-                data = r.json()
-                entries = data.get("configs", []) if isinstance(data, dict) else []
-                for e in entries:
-                    if e.get("ip") == ip:
-                        configs.append(e)
-                        return
-                configs.append({"ip": ip, "config": data})
-            except Exception:
-                pass
-        await asyncio.gather(*[_fetch_cfg(d["ip"]) for d in devices if d.get("ip")])
-    return {"configs": configs}
+        return await _fetch_lottominer_safe(client, nm_devices)
 
 
 @router.get("/api/lottominer/scan")
@@ -93,25 +64,19 @@ async def scan_lottominer_devices():
     sem = asyncio.Semaphore(60)
 
     limits = httpx.Limits(max_connections=60, max_keepalive_connections=0)
-    async with httpx.AsyncClient(timeout=1.5, limits=limits) as client:
+    async with httpx.AsyncClient(timeout=2.0, limits=limits) as client:
         async def _probe(ip: str):
             async with sem:
-                try:
-                    resp = await client.get(f"http://{ip}/probe")
-                    if resp.status_code != 200:
-                        return
-                    data = resp.json()
-                    if not isinstance(data, dict):
-                        return
-                    if str(data.get("model", "")).lower() == "nmminer" or ("hr" in data and "ver" in data):
-                        found.append({
-                            "ip": ip,
-                            "role": "device",
-                            "device_count": 1,
-                            "devices": [{"ip": ip, "name": data.get("hostname") or f"NMMiner ({ip})"}],
-                        })
-                except Exception:
-                    pass
+                # Reuse the driver probe so this picks up firmware that only
+                # serves /api/system/info (e.g. v2.0.02), not just /probe.
+                rec = await _probe_lottominer(ip, client)
+                if rec:
+                    found.append({
+                        "ip": ip,
+                        "role": "device",
+                        "device_count": 1,
+                        "devices": [{"ip": ip, "name": rec.get("name") or f"NMMiner ({ip})"}],
+                    })
 
         await asyncio.gather(*[_probe(f"{subnet}.{i}") for i in range(1, 255)])
 
@@ -126,7 +91,7 @@ async def lottominer_action_batch(data: NmActionBatchRequest):
     the AxeHub fanout, the rest through the NMMiner/Lottominer fanout. An action
     unsupported by a family is skipped for that family.
     """
-    valid = set(_LOTTO_ACTION_MAP) | set(_AXEHUB_ACTION_MAP)
+    valid = set(_LOTTO_ACTION_MAP) | set(_WROOM_ACTION_MAP) | set(_AXEHUB_ACTION_MAP)
     if data.action not in valid:
         raise HTTPException(status_code=400, detail=f"action must be one of {valid}")
 
@@ -134,30 +99,21 @@ async def lottominer_action_batch(data: NmActionBatchRequest):
     axehub_ips_set = {
         (d.get("ip") if isinstance(d, dict) else d) for d in config.get("axehub_devices", [])
     }
+    wroom_ips_set = {
+        (d.get("ip") if isinstance(d, dict) else d) for d in config.get("wroomminer_devices", [])
+    }
     axehub_ips = [ip for ip in data.ips if ip in axehub_ips_set]
-    nm_ips = [ip for ip in data.ips if ip not in axehub_ips_set]
+    wroom_ips = [ip for ip in data.ips if ip in wroom_ips_set]
+    nm_ips = [ip for ip in data.ips if ip not in axehub_ips_set and ip not in wroom_ips_set]
 
     results: list[dict] = []
     if nm_ips and data.action in _LOTTO_ACTION_MAP:
         results += await lottominer_fanout(data.action, nm_ips)
+    if wroom_ips and data.action in _WROOM_ACTION_MAP:
+        results += await wroomminer_fanout(data.action, wroom_ips)
     if axehub_ips and data.action in _AXEHUB_ACTION_MAP:
         results += await axehub_fanout(data.action, axehub_ips)
     return {"action": data.action, "results": results}
-
-
-@router.post("/api/lottominer/broadcast-config")
-async def broadcast_lottominer_config(data: dict):
-    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    master = config.get("lottominer_master", "")
-    if not master:
-        raise HTTPException(status_code=400, detail="No Lottominer master configured")
-    async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            resp = await client.post(f"http://{master}/broadcast-config", json=data)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
 
 
 # NMMiner groups settings across several POST endpoints (see API reference):

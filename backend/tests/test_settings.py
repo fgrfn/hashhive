@@ -50,7 +50,8 @@ def test_roundtrip(tmp_path):
 
 def test_default_config_has_required_keys():
     assert "lottominer_devices" in DEFAULT_CONFIG
-    assert "lottominer_master" in DEFAULT_CONFIG
+    assert "wroomminer_devices" in DEFAULT_CONFIG
+    assert "lottominer_master" not in DEFAULT_CONFIG  # dropped: no more master concept
     assert "axeos_devices" in DEFAULT_CONFIG
     assert "refresh_interval" in DEFAULT_CONFIG
 
@@ -65,8 +66,22 @@ def test_migrate_config_renames_legacy_nmminer_keys():
     cfg = load_json(CONFIG_FILE, {})
     assert "nmminer_master" not in cfg
     assert "nmminer_devices" not in cfg
-    assert cfg["lottominer_master"] == "192.168.1.5"
-    assert cfg["lottominer_devices"][0]["ip"] == "192.168.1.6"
+    assert "lottominer_master" not in cfg
+    # The legacy master IP is folded into lottominer_devices as a standalone device.
+    ips = {d.get("ip") for d in cfg["lottominer_devices"]}
+    assert ips == {"192.168.1.6", "192.168.1.5"}
+
+
+def test_migrate_config_folds_lottominer_master_into_devices():
+    save_json(CONFIG_FILE, {
+        "lottominer_master": "10.0.0.9",
+        "lottominer_devices": [{"ip": "10.0.0.10", "name": "dev"}],
+    })
+    _migrate_config()
+    cfg = load_json(CONFIG_FILE, {})
+    assert "lottominer_master" not in cfg
+    ips = {d.get("ip") for d in cfg["lottominer_devices"]}
+    assert ips == {"10.0.0.10", "10.0.0.9"}
 
 
 def test_load_json_returns_copy_not_default_reference(tmp_path):
