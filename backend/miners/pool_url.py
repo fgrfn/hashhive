@@ -46,16 +46,25 @@ class PoolEndpoint:
         """``host:port`` (or bare host when no port is known)."""
         return f"{self.host}:{self.port}" if self.host and self.port else self.host
 
-    def stratum_url(self, default_port: int = DEFAULT_STRATUM_PORT) -> str:
+    def stratum_url(self, default_port: int = DEFAULT_STRATUM_PORT,
+                    force_tls: bool | None = None) -> str:
         """Full single-line URL (NMMiner): ``scheme://host:port``.
 
         Always includes a port — NMMiner's resolver needs one — falling back to
         ``default_port`` when the source string carried none. The original
         scheme is preserved so ``stratum+ssl://`` (TLS) survives the round-trip.
+
+        ``force_tls`` overrides the scheme regardless of the source string: pass
+        ``True`` to emit ``stratum+ssl://`` (e.g. a preset's explicit TLS flag),
+        ``False`` for plain ``stratum+tcp://``, or ``None`` to keep as parsed.
         """
         if not self.host:
             return ""
-        scheme = self.scheme or ("stratum+ssl" if self.tls else "stratum+tcp")
+        tls = self.tls if force_tls is None else force_tls
+        if force_tls is None and self.scheme:
+            scheme = self.scheme
+        else:
+            scheme = "stratum+ssl" if tls else "stratum+tcp"
         port = self.port or default_port
         return f"{scheme}://{self.host}:{port}"
 

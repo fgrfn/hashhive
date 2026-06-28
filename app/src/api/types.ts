@@ -348,6 +348,11 @@ export interface NMMinerConfig {
   WeatherAltMode?: string;
 }
 
+/** Stratum protocol version a pool speaks (AxeOS supports both; others SV1). */
+export type StratumProtocol = 'SV1' | 'SV2';
+/** SV2 channel type; "extended" is recommended for external SV2 pools. */
+export type Sv2Channel = 'extended' | 'standard';
+
 export interface PoolPreset {
   id: string;
   name: string;
@@ -355,10 +360,20 @@ export interface PoolPreset {
   wallet?: string;
   worker?: string;
   password?: string;
+  // Primary pool protocol/security (optional; default plain SV1/TCP).
+  protocol?: StratumProtocol;
+  tls?: boolean;
+  channel?: Sv2Channel;
+  sv2_pubkey?: string;
   url2?: string;
   wallet2?: string;
   worker2?: string;
   password2?: string;
+  // Backup pool protocol/security.
+  protocol2?: StratumProtocol;
+  tls2?: boolean;
+  channel2?: Sv2Channel;
+  sv2_pubkey2?: string;
   coin?: string;
   is_default?: boolean;
 }

@@ -176,3 +176,57 @@ def test_axehub_backup_is_skipped():
     from miners.axehub import set_axehub_pool
     res = asyncio.run(set_axehub_pool("10.0.0.8", {"url": "pool.io:3333"}, slot="backup"))
     assert res["status"] == "skipped" and res["slot"] == "backup"
+
+
+# ── Stratum protocol / TLS / SV2 ──────────────────────────────────────────────
+
+def test_axeos_sv2_and_tls_fields():
+    save_json(CONFIG_FILE, {"axeos_devices": [{"ip": "10.0.0.5", "name": "axe", "type": "bitaxe"}]})
+    _, cap = _push("10.0.0.5", {
+        "url": "public-pool.io:13333", "wallet": "bc1qW",
+        "protocol": "SV2", "tls": True, "channel": "extended", "sv2_pubkey": "9c4zKEY",
+    }, {"hostname": "axe01"})
+    b = cap["body"]
+    assert b["stratumProtocol"] == "SV2"
+    assert b["stratumV2ChannelType"] == "extended"
+    assert b["stratumV2AuthorityPubkey"] == "9c4zKEY"
+    assert b["stratumTLS"] is True
+
+
+def test_axeos_sv1_emits_protocol_but_no_sv2_keys():
+    save_json(CONFIG_FILE, {"axeos_devices": [{"ip": "10.0.0.5", "name": "axe", "type": "bitaxe"}]})
+    _, cap = _push("10.0.0.5", {
+        "url": "public-pool.io:13333", "wallet": "bc1qW", "protocol": "SV1",
+    }, {"hostname": "axe01"})
+    b = cap["body"]
+    assert b["stratumProtocol"] == "SV1"
+    assert "stratumV2ChannelType" not in b and "stratumV2AuthorityPubkey" not in b
+    assert "stratumTLS" not in b  # TLS not requested
+
+
+def test_axeos_plain_preset_sends_no_advanced_fields():
+    # A preset without protocol/tls keys must behave exactly as before.
+    save_json(CONFIG_FILE, {"axeos_devices": [{"ip": "10.0.0.5", "name": "axe", "type": "bitaxe"}]})
+    _, cap = _push("10.0.0.5", {"url": "public-pool.io:13333", "wallet": "bc1qW"}, {"hostname": "axe01"})
+    b = cap["body"]
+    assert "stratumProtocol" not in b and "stratumTLS" not in b
+
+
+def test_axeos_backup_slot_uses_fallback_protocol_keys():
+    save_json(CONFIG_FILE, {"axeos_devices": [{"ip": "10.0.0.5", "name": "axe", "type": "bitaxe"}]})
+    _, cap = _push("10.0.0.5", {
+        "url": "public-pool.io:3333", "wallet": "bc1qW", "slot": "backup",
+        "protocol": "SV2", "tls": True,
+    }, {"hostname": "axe01"})
+    b = cap["body"]
+    assert b["fallbackStratumProtocol"] == "SV2"
+    assert b["fallbackStratumTLS"] is True
+    assert "stratumProtocol" not in b  # primary untouched
+
+
+def test_nmminer_tls_uses_ssl_scheme():
+    save_json(CONFIG_FILE, {"lottominer_devices": [{"ip": "10.0.0.9", "name": "nm"}]})
+    _, cap = _push("10.0.0.9", {
+        "url": "public-pool.io:3333", "wallet": "bc1qW", "tls": True,
+    }, {"Hostname": "nm01"})
+    assert cap["body"]["PrimaryPool"] == "stratum+ssl://public-pool.io:3333"
