@@ -336,6 +336,7 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
   const [state, setState] = useState<'checking' | 'up-to-date' | 'available'>('checking');
   const [current, setCurrent] = useState<string>('');
   const [latest, setLatest] = useState<string>('');
+  const [channel, setChannel] = useState<string>('release');
   const [releaseNotes, setReleaseNotes] = useState<string[]>([]);
   const [releaseSize, setReleaseSize] = useState<string>('');
   const [showPopover, setShowPopover] = useState(false);
@@ -343,13 +344,15 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
   const { devicesTotal } = useAppStore();
 
   useEffect(() => {
-    const ver = (v: string) => v.startsWith('v') ? v : `v${v}`;
+    // Only prefix a "v" on real semver versions — rolling tags like "latest"
+    // or "dev" are shown verbatim (otherwise "latest" becomes "vlatest").
+    const ver = (v: string) => /^\d+\.\d+/.test(v) ? `v${v}` : v;
     fetch('/api/updates/latest')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) { setState('up-to-date'); return; }
-        const cur = ver(d.current || '');
-        setCurrent(cur);
+        setChannel(d.channel || 'release');
+        setCurrent(ver(d.current || ''));
         if (d.latest) {
           setLatest(ver(d.latest.version || ''));
           setReleaseNotes(Array.isArray(d.latest.notes) ? d.latest.notes : []);
@@ -376,7 +379,7 @@ function LiveFooter({ t, collapsed }: { t: Theme; collapsed: boolean }) {
 
   const cfg = {
     checking:    { color: t.textMuted, dot: t.textMuted, label: 'Checking for updates…', sub: '' },
-    'up-to-date': { color: t.success,  dot: t.success,   label: 'Up to date',            sub: 'latest version' },
+    'up-to-date': { color: t.success,  dot: t.success,   label: 'Up to date',            sub: channel === 'rolling' ? `rolling · ${current || 'latest'}` : 'latest version' },
     available:   { color: t.warning,   dot: t.warning,   label: 'Update available',       sub: latest ? `${current} → ${latest}` : '' },
   }[state];
 
