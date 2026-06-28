@@ -4,7 +4,7 @@ import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
-import type { PoolPreset, PoolSlot } from '../api';
+import type { PoolPreset, PoolSlot, StratumProtocol, Sv2Channel } from '../api';
 import { Database, Plus, Edit, Trash2, Send, Check } from 'lucide-react';
 import { toast } from '../store/toast';
 
@@ -134,7 +134,11 @@ function PoolCard({ t, pool: p, onEdit, onDelete, onPush }: { t: Theme; pool: Po
           <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
           {p.coin && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{p.coin}</div>}
         </div>
-        {p.is_default && <Pill t={t} sev="success">default</Pill>}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {p.protocol === 'SV2' && <Pill t={t} sev="info">SV2</Pill>}
+          {p.tls && <Pill t={t} sev="warning">TLS</Pill>}
+          {p.is_default && <Pill t={t} sev="success">default</Pill>}
+        </div>
       </div>
 
       <div style={{ padding: '10px 12px', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 12 }}>
@@ -277,17 +281,39 @@ function parseUrlPort(full: string): { base: string; port: string } {
   return m ? { base: m[1], port: m[2] } : { base: full, port: '' };
 }
 
-function PoolSection({ t, label, base, port, wallet, password, onBase, onPort, onWallet, onPassword, optional }: {
+interface PoolAdvanced {
+  protocol: StratumProtocol; tls: boolean; channel: Sv2Channel; pubkey: string;
+  onProtocol: (v: StratumProtocol) => void; onTls: (v: boolean) => void;
+  onChannel: (v: Sv2Channel) => void; onPubkey: (v: string) => void;
+}
+
+function Segmented<T extends string>({ t, value, options, onChange }: {
+  t: Theme; value: T; options: [T, string][]; onChange: (v: T) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {options.map(([v, label]) => (
+        <button key={v} type="button" onClick={() => onChange(v)}
+          style={{ ...btnStyle(t, value === v ? 'primary' : 'ghost'), flex: 1, fontSize: 11, padding: '5px 8px' }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PoolSection({ t, label, base, port, wallet, password, onBase, onPort, onWallet, onPassword, optional, adv }: {
   t: Theme; label: string; base: string; port: string; wallet: string; password: string;
   onBase: (v: string) => void; onPort: (v: string) => void; onWallet: (v: string) => void; onPassword: (v: string) => void;
-  optional?: boolean;
+  optional?: boolean; adv: PoolAdvanced;
 }) {
+  const [showAdv, setShowAdv] = useState(adv.protocol === 'SV2' || adv.tls);
   return (
     <div style={{ padding: '12px 14px', background: t.surface2, borderRadius: 8, border: `1px solid ${t.border}` }}>
       <Label t={t} style={{ marginBottom: 10 }}>{label}{optional && <span style={{ color: t.textDim, fontWeight: 400, marginLeft: 6 }}>(optional)</span>}</Label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
-          <FormField t={t} label="Host" value={base} onChange={onBase} mono placeholder="stratum+tcp://pool.example.com" />
+          <FormField t={t} label="Host" value={base} onChange={onBase} mono placeholder="pool.example.com" />
           <FormField t={t} label="Port" value={port} onChange={onPort} mono placeholder="3333" type="number" />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -301,6 +327,43 @@ function PoolSection({ t, label, base, port, wallet, password, onBase, onPort, o
           </div>
           <FormField t={t} label="Password" value={password} onChange={onPassword} mono placeholder="x" />
         </div>
+
+        <button type="button" onClick={() => setShowAdv(s => !s)}
+          style={{ background: 'transparent', border: 'none', color: t.accent, cursor: 'pointer', fontSize: 11, padding: 0, textAlign: 'left', width: 'fit-content' }}>
+          {showAdv ? '▾' : '▸'} Protocol & security
+        </button>
+        {showAdv && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px', background: t.surface, borderRadius: 6, border: `1px solid ${t.border}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <Label t={t} style={{ marginBottom: 6 }}>Stratum protocol</Label>
+                <Segmented t={t} value={adv.protocol} onChange={adv.onProtocol}
+                  options={[['SV1', 'Stratum V1'], ['SV2', 'Stratum V2']]} />
+              </div>
+              <div>
+                <Label t={t} style={{ marginBottom: 6 }}>Encryption</Label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 30 }}>
+                  <Toggle t={t} on={adv.tls} onChange={adv.onTls} />
+                  <span style={{ fontSize: 12, color: t.textMuted }}>TLS{adv.tls ? ' on' : ' off'}</span>
+                </div>
+              </div>
+            </div>
+            {adv.protocol === 'SV2' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <Label t={t} style={{ marginBottom: 6 }}>SV2 channel type</Label>
+                  <Segmented t={t} value={adv.channel} onChange={adv.onChannel}
+                    options={[['extended', 'Extended'], ['standard', 'Standard']]} />
+                  <div style={{ fontSize: 10, color: t.textDim, marginTop: 4 }}>Extended is recommended for external SV2 pools.</div>
+                </div>
+                <FormField t={t} label="SV2 authority pubkey" value={adv.pubkey} onChange={adv.onPubkey} mono placeholder="Base58 key (optional)" />
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: t.textDim }}>
+              Applied to AxeOS (BitAxe/NerdAxe). NMMiner is SV1-only; TLS is sent as <span style={{ fontFamily: FONT_MONO }}>stratum+ssl://</span>.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -320,6 +383,16 @@ function PoolModal({ t, pool, onClose, onSave }: { t: Theme; pool: PoolPreset | 
   const [password2, setPassword2] = useState(pool?.password2 || 'x');
   const [coin, setCoin] = useState(pool?.coin || 'BTC');
   const [isDefault, setIsDefault] = useState(pool?.is_default || false);
+  // Primary protocol/security
+  const [protocol, setProtocol] = useState<StratumProtocol>(pool?.protocol || 'SV1');
+  const [tls, setTls] = useState(pool?.tls || false);
+  const [channel, setChannel] = useState<Sv2Channel>(pool?.channel || 'extended');
+  const [pubkey, setPubkey] = useState(pool?.sv2_pubkey || '');
+  // Backup protocol/security
+  const [protocol2, setProtocol2] = useState<StratumProtocol>(pool?.protocol2 || 'SV1');
+  const [tls2, setTls2] = useState(pool?.tls2 || false);
+  const [channel2, setChannel2] = useState<Sv2Channel>(pool?.channel2 || 'extended');
+  const [pubkey2, setPubkey2] = useState(pool?.sv2_pubkey2 || '');
 
   const buildUrl = (b: string, p: string) => b ? (p ? `${b}:${p}` : b) : '';
   const valid = name.trim() && base.trim();
@@ -334,11 +407,13 @@ function PoolModal({ t, pool, onClose, onSave }: { t: Theme; pool: PoolPreset | 
 
         <PoolSection t={t} label="Primary pool"
           base={base} port={port} wallet={wallet} password={password}
-          onBase={setBase} onPort={setPort} onWallet={setWallet} onPassword={setPassword} />
+          onBase={setBase} onPort={setPort} onWallet={setWallet} onPassword={setPassword}
+          adv={{ protocol, tls, channel, pubkey, onProtocol: setProtocol, onTls: setTls, onChannel: setChannel, onPubkey: setPubkey }} />
 
         <PoolSection t={t} label="Backup pool" optional
           base={base2} port={port2} wallet={wallet2} password={password2}
-          onBase={setBase2} onPort={setPort2} onWallet={setWallet2} onPassword={setPassword2} />
+          onBase={setBase2} onPort={setPort2} onWallet={setWallet2} onPassword={setPassword2}
+          adv={{ protocol: protocol2, tls: tls2, channel: channel2, pubkey: pubkey2, onProtocol: setProtocol2, onTls: setTls2, onChannel: setChannel2, onPubkey: setPubkey2 }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Toggle t={t} on={isDefault} onChange={setIsDefault} />
@@ -348,7 +423,13 @@ function PoolModal({ t, pool, onClose, onSave }: { t: Theme; pool: PoolPreset | 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
           <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
           <button
-            onClick={() => valid && onSave({ name, coin, is_default: isDefault, url: buildUrl(base, port), wallet, password, url2: buildUrl(base2, port2), wallet2, password2 })}
+            onClick={() => valid && onSave({
+              name, coin, is_default: isDefault,
+              url: buildUrl(base, port), wallet, password,
+              protocol, tls, channel, sv2_pubkey: pubkey,
+              url2: buildUrl(base2, port2), wallet2, password2,
+              protocol2, tls2, channel2, sv2_pubkey2: pubkey2,
+            })}
             disabled={!valid} style={{ ...btnStyle(t, 'primary'), opacity: valid ? 1 : 0.5 }}>
             {pool ? 'Save changes' : <><Plus size={13} /> Add pool</>}
           </button>

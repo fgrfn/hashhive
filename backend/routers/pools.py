@@ -134,6 +134,30 @@ def _push_slot(pool: dict) -> str:
     return "backup" if slot in ("backup", "fallback", "secondary") else "primary"
 
 
+def _axe_advanced_fields(protocol, tls, channel, pubkey, *, fallback: bool) -> dict:
+    """AxeOS stratum protocol / TLS / SV2 fields for one pool slot.
+
+    Field names follow the AxeOS ``openapi.yaml`` (``stratumProtocol`` /
+    ``stratumTLS`` / ``stratumV2ChannelType`` / ``stratumV2AuthorityPubkey`` and
+    their ``fallback*`` equivalents). A field is only emitted when the preset
+    opted into it, so presets without these keys behave exactly as before — and
+    firmwares that predate SV2/TLS never see unknown fields.
+    """
+    pfx = "fallbackStratum" if fallback else "stratum"
+    out: dict = {}
+    proto = str(protocol or "").strip().upper()
+    if proto in ("SV1", "SV2"):
+        out[f"{pfx}Protocol"] = proto
+        if proto == "SV2":
+            ch = str(channel or "extended").strip().lower()
+            out[f"{pfx}V2ChannelType"] = ch if ch in ("standard", "extended") else "extended"
+            if pubkey:
+                out[f"{pfx}V2AuthorityPubkey"] = pubkey
+    if tls:
+        out[f"{pfx}TLS"] = True
+    return out
+
+
 @router.post("/api/pools/push/{ip}")
 async def push_pool_to_device(ip: str, pool: dict):
     """Push a pool preset to a single device. Worker is auto-built as wallet.hostname.
@@ -191,6 +215,9 @@ async def push_pool_to_device(ip: str, pool: dict):
                 }
                 if ep.port:
                     payload["fallbackStratumPort"] = ep.port
+                payload.update(_axe_advanced_fields(
+                    pool.get("protocol"), pool.get("tls"), pool.get("channel"),
+                    pool.get("sv2_pubkey"), fallback=True))
             else:
                 payload = {
                     "stratumURL": ep.host,
@@ -199,6 +226,9 @@ async def push_pool_to_device(ip: str, pool: dict):
                 }
                 if ep.port:
                     payload["stratumPort"] = ep.port
+                payload.update(_axe_advanced_fields(
+                    pool.get("protocol"), pool.get("tls"), pool.get("channel"),
+                    pool.get("sv2_pubkey"), fallback=False))
                 if url2:
                     ep2 = parse_pool_endpoint(url2, default_port=int(pool.get("port2") or DEFAULT_STRATUM_PORT))
                     w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
@@ -207,30 +237,36 @@ async def push_pool_to_device(ip: str, pool: dict):
                         payload["fallbackStratumPort"] = ep2.port
                     payload["fallbackStratumUser"] = w2
                     payload["fallbackStratumPassword"] = password2
+                    payload.update(_axe_advanced_fields(
+                        pool.get("protocol2"), pool.get("tls2"), pool.get("channel2"),
+                        pool.get("sv2_pubkey2"), fallback=True))
             resp = await client.patch(f"http://{ip}/api/system", json=payload)
             return {"ip": ip, "type": "axeos", "slot": slot, "status": resp.status_code}
 
         else:
             # NMMiner: POST mining settings to the device itself (no master/swarm).
             # It needs a full stratum+tcp://host:port line on a single field.
+            # NMMiner is SV1-only; TLS is expressed via the stratum+ssl:// scheme.
             hostname = await _get_nm_hostname(client, ip)
             worker = f"{wallet}.{hostname}" if wallet else pool.get("worker", "")
+            tls = True if pool.get("tls") else None
+            tls2 = True if pool.get("tls2") else None
             if slot == "backup":
                 payload = {
-                    "SecondaryPool": ep.stratum_url(),
+                    "SecondaryPool": ep.stratum_url(force_tls=tls),
                     "SecondaryAddress": worker,
                     "SecondaryPassword": password,
                 }
             else:
                 payload = {
-                    "PrimaryPool": ep.stratum_url(),
+                    "PrimaryPool": ep.stratum_url(force_tls=tls),
                     "PrimaryAddress": worker,
                     "PrimaryPassword": password,
                 }
                 if url2:
                     ep2 = parse_pool_endpoint(url2, default_port=int(pool.get("port2") or DEFAULT_STRATUM_PORT))
                     w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
-                    payload["SecondaryPool"] = ep2.stratum_url()
+                    payload["SecondaryPool"] = ep2.stratum_url(force_tls=tls2)
                     payload["SecondaryAddress"] = w2
                     payload["SecondaryPassword"] = password2
             resp = await client.post(f"http://{ip}/api/setting/mining", json=payload)
