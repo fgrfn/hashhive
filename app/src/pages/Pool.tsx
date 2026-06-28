@@ -4,9 +4,32 @@ import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api } from '../api';
-import type { PoolPreset } from '../api';
+import type { PoolPreset, PoolSlot } from '../api';
 import { Database, Plus, Edit, Trash2, Send, Check } from 'lucide-react';
 import { toast } from '../store/toast';
+
+/** A device a pool can be pushed to, unified across miner families. */
+interface PushTarget { ip: string; name: string; type: string; online: boolean }
+
+/** Build the unified push-target list from both device stores. */
+function usePushTargets(): PushTarget[] {
+  const { devices, axeDevices } = useAppStore();
+  return [
+    ...devices.map(d => ({
+      ip: d.ip || '', name: d.hostname || d.name || d.ip || '',
+      type: d._type || 'lottominer', online: d._online !== false,
+    })),
+    ...axeDevices.map(d => ({
+      ip: d._ip || '', name: d.hostname || d._name || d._ip || '',
+      type: d._type || 'bitaxe', online: !!d._online,
+    })),
+  ].filter(d => d.ip);
+}
+
+/** AxeHub firmware has a single pool — it can't receive a backup-slot push. */
+function supportsSlot(type: string, slot: PoolSlot): boolean {
+  return slot === 'primary' || type !== 'axehub';
+}
 
 export function Pool() {
   const { theme: t } = useThemeStore();
@@ -30,23 +53,11 @@ export function Pool() {
 
 function PoolLibrary() {
   const { theme: t } = useThemeStore();
-  const { devices, axeDevices } = useAppStore();
   const [fetched, setFetched] = useState(false);
   const [pools, setPools] = useState<PoolPreset[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<PoolPreset | null>(null);
-  const [pushingId, setPushingId] = useState<string | null>(null);
-
-  const pushToAll = async (pool: PoolPreset) => {
-    const ips = [...devices.map(d => d.ip || ''), ...axeDevices.map(d => d._ip || '')].filter(Boolean);
-    if (ips.length === 0) { toast('No devices configured', 'error'); return; }
-    if (!window.confirm(`Push pool "${pool.name || pool.url}" to all ${ips.length} miner(s)?`)) return;
-    setPushingId(pool.id);
-    const results = await Promise.allSettled(ips.map(ip => api.pools.pushToDevice(ip, pool)));
-    setPushingId(null);
-    const ok = results.filter(r => r.status === 'fulfilled').length;
-    toast(`Pushed to ${ok}/${ips.length} miner${ips.length !== 1 ? 's' : ''}${ok < ips.length ? ' — some failed' : ''}`, ok ? undefined : 'error');
-  };
+  const [pushPool, setPushPool] = useState<PoolPreset | null>(null);
 
   useEffect(() => {
     api.pools.list().then(setPools).catch(() => {}).finally(() => setFetched(true));
@@ -95,7 +106,7 @@ function PoolLibrary() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
           {pools.map(p => (
             <PoolCard key={p.id} t={t} pool={p} onEdit={() => setEditing(p)} onDelete={() => deletePool(p.id)}
-              onPush={() => pushToAll(p)} pushing={pushingId === p.id} />
+              onPush={() => setPushPool(p)} />
           ))}
         </div>
       )}
@@ -103,11 +114,15 @@ function PoolLibrary() {
       {(showAdd || editing) && (
         <PoolModal t={t} pool={editing} onClose={() => { setShowAdd(false); setEditing(null); }} onSave={savePool} />
       )}
+
+      {pushPool && (
+        <PushModal t={t} pool={pushPool} onClose={() => setPushPool(null)} />
+      )}
     </div>
   );
 }
 
-function PoolCard({ t, pool: p, onEdit, onDelete, onPush, pushing }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void; onPush: () => void; pushing: boolean }) {
+function PoolCard({ t, pool: p, onEdit, onDelete, onPush }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void; onPush: () => void }) {
   const wallet = p.wallet || p.worker || '—';
   return (
     <Card t={t}>
@@ -133,10 +148,127 @@ function PoolCard({ t, pool: p, onEdit, onDelete, onPush, pushing }: { t: Theme;
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={onEdit} style={{ ...btnStyle(t), fontSize: 11 }}><Edit size={11} /> Edit</button>
-        <button onClick={onPush} disabled={pushing} style={{ ...btnStyle(t), fontSize: 11, opacity: pushing ? 0.6 : 1 }}><Send size={11} /> {pushing ? 'Pushing…' : 'Push to miners'}</button>
+        <button onClick={onPush} style={{ ...btnStyle(t), fontSize: 11 }}><Send size={11} /> Push to miners</button>
         <button onClick={onDelete} style={{ ...btnStyle(t, 'danger'), fontSize: 11, marginLeft: 'auto' }}><Trash2 size={11} /></button>
       </div>
     </Card>
+  );
+}
+
+function PushModal({ t, pool, onClose }: { t: Theme; pool: PoolPreset; onClose: () => void }) {
+  const targets = usePushTargets();
+  const [slot, setSlot] = useState<PoolSlot>('primary');
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(targets.map(d => d.ip)));
+  const [pushing, setPushing] = useState(false);
+  const [results, setResults] = useState<Record<string, 'ok' | 'fail' | 'skip'>>({});
+
+  // Only targets that can accept the chosen slot count as selectable.
+  const eligible = targets.filter(d => supportsSlot(d.type, slot));
+  const selectedEligible = eligible.filter(d => selected.has(d.ip));
+
+  const toggle = (ip: string) => setSelected(prev => {
+    const s = new Set(prev);
+    if (s.has(ip)) s.delete(ip); else s.add(ip);
+    return s;
+  });
+  const allSelected = eligible.length > 0 && eligible.every(d => selected.has(d.ip));
+  const toggleAll = () => setSelected(prev => {
+    if (allSelected) { const s = new Set(prev); eligible.forEach(d => s.delete(d.ip)); return s; }
+    const s = new Set(prev); eligible.forEach(d => s.add(d.ip)); return s;
+  });
+
+  const doPush = async () => {
+    const ips = selectedEligible.map(d => d.ip);
+    if (ips.length === 0) return;
+    setPushing(true);
+    setResults({});
+    const settled = await Promise.allSettled(
+      ips.map(ip => api.pools.pushToDevice(ip, { ...pool, slot }).then(() => ip)),
+    );
+    const next: Record<string, 'ok' | 'fail' | 'skip'> = {};
+    settled.forEach((r, i) => { next[ips[i]] = r.status === 'fulfilled' ? 'ok' : 'fail'; });
+    setResults(next);
+    setPushing(false);
+    const ok = settled.filter(r => r.status === 'fulfilled').length;
+    toast(`Pushed to ${ok}/${ips.length} miner${ips.length !== 1 ? 's' : ''}${ok < ips.length ? ' — some failed' : ''}`, ok ? undefined : 'error');
+  };
+
+  const typeSev = (type: string): 'success' | 'info' | 'warning' =>
+    type === 'bitaxe' || type === 'nerdaxe' ? 'success' : type === 'axehub' ? 'warning' : 'info';
+
+  return (
+    <Modal t={t} title={`Push "${pool.name}" to miners`} onClose={onClose} width={560}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Slot selector */}
+        <div>
+          <Label t={t} style={{ marginBottom: 8 }}>Target pool slot</Label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['primary', 'backup'] as PoolSlot[]).map(s => (
+              <button key={s} onClick={() => setSlot(s)}
+                style={{ ...btnStyle(t, slot === s ? 'primary' : 'ghost'), flex: 1, fontSize: 12, textTransform: 'capitalize' }}>
+                {s} pool
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: t.textDim, marginTop: 6 }}>
+            {slot === 'primary'
+              ? 'Sets the device’s primary pool (and backup pool if the preset has one).'
+              : 'Writes this preset into the device’s backup/fallback slot, leaving the primary pool unchanged.'}
+          </div>
+        </div>
+
+        {/* Device list */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Label t={t}>Miners ({selectedEligible.length}/{eligible.length} selected)</Label>
+            {eligible.length > 0 && (
+              <button onClick={toggleAll} style={{ ...btnStyle(t), fontSize: 11, padding: '4px 8px' }}>
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+          </div>
+          {targets.length === 0 ? (
+            <div style={{ padding: '16px', color: t.textMuted, fontSize: 13, textAlign: 'center', border: `1px solid ${t.border}`, borderRadius: 8 }}>
+              No devices configured.
+            </div>
+          ) : (
+            <div style={{ maxHeight: 280, overflow: 'auto', border: `1px solid ${t.border}`, borderRadius: 8 }}>
+              {targets.map((d, i) => {
+                const unsupported = !supportsSlot(d.type, slot);
+                const checked = !unsupported && selected.has(d.ip);
+                const res = results[d.ip];
+                return (
+                  <div key={d.ip} onClick={() => !unsupported && !pushing && toggle(d.ip)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                      borderBottom: i === targets.length - 1 ? 'none' : `1px solid ${t.border}`,
+                      cursor: unsupported || pushing ? 'default' : 'pointer', opacity: unsupported ? 0.5 : 1 }}>
+                    <input type="checkbox" checked={checked} disabled={unsupported || pushing} readOnly
+                      style={{ accentColor: t.accent, cursor: unsupported || pushing ? 'default' : 'pointer' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
+                      <div style={{ fontSize: 10, fontFamily: FONT_MONO, color: t.textMuted }}>{d.ip}</div>
+                    </div>
+                    {!d.online && <span style={{ fontSize: 10, color: t.textDim }}>offline</span>}
+                    {unsupported && <span style={{ fontSize: 10, color: t.textDim }}>no backup slot</span>}
+                    {res === 'ok' && <Check size={13} color={t.success} />}
+                    {res === 'fail' && <span style={{ fontSize: 11, color: t.danger }}>failed</span>}
+                    <Pill t={t} sev={typeSev(d.type)}>{d.type}</Pill>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4, borderTop: `1px solid ${t.border}` }}>
+          <button onClick={onClose} style={btnStyle(t)}>Cancel</button>
+          <button onClick={doPush} disabled={pushing || selectedEligible.length === 0}
+            style={{ ...btnStyle(t, 'primary'), opacity: pushing || selectedEligible.length === 0 ? 0.5 : 1 }}>
+            <Send size={13} /> {pushing ? 'Pushing…' : `Push to ${selectedEligible.length} miner${selectedEligible.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

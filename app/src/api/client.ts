@@ -3,7 +3,7 @@ import { get, post, put, patch, del } from './http';
 import type {
   DashboardData, AppSettings, NMMinerDevice, NMMinerConfig, AxeDevice,
   AxeActionResponse, AxeAction, NmAction, DeviceTemplate, StatSample,
-  Group, GroupActionResult, Alert, HealthData, PoolPreset, Wallet,
+  Group, GroupActionResult, Alert, HealthData, PoolPreset, PoolPushPayload, Wallet,
   Schedule, DiscoveryScanResult, DiscoveredDevice, ProbabilityResult, AnalyticsResult,
   AlertRule, NotificationChannel,
 } from './types';
@@ -76,7 +76,7 @@ export const api = {
     create:       (p: Partial<PoolPreset>)             => post<PoolPreset>('/api/pools', p),
     update:       (id: string, p: Partial<PoolPreset>) => put<PoolPreset>(`/api/pools/${id}`, p),
     delete:       (id: string)                         => del(`/api/pools/${id}`),
-    pushToDevice: (ip: string, pool: Partial<PoolPreset>) => post(`/api/pools/push/${ip}`, pool),
+    pushToDevice: (ip: string, pool: PoolPushPayload) => post(`/api/pools/push/${ip}`, pool),
     ping:         (target: string)                     => get<{ target: string; latency_ms: number | null }>(`/api/pools/ping?target=${encodeURIComponent(target)}`),
     health:       ()                                   => get<Array<{ url: string; up: boolean; latency_ms: number | null; devices: number; since: string }>>('/api/pools/health'),
   },
