@@ -1,5 +1,6 @@
 """Updates router: GitHub release listing + latest-version check (cached)."""
 
+import re
 import time
 
 import httpx
@@ -11,6 +12,34 @@ router = APIRouter()
 
 _releases_cache: dict = {"data": None, "fetched_at": 0.0}
 _RELEASES_TTL = 300  # 5 min cache
+
+# Moving Docker tags built from a branch rather than a version tag. Images built
+# from these carry the tag name (e.g. "latest") as their version, so they are not
+# a comparable semver — they track the tip of a branch and are at/ahead of the
+# newest release. Comparing them against a release would always look "outdated".
+ROLLING_TAGS = {"latest", "dev", "edge", "main", "nightly"}
+
+
+def _channel(version: str) -> str:
+    return "rolling" if str(version or "").strip().lower() in ROLLING_TAGS else "release"
+
+
+def _parse_semver(v: str):
+    """Parse a leading ``A.B.C`` (optional ``v`` prefix / ``-suffix``) into a
+    comparable ``(major, minor, patch)`` tuple, or ``None`` if not a semver."""
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)", str(v or "").strip().lstrip("v"))
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def _update_available(current: str, latest_version: str) -> bool:
+    """True only when both sides are real semvers and the release is strictly
+    newer. A non-semver ``current`` (rolling tag, "dev", a dirty build) is never
+    flagged as outdated — it can't be meaningfully compared to a release."""
+    cur = _parse_semver(current)
+    lat = _parse_semver(latest_version)
+    if cur is None or lat is None:
+        return False
+    return lat > cur
 
 
 @router.get("/api/updates/releases")
@@ -62,6 +91,7 @@ async def get_latest_release():
     latest = stable[0] if stable else (data["releases"][0] if data["releases"] else None)
     return {
         "current": APP_VERSION,
+        "channel": _channel(APP_VERSION),
         "latest": latest,
-        "update_available": latest is not None and latest["version"] != APP_VERSION,
+        "update_available": latest is not None and _update_available(APP_VERSION, latest["version"]),
     }
