@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from core import CONFIG_FILE, DEFAULT_CONFIG, _pool_health, _validate_device_ip, load_json, save_json
 from miners.axehub import set_axehub_pool
 from miners.wroomminer import set_wroomminer_pool
-from miners.lottominer import ensure_stratum_scheme
+from miners.pool_url import DEFAULT_STRATUM_PORT, parse_pool_endpoint
 
 router = APIRouter()
 
@@ -124,9 +124,25 @@ async def _get_nm_hostname(client: httpx.AsyncClient, ip: str) -> str:
         return ip
 
 
+def _push_slot(pool: dict) -> str:
+    """Which pool slot a push targets: ``primary`` (default) or ``backup``.
+
+    Pushing to ``backup`` writes the preset's *primary* endpoint into the
+    device's fallback/secondary slot and leaves the primary pool untouched.
+    """
+    slot = str(pool.get("slot") or "primary").strip().lower()
+    return "backup" if slot in ("backup", "fallback", "secondary") else "primary"
+
+
 @router.post("/api/pools/push/{ip}")
 async def push_pool_to_device(ip: str, pool: dict):
-    """Push a pool preset to a single device. Worker is auto-built as wallet.hostname."""
+    """Push a pool preset to a single device. Worker is auto-built as wallet.hostname.
+
+    The preset URL is normalized per family (AxeOS wants host + a separate port,
+    NMMiner wants a full ``stratum+tcp://host:port`` line, …) so every device
+    receives a shape it can actually connect with. ``pool['slot']`` selects the
+    primary or backup pool slot.
+    """
     _validate_device_ip(ip)
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
 
@@ -147,48 +163,75 @@ async def push_pool_to_device(ip: str, pool: dict):
     if not is_axe and not is_axehub and not is_wroom and not is_nm:
         raise HTTPException(status_code=404, detail=f"Device {ip} not found in config")
 
+    slot = _push_slot(pool)
+
     if is_axehub:
-        return await set_axehub_pool(ip, pool)
+        return await set_axehub_pool(ip, pool, slot=slot)
 
     if is_wroom:
-        return await set_wroomminer_pool(ip, pool)
+        return await set_wroomminer_pool(ip, pool, slot=slot)
 
     wallet = pool.get("wallet") or pool.get("worker", "")
     password = pool.get("password") or "x"
     url = pool.get("url", "")
     url2 = pool.get("url2", "")
     password2 = pool.get("password2") or "x"
+    ep = parse_pool_endpoint(url, default_port=int(pool.get("port") or DEFAULT_STRATUM_PORT))
 
     async with httpx.AsyncClient(timeout=15) as client:
         if is_axe:
+            # AxeOS keeps host and port in separate fields; the scheme is implied.
             hostname = await _get_axe_hostname(client, ip)
             worker = f"{wallet}.{hostname}" if wallet else pool.get("worker", "")
-            payload: dict = {
-                "stratumURL": url,
-                "stratumUser": worker,
-                "stratumPassword": password,
-            }
-            if url2:
-                w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
-                payload["fallbackStratumURL"] = url2
-                payload["fallbackStratumUser"] = w2
-                payload["fallbackStratumPassword"] = password2
+            if slot == "backup":
+                payload: dict = {
+                    "fallbackStratumURL": ep.host,
+                    "fallbackStratumUser": worker,
+                    "fallbackStratumPassword": password,
+                }
+                if ep.port:
+                    payload["fallbackStratumPort"] = ep.port
+            else:
+                payload = {
+                    "stratumURL": ep.host,
+                    "stratumUser": worker,
+                    "stratumPassword": password,
+                }
+                if ep.port:
+                    payload["stratumPort"] = ep.port
+                if url2:
+                    ep2 = parse_pool_endpoint(url2, default_port=int(pool.get("port2") or DEFAULT_STRATUM_PORT))
+                    w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
+                    payload["fallbackStratumURL"] = ep2.host
+                    if ep2.port:
+                        payload["fallbackStratumPort"] = ep2.port
+                    payload["fallbackStratumUser"] = w2
+                    payload["fallbackStratumPassword"] = password2
             resp = await client.patch(f"http://{ip}/api/system", json=payload)
-            return {"ip": ip, "type": "axeos", "status": resp.status_code}
+            return {"ip": ip, "type": "axeos", "slot": slot, "status": resp.status_code}
 
         else:
             # NMMiner: POST mining settings to the device itself (no master/swarm).
+            # It needs a full stratum+tcp://host:port line on a single field.
             hostname = await _get_nm_hostname(client, ip)
             worker = f"{wallet}.{hostname}" if wallet else pool.get("worker", "")
-            payload = {
-                "PrimaryPool": ensure_stratum_scheme(url),
-                "PrimaryAddress": worker,
-                "PrimaryPassword": password,
-            }
-            if url2:
-                w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
-                payload["SecondaryPool"] = ensure_stratum_scheme(url2)
-                payload["SecondaryAddress"] = w2
-                payload["SecondaryPassword"] = password2
+            if slot == "backup":
+                payload = {
+                    "SecondaryPool": ep.stratum_url(),
+                    "SecondaryAddress": worker,
+                    "SecondaryPassword": password,
+                }
+            else:
+                payload = {
+                    "PrimaryPool": ep.stratum_url(),
+                    "PrimaryAddress": worker,
+                    "PrimaryPassword": password,
+                }
+                if url2:
+                    ep2 = parse_pool_endpoint(url2, default_port=int(pool.get("port2") or DEFAULT_STRATUM_PORT))
+                    w2 = f"{wallet}.{hostname}" if wallet else pool.get("worker2", "")
+                    payload["SecondaryPool"] = ep2.stratum_url()
+                    payload["SecondaryAddress"] = w2
+                    payload["SecondaryPassword"] = password2
             resp = await client.post(f"http://{ip}/api/setting/mining", json=payload)
-            return {"ip": ip, "type": "lottominer", "status": resp.status_code}
+            return {"ip": ip, "type": "lottominer", "slot": slot, "status": resp.status_code}

@@ -30,6 +30,7 @@ import httpx
 from core import _append_entry, _validate_device_ip
 
 from .base import MinerDriver
+from .pool_url import parse_pool_endpoint
 
 WROOM_MODEL = "WroomMiner"
 
@@ -156,44 +157,50 @@ async def wroomminer_fanout(action: str, ips: list[str]) -> list[dict]:
     return results
 
 
-async def set_wroomminer_pool(ip: str, pool: dict) -> dict:
+async def set_wroomminer_pool(ip: str, pool: dict, slot: str = "primary") -> dict:
     """Push pool/wallet config to a WroomMiner via POST /api/config.
 
     WroomMiner stores the wallet and worker name separately and builds the
-    stratum worker as ``wallet_address.worker_name`` itself.
+    stratum worker as ``wallet_address.worker_name`` itself. Host and port go in
+    separate fields, so the preset URL is split (scheme stripped). ``slot``
+    selects the primary or fallback pool: ``backup`` writes the preset's primary
+    endpoint into the fallback slot and leaves the primary pool untouched.
     """
     _validate_device_ip(ip)
     wallet = pool.get("wallet") or pool.get("worker", "")
     worker_name = pool.get("worker", "") or ""
 
-    def _split(raw_url: str, default_port: int) -> tuple[str, int]:
-        host_port = (raw_url or "").split("://")[-1].strip().strip("/")
-        if ":" in host_port:
-            host, _, port_s = host_port.rpartition(":")
-            try:
-                return host, int(port_s)
-            except ValueError:
-                return host_port, default_port
-        return host_port, default_port
+    ep = parse_pool_endpoint(pool.get("url", ""), default_port=int(pool.get("port") or 3333))
 
-    host, port = _split(pool.get("url", ""), int(pool.get("port") or 3333))
-    body: dict = {
-        "pool_primary_url": host,
-        "pool_primary_port": port,
+    if str(slot).lower() in ("backup", "fallback", "secondary"):
+        body: dict = {
+            "pool_fallback_url": ep.host,
+            "pool_fallback_port": ep.port,
+            "wallet_fallback_address": wallet,
+        }
+        if worker_name:
+            body["worker_name"] = worker_name
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(f"http://{ip}/api/config", json=body)
+            return {"ip": ip, "type": "wroomminer", "slot": "backup", "status": resp.status_code}
+
+    body = {
+        "pool_primary_url": ep.host,
+        "pool_primary_port": ep.port,
         "wallet_address": wallet,
     }
     if worker_name:
         body["worker_name"] = worker_name
     url2 = pool.get("url2", "")
     if url2:
-        host2, port2 = _split(url2, int(pool.get("port2") or 3333))
-        body["pool_fallback_url"] = host2
-        body["pool_fallback_port"] = port2
+        ep2 = parse_pool_endpoint(url2, default_port=int(pool.get("port2") or 3333))
+        body["pool_fallback_url"] = ep2.host
+        body["pool_fallback_port"] = ep2.port
         body["wallet_fallback_address"] = pool.get("wallet2") or wallet
 
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(f"http://{ip}/api/config", json=body)
-        return {"ip": ip, "type": "wroomminer", "status": resp.status_code}
+        return {"ip": ip, "type": "wroomminer", "slot": "primary", "status": resp.status_code}
 
 
 async def probe_wroomminer(ip: str, client: httpx.AsyncClient) -> dict | None:

@@ -363,5 +363,11 @@ export interface PoolPreset {
   is_default?: boolean;
 }
 
+/** Which device pool slot a push targets. */
+export type PoolSlot = 'primary' | 'backup';
+
+/** A preset as sent to a device push — carries the transient target slot. */
+export type PoolPushPayload = Partial<PoolPreset> & { slot?: PoolSlot };
+
 export type AxeAction = 'pause' | 'resume' | 'restart' | 'identify';
 export type NmAction = 'restart';

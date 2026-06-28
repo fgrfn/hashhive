@@ -27,6 +27,7 @@ import httpx
 from core import _append_entry, _validate_device_ip
 
 from .base import MinerDriver
+from .pool_url import parse_pool_endpoint
 
 AXEHUB_BASE = "/api/axehub/v1"
 AXEHUB_HEADERS = {"X-AxeHub-Compat": "1"}
@@ -157,26 +158,26 @@ async def _get_axehub_hostname(client: httpx.AsyncClient, ip: str) -> str:
         return ip
 
 
-async def set_axehub_pool(ip: str, pool: dict) -> dict:
+async def set_axehub_pool(ip: str, pool: dict, slot: str = "primary") -> dict:
     """Push pool/wallet config to an AxeHub via POST /pool/set.
 
-    Worker is built as ``wallet.hostname`` (matching the other families).
+    Worker is built as ``wallet.hostname`` (matching the other families). Host
+    and port go in separate fields, so the preset URL is split (scheme stripped).
+
+    AxeHub firmware exposes only a single pool — there is no backup/fallback
+    slot — so a ``backup`` push is skipped rather than silently overwriting the
+    primary pool.
     """
     _validate_device_ip(ip)
+    if str(slot).lower() in ("backup", "fallback", "secondary"):
+        return {"ip": ip, "type": "axehub", "slot": "backup", "status": "skipped",
+                "reason": "AxeHub has no backup pool slot"}
+
     wallet = pool.get("wallet") or pool.get("worker", "")
     password = pool.get("password") or "x"
-    raw_url = pool.get("url", "") or ""
-    # Strip any scheme (stratum+tcp://host:port) and split host:port.
-    host_port = raw_url.split("://")[-1].strip().strip("/")
-    if ":" in host_port:
-        host, _, port_s = host_port.rpartition(":")
-        try:
-            port = int(port_s)
-        except ValueError:
-            host, port = host_port, int(pool.get("port") or 3333)
-    else:
-        host = host_port
-        port = int(pool.get("port") or 3333)
+    ep = parse_pool_endpoint(pool.get("url", ""), default_port=int(pool.get("port") or 3333))
+    host = ep.host
+    port = ep.port or int(pool.get("port") or 3333)
 
     async with httpx.AsyncClient(timeout=15) as client:
         hostname = await _get_axehub_hostname(client, ip)
@@ -184,7 +185,7 @@ async def set_axehub_pool(ip: str, pool: dict) -> dict:
         body = {"url": host, "port": int(port), "user": worker, "pass": password}
         headers = {**AXEHUB_HEADERS, "Content-Type": "application/json"}
         resp = await client.post(f"http://{ip}{AXEHUB_BASE}/pool/set", json=body, headers=headers)
-        return {"ip": ip, "type": "axehub", "status": resp.status_code}
+        return {"ip": ip, "type": "axehub", "slot": "primary", "status": resp.status_code}
 
 
 async def probe_axehub(ip: str, client: httpx.AsyncClient) -> dict | None:
