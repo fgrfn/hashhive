@@ -1,4 +1,7 @@
-"""Default configuration and request/response models."""
+"""Default configuration, public projections, and request/response models."""
+
+import copy
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -10,6 +13,7 @@ DEFAULT_CONFIG: dict = {
     "refresh_interval": 30,
     "offline_grace_minutes": 2,
     "alert_cooldown_minutes": 30,
+    "alert_transition_checks": 2,
     "thresholds": {
         "temp_max": 70,
         "vr_temp_max": 85,
@@ -75,6 +79,10 @@ DEFAULT_CONFIG: dict = {
         "channel_id": "",         # optional: only respond in this channel (blank = any)
     },
     "pool_presets": [],
+    "pool_health": {
+        "failure_checks": 2,
+        "recovery_checks": 2,
+    },
     "groups": [],
     "schedules": [],
     "wallets": [],
@@ -110,6 +118,65 @@ DEFAULT_CONFIG: dict = {
         "password_hash": "",
     },
 }
+
+
+# Values returned to the browser use a stable sentinel instead of exposing
+# notification credentials. Saving that sentinel means "keep the stored value",
+# so an unrelated autosave never destroys a configured secret.
+SECRET_MASK = "••••••••"
+_SECRET_PATHS: tuple[tuple[str, ...], ...] = (
+    ("notifications", "telegram_token"),
+    ("notifications", "discord_webhook"),
+    ("notifications", "gotify_token"),
+    ("notifications", "ntfy_token"),
+    ("notifications", "pushover_user_key"),
+    ("notifications", "pushover_app_token"),
+    ("discord_dashboard", "webhook"),
+    ("discord_bot", "token"),
+)
+
+
+def _deep_merge(base: dict, patch: dict) -> dict:
+    """Recursively merge mappings; lists and scalars replace prior values."""
+    out = copy.deepcopy(base)
+    for key, value in patch.items():
+        if value == SECRET_MASK:
+            continue
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = copy.deepcopy(value)
+    return out
+
+
+def merge_config(current: dict, patch: dict) -> dict:
+    """Apply a partial settings patch without dropping existing/new defaults."""
+    with_defaults = _deep_merge(DEFAULT_CONFIG, current if isinstance(current, dict) else {})
+    return _deep_merge(with_defaults, patch if isinstance(patch, dict) else {})
+
+
+def public_config(config: dict) -> dict:
+    """Return a browser-safe copy of the persisted configuration."""
+    # Project onto current defaults so older installations receive newly added
+    # settings immediately, even before they save anything after an upgrade.
+    result: dict[str, Any] = merge_config({}, config)
+    auth = result.get("auth", {})
+    if isinstance(auth, dict):
+        auth.pop("password_hash", None)
+    # Pool presets are fetched through their dedicated endpoint when needed.
+    # Omitting them here prevents credentials from being repeated in every
+    # dashboard response and WebSocket broadcast.
+    result.pop("pool_presets", None)
+    for path in _SECRET_PATHS:
+        node: Any = result
+        for part in path[:-1]:
+            if not isinstance(node, dict):
+                node = None
+                break
+            node = node.get(part)
+        if isinstance(node, dict) and node.get(path[-1]):
+            node[path[-1]] = SECRET_MASK
+    return result
 
 
 class LoginRequest(BaseModel):

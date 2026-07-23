@@ -92,7 +92,10 @@ describe('fmtProb', () => {
   });
   it('formats a large probability as percent', () => expect(fmtProb(0.25)).toBe('25.0%'));
   it('formats a small-but-visible probability with more decimals', () => expect(fmtProb(0.001)).toBe('0.100%'));
-  it('formats a tiny probability as full odds with separators', () => expect(fmtProb(0.00001)).toBe('1 : 100,000'));
+  it('formats tiny odds with the requested locale', () => {
+    expect(fmtProb(0.00001, 'en-US')).toBe('1 : 100,000');
+    expect(fmtProb(0.00001, 'de-DE')).toBe('1 : 100.000');
+  });
 });
 
 import { isFirmwareOutdated } from '../api';

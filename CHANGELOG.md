@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+* preserve password hashes during settings autosave and revoke stale sessions on password recovery
+* mask notification credentials in settings, dashboard, WebSocket, and safe backups
+* omit pool credentials from recurring dashboard and WebSocket payloads
+* remove unrestricted cross-origin API access
+
+### Reliability
+
+* run backend tests before publishing Docker images or releases
+* make partial settings updates non-destructive and return the updated configuration
+* add a reproducible Python dependency lock
+* add AxeOS energy and cost analytics with daily, weekly and monthly-projected totals
+* debounce pool reachability, device pool and fallback state transitions
+* include AxeHub devices in the initial WebSocket payload
+
+### Documentation
+
+* correct native Windows, manual, Docker update, version, and supported-device instructions
+* refresh the roadmap to match already shipped group and market features
+
 ## [1.3.0](https://github.com/fgrfn/hashhive/compare/v1.2.0...v1.3.0) (2026-05-07)
 
 

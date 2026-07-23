@@ -9,6 +9,9 @@ from pathlib import Path
 
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
+_data_dir = Path(os.environ["HASHHIVE_DATA_DIR"])
+(_data_dir / "logs").mkdir(parents=True, exist_ok=True)
+(_data_dir / "stats").mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -23,6 +26,7 @@ from main import (  # noqa: E402
     load_json,
     DEFAULT_CONFIG,
 )
+from core import CONFIG_FILE, _sessions, save_json  # noqa: E402
 
 
 # ── _hash_pw / _verify_pw ─────────────────────────────────────────────────────
@@ -115,3 +119,61 @@ def test_bootstrap_auth_noop_when_no_env(tmp_path, monkeypatch):
     monkeypatch.setattr(core.auth, "CONFIG_FILE", tmp_path / "config.json")
     _bootstrap_auth()
     assert not (tmp_path / "config.json").exists()
+
+
+def test_bootstrap_auth_revokes_persisted_sessions(tmp_path, monkeypatch):
+    monkeypatch.setenv("HASHHIVE_PASSWORD", "replacement-password")
+    import core.auth
+    config_file = tmp_path / "config.json"
+    sessions_file = tmp_path / "sessions.json"
+    monkeypatch.setattr(core.auth, "CONFIG_FILE", config_file)
+    monkeypatch.setattr(core.auth, "_SESSIONS_FILE", sessions_file)
+    core.auth._sessions["stolen"] = time.time() + 3600
+    sessions_file.write_text(json.dumps(core.auth._sessions))
+    _bootstrap_auth()
+    assert core.auth._sessions == {}
+    assert json.loads(sessions_file.read_text()) == {}
+
+
+def test_auth_update_preserves_caller_and_revokes_other_sessions():
+    import asyncio
+    from routers.settings import update_auth_settings
+
+    class Request:
+        cookies = {"hh_session": "current"}
+
+    save_json(CONFIG_FILE, {
+        **DEFAULT_CONFIG,
+        "auth": {"enabled": True, "password_hash": _hash_pw("old-password")},
+    })
+    _sessions.clear()
+    _sessions.update({"current": time.time() + 3600, "other": time.time() + 3600})
+    result = asyncio.run(update_auth_settings(
+        Request(),
+        {"enabled": True, "password": "new-password"},
+    ))
+    assert result["auth"] == {"enabled": True}
+    assert set(_sessions) == {"current"}
+    saved = load_json(CONFIG_FILE, {})
+    assert _verify_pw("new-password", saved["auth"]["password_hash"])
+
+
+def test_http_security_headers_without_wildcard_cors():
+    import asyncio
+    import httpx
+    from main import app
+
+    async def _request():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get(
+                "/api/auth/check",
+                headers={"Origin": "https://untrusted.example"},
+            )
+
+    response = asyncio.run(_request())
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "content-security-policy" in response.headers
+    assert "access-control-allow-origin" not in response.headers

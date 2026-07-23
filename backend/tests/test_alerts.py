@@ -12,6 +12,7 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from main import _append_entry, _load_recent, _today, LOGS_DIR  # noqa: E402
+from alerts import _debounced_state_transition  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -55,3 +56,18 @@ def test_append_entry_caps_at_max(monkeypatch):
 def test_load_recent_returns_list():
     result = _load_recent(days=1)
     assert isinstance(result, list)
+
+
+def test_pool_transition_requires_repeated_observations():
+    previous = {"pool": "stratum+tcp://pool:3333"}
+    stable, changed, pending = _debounced_state_transition(
+        previous, False, "pool", 2,
+    )
+    assert stable is True
+    assert changed is False
+    stable, changed, confirmed = _debounced_state_transition(
+        {**previous, **pending}, False, "pool", 2,
+    )
+    assert stable is False
+    assert changed is True
+    assert confirmed["pool_candidate_count"] == 0

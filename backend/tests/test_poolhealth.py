@@ -54,7 +54,11 @@ def test_transition_alerts_and_state():
     assert _pool_health["stratum+tcp://eu.pool.io:3333"]["up"] is True
     assert _pool_health["stratum+tcp://eu.pool.io:3333"]["latency_ms"] == 12.0
 
-    # Pool goes down → one critical pool_unreachable alert.
+    # One failed probe is treated as a transient.
+    alerts = _run(nm, [], latency=None)
+    assert alerts == []
+
+    # A second failed probe confirms the outage.
     alerts = _run(nm, [], latency=None)
     assert [a["kind"] for a in alerts] == ["pool_unreachable"]
     assert alerts[0]["severity"] == "critical"
@@ -64,7 +68,9 @@ def test_transition_alerts_and_state():
     alerts = _run(nm, [], latency=None)
     assert alerts == []
 
-    # Recovers → one info pool_reachable alert.
+    # Recovery is also confirmed twice.
+    alerts = _run(nm, [], latency=8.0)
+    assert alerts == []
     alerts = _run(nm, [], latency=8.0)
     assert [a["kind"] for a in alerts] == ["pool_reachable"]
     assert alerts[0]["severity"] == "info"
@@ -73,6 +79,8 @@ def test_transition_alerts_and_state():
 def test_first_observation_down_alerts():
     _reset()
     nm = [{"_online": True, "pool": "down.pool.io:3333"}]
+    alerts = _run(nm, [], latency=None)
+    assert alerts == []
     alerts = _run(nm, [], latency=None)
     assert [a["kind"] for a in alerts] == ["pool_unreachable"]
 

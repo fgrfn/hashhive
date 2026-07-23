@@ -79,6 +79,16 @@ def _persist_sessions() -> None:
         pass
 
 
+def _revoke_sessions(except_token: str | None = None) -> None:
+    """Revoke all sessions, optionally preserving the caller's valid token."""
+    retained = {}
+    if except_token and except_token in _sessions and _sessions[except_token] > time.time():
+        retained[except_token] = _sessions[except_token]
+    _sessions.clear()
+    _sessions.update(retained)
+    _persist_sessions()
+
+
 def _bootstrap_auth() -> None:
     """If HASHHIVE_PASSWORD is set, enforce it as the current password (allows env-based recovery)."""
     pw = os.environ.get("HASHHIVE_PASSWORD", "").strip()
@@ -88,3 +98,6 @@ def _bootstrap_auth() -> None:
     config.setdefault("auth", {})["enabled"] = True
     config["auth"]["password_hash"] = _hash_pw(pw)
     save_json(CONFIG_FILE, config)
+    # Password recovery must invalidate sessions that may have been stolen.
+    _sessions.clear()
+    save_json(_SESSIONS_FILE, {})

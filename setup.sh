@@ -28,6 +28,10 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 echo "✓  $(python3 --version)"
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+    echo "✗  HashHive requires Python 3.10 or newer."
+    exit 1
+fi
 
 # ── Ensure python3-venv ──────────────────────────────────────────────────────
 if ! python3 -m ensurepip --version &>/dev/null; then
@@ -49,7 +53,7 @@ UVICORN="$VENV_DIR/bin/uvicorn"
 echo ""
 echo "Installing dependencies..."
 "$PIP" install --quiet --upgrade pip
-"$PIP" install --quiet -r "$BACKEND_DIR/requirements.txt"
+"$PIP" install --quiet -r "$BACKEND_DIR/requirements.lock"
 echo "✓  Dependencies installed."
 
 # ── Autostart ────────────────────────────────────────────────────────────────

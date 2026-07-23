@@ -1,6 +1,6 @@
 services:
   hashhive:
-    build: .
+    image: ghcr.io/fgrfn/hashhive:latest
     container_name: hashhive
     restart: unless-stopped
     ports:

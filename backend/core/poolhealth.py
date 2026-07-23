@@ -147,6 +147,9 @@ async def check_pool_health(config: dict, nm_results, axe_results) -> list[dict]
     latencies = await asyncio.gather(*[_probe(u) for u in urls]) if urls else []
 
     alerts: list[dict] = []
+    health_cfg = config.get("pool_health", {}) if isinstance(config, dict) else {}
+    failure_checks = max(1, int(health_cfg.get("failure_checks", 2) or 2))
+    recovery_checks = max(1, int(health_cfg.get("recovery_checks", 2) or 2))
     for url, latency in zip(urls, latencies):
         up = latency is not None
         prev = _pool_health.get(url)
@@ -155,33 +158,48 @@ async def check_pool_health(config: dict, nm_results, axe_results) -> list[dict]
         devices = counts[url]
 
         if prev is None:
-            # First observation. Only alert if already down (a problem worth
-            # surfacing); never alert on a healthy pool seen for the first time.
+            # Treat a new pool as healthy until repeated failed probes confirm
+            # otherwise. Its observed state is still exposed immediately.
+            confirmed_up = True
+            pending_up = up
+            pending_count = 0 if up else 1
             since = _now_iso()
-            if not up:
-                alerts.append(_make_pool_alert(
-                    url, "pool_unreachable", "critical",
-                    f"Pool {label} is unreachable ({devices} device(s) affected)",
-                ))
         else:
-            was_up = bool(prev.get("up"))
-            if was_up == up:
+            confirmed_up = bool(prev.get("confirmed_up", prev.get("up", True)))
+            if up == confirmed_up:
+                pending_up = up
+                pending_count = 0
                 since = prev.get("since") or _now_iso()
             else:
-                since = _now_iso()
-                if was_up and not up:
-                    alerts.append(_make_pool_alert(
-                        url, "pool_unreachable", "critical",
-                        f"Pool {label} is unreachable ({devices} device(s) affected)",
-                    ))
-                elif not was_up and up:
-                    alerts.append(_make_pool_alert(
-                        url, "pool_reachable", "info",
-                        f"Pool {label} is reachable again",
-                    ))
+                pending_up = up
+                pending_count = (
+                    int(prev.get("pending_count", 0)) + 1
+                    if prev.get("pending_up") == up else 1
+                )
+                required = recovery_checks if up else failure_checks
+                if pending_count >= required:
+                    was_up = confirmed_up
+                    confirmed_up = up
+                    pending_count = 0
+                    since = _now_iso()
+                    if was_up and not up:
+                        alerts.append(_make_pool_alert(
+                            url, "pool_unreachable", "critical",
+                            f"Pool {label} is unreachable ({devices} device(s) affected)",
+                        ))
+                    elif not was_up and up:
+                        alerts.append(_make_pool_alert(
+                            url, "pool_reachable", "info",
+                            f"Pool {label} is reachable again",
+                        ))
+                else:
+                    since = prev.get("since") or _now_iso()
 
         _pool_health[url] = {
             "up": up,
+            "confirmed_up": confirmed_up,
+            "pending_up": pending_up,
+            "pending_count": pending_count,
             "latency_ms": latency,
             "devices": devices,
             "since": since,

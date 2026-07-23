@@ -17,8 +17,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Abhängigkeiten zuerst (Layer-Caching)
-COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt backend/requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 # Backend + Frontend (prototype/shared) + Vite dist + Version
 COPY backend/ ./backend/

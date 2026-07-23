@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -56,6 +55,7 @@ from core import (  # noqa: F401
     _log_file,
     _write_day,
     _append_entry as _append_entry_re,
+    public_config,
     _load_recent,
     _cleanup_old_stats_dir,
     _migrate_legacy as _migrate_legacy_re,
@@ -87,6 +87,7 @@ from core import (  # noqa: F401
     _bootstrap_auth as _bootstrap_auth_re,
 )
 
+from miners.axehub import fetch_axehub_safe as _fetch_axehub_safe
 from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
 from routers.axeos import _fetch_axeos_device
 from routers.lottominer import _fetch_lottominer_safe
@@ -167,13 +168,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="HashHive", version=APP_VERSION, lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
@@ -314,25 +308,30 @@ async def websocket_endpoint(ws: WebSocket):
         config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
         nm_devices = config.get("lottominer_devices", [])
         wroom_devices = config.get("wroomminer_devices", [])
+        axehub_devices = config.get("axehub_devices", [])
         axeos_devices = config.get("axeos_devices", [])
         has_nmminer = bool(nm_devices)
         has_wroom = bool(wroom_devices)
+        has_axehub = bool(axehub_devices)
         async with httpx.AsyncClient(timeout=10) as client:
             coros = []
             if has_nmminer:
                 coros.append(_fetch_lottominer_safe(client, nm_devices))
             if has_wroom:
                 coros.append(_fetch_wroomminer_safe(client, wroom_devices))
+            if has_axehub:
+                coros.append(_fetch_axehub_safe(client, axehub_devices))
             coros += [_fetch_axeos_device(client, d) for d in axeos_devices]
             results = await asyncio.gather(*coros) if coros else []
         idx = 0
         nmminer_data = results[idx] if (has_nmminer and results) else {"devices": []}
         if has_nmminer:
             idx += 1
-        if has_wroom and idx < len(results):
-            nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
-                list(results[idx].get("devices", []))
-            idx += 1
+        for has_family in (has_wroom, has_axehub):
+            if has_family and idx < len(results):
+                nmminer_data["devices"] = list(nmminer_data.get("devices", [])) + \
+                    list(results[idx].get("devices", []))
+                idx += 1
         axeos_results = list(results[idx:])
         axeos_data = {"devices": axeos_results}
         today_entries = _read_day(_today())
@@ -342,7 +341,7 @@ async def websocket_endpoint(ws: WebSocket):
             "lottominer": nmminer_data,
             "axeos": axeos_data,
             "unread_alerts": unread,
-            "config": config,
+            "config": public_config(config),
         }))
         # Keep alive — wait for client to close
         while True:

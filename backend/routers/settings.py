@@ -1,11 +1,12 @@
 """Settings router: get/post settings, backup/restore, device patch."""
 
 import copy
+import json
 import shutil
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 
 from core import (
     CONFIG_FILE,
@@ -19,6 +20,10 @@ from core import (
     PatchDeviceRequest,
     _append_entry,
     _hash_pw,
+    _revoke_sessions,
+    _session_valid,
+    merge_config,
+    public_config,
     load_json,
     save_json,
 )
@@ -101,25 +106,30 @@ async def purge_data(data: dict):
 @router.get("/api/settings")
 async def get_settings() -> dict:
     config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
-    # Never expose the password hash to the frontend
-    auth = config.get("auth", {})
-    config["auth"] = {k: v for k, v in auth.items() if k != "password_hash"}
-    return config
+    return public_config(config)
 
 
 @router.post("/api/settings")
 async def post_settings(data: dict) -> dict:
-    # Hash plaintext password if provided (crypto.subtle unavailable on plain HTTP,
-    # so the frontend sends plaintext and the backend performs SHA-256 hashing)
-    auth_data = data.get("auth")
+    current = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    patch = copy.deepcopy(data)
+    # Backward compatibility for older clients that changed the password through
+    # the general settings endpoint. New clients use /api/settings/auth.
+    auth_data = patch.get("auth")
+    password_changed = False
     if isinstance(auth_data, dict):
         plaintext_pw = auth_data.pop("password", None)
         if plaintext_pw:
+            if len(str(plaintext_pw)) < 8:
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
             auth_data["password_hash"] = _hash_pw(plaintext_pw)
-    # Merge with DEFAULT_CONFIG so new keys added in updates are preserved
-    merged = {**DEFAULT_CONFIG, **data}
-    merged.setdefault("thresholds", {}).update({k: v for k, v in DEFAULT_CONFIG["thresholds"].items() if k not in data.get("thresholds", {})})
+            password_changed = True
+        elif auth_data.get("enabled") and not current.get("auth", {}).get("password_hash"):
+            raise HTTPException(status_code=400, detail="Set a password before enabling authentication")
+    merged = merge_config(current, patch)
     save_json(CONFIG_FILE, merged)
+    if password_changed:
+        _revoke_sessions()
     now = datetime.now(timezone.utc).isoformat()
     _append_entry({
         "id": f"system:config_saved:{now}",
@@ -131,29 +141,67 @@ async def post_settings(data: dict) -> dict:
         "read": True,
         "source": "system",
     })
-    return {"status": "ok"}
+    return public_config(merged)
+
+
+@router.post("/api/settings/auth")
+async def update_auth_settings(request: Request, data: dict) -> dict:
+    """Atomically enable/disable auth or change its password."""
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    auth = dict(config.get("auth", {}))
+    enabled = bool(data.get("enabled", auth.get("enabled", False)))
+    password = str(data.get("password") or "")
+    if password:
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        auth["password_hash"] = _hash_pw(password)
+    if enabled and not auth.get("password_hash"):
+        raise HTTPException(status_code=400, detail="Set a password before enabling authentication")
+    auth["enabled"] = enabled
+    config["auth"] = auth
+    save_json(CONFIG_FILE, config)
+
+    # A password change revokes other browsers, while preserving the caller's
+    # current authenticated session. Disabling auth invalidates every session.
+    current_token = request.cookies.get("hh_session", "") if enabled else None
+    _revoke_sessions(except_token=current_token)
+    return public_config(config)
 
 
 @router.get("/api/settings/backup")
-async def download_config():
-    """Download dashboard_config.json as a file attachment."""
+async def download_config(
+    request: Request,
+    include_secrets: bool = Query(False),
+):
+    """Download a safe backup, or a full backup for authenticated installs."""
     if not CONFIG_FILE.exists():
         raise HTTPException(status_code=404, detail="No config file found")
-    return FileResponse(
-        CONFIG_FILE,
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    if include_secrets:
+        if not config.get("auth", {}).get("enabled") or not _session_valid(request):
+            raise HTTPException(
+                status_code=403,
+                detail="Full backups require enabled authentication and a valid session",
+            )
+        payload = config
+        filename = "hashhive-config-full.json"
+    else:
+        payload = public_config(config)
+        filename = "hashhive-config.json"
+    return Response(
+        json.dumps(payload, indent=2, ensure_ascii=False),
         media_type="application/json",
-        filename="dashboard_config.json",
-        headers={"Content-Disposition": 'attachment; filename="dashboard_config.json"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
 @router.post("/api/settings/restore")
 async def restore_config(data: dict) -> dict:
     """Restore dashboard_config.json from uploaded JSON body."""
-    # Merge with DEFAULT_CONFIG to ensure all required keys exist
-    merged = {**DEFAULT_CONFIG, **data}
+    current = load_json(CONFIG_FILE, DEFAULT_CONFIG)
+    merged = merge_config(current, data)
     save_json(CONFIG_FILE, merged)
-    return {"status": "ok"}
+    return public_config(merged)
 
 
 @router.patch("/api/settings/device")

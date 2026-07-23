@@ -18,6 +18,7 @@ export const api = {
   settings: {
     get:         ()                                                            => get<AppSettings>('/api/settings'),
     save:        (data: Partial<AppSettings>)                                  => post<AppSettings>('/api/settings', data),
+    updateAuth:  (data: { enabled: boolean; password?: string })                => post<AppSettings>('/api/settings/auth', data),
     restore:     (data: Record<string, unknown>)                               => post<{ status: string }>('/api/settings/restore', data),
     patchDevice: (data: { ip: string; name?: string; temp_max?: number })      => patch('/api/settings/device', data),
     purgeCategories: ()                       => get<Array<{ id: string; label: string }>>('/api/settings/purge-categories'),

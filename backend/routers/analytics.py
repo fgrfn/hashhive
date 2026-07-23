@@ -11,6 +11,8 @@ from fastapi import APIRouter
 
 from alerts import _get_network_difficulty
 from core import (
+    CONFIG_FILE,
+    DEFAULT_CONFIG,
     _bestdiff_file,
     _dev_stats_file,
     _load_records,
@@ -115,6 +117,64 @@ def _efficiency_ranking() -> list[dict]:
     rows.sort(key=lambda r: r["w_per_th"])
     return rows
 
+
+def _energy_from_samples(samples: list[dict]) -> tuple[float, float]:
+    """Integrate fleet power samples into (kWh, covered hours).
+
+    Gaps are capped at five minutes. This avoids charging an entire outage or
+    monitoring gap at the last observed power draw.
+    """
+    points: list[tuple[datetime, float]] = []
+    for sample in samples:
+        try:
+            ts = datetime.fromisoformat(str(sample["ts"]).replace("Z", "+00:00"))
+            power_w = max(0.0, float(sample.get("pwr", 0) or 0))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        points.append((ts.astimezone(timezone.utc), power_w))
+    points.sort(key=lambda item: item[0])
+
+    watt_hours = 0.0
+    covered_hours = 0.0
+    for (start, pwr_start), (end, pwr_end) in zip(points, points[1:]):
+        hours = min(max((end - start).total_seconds(), 0.0), 300.0) / 3600
+        if hours <= 0:
+            continue
+        watt_hours += ((pwr_start + pwr_end) / 2) * hours
+        covered_hours += hours
+    return watt_hours / 1000, covered_hours
+
+
+def _energy_summary(price_per_kwh: float) -> dict:
+    """Energy and cost totals derived from persisted AxeOS fleet power."""
+    days = _recent_dates(7)
+    daily = []
+    for date_str in days:
+        samples = load_json(_stats_file(date_str), [])
+        kwh, hours = _energy_from_samples(samples if isinstance(samples, list) else [])
+        daily.append({"date": date_str, "kwh": kwh, "hours": hours})
+
+    today = daily[-1]
+    week_kwh = sum(day["kwh"] for day in daily)
+    week_hours = sum(day["hours"] for day in daily)
+    hourly_kwh = week_kwh / week_hours if week_hours > 0 else 0.0
+    projected_monthly_kwh = hourly_kwh * 24 * 30
+    price = max(0.0, float(price_per_kwh or 0))
+    return {
+        "has_data": week_hours > 0,
+        "price_per_kwh": round(price, 4),
+        "kwh_today": round(today["kwh"], 4),
+        "kwh_7d": round(week_kwh, 4),
+        "cost_today": round(today["kwh"] * price, 2),
+        "cost_7d": round(week_kwh * price, 2),
+        "projected_monthly_kwh": round(projected_monthly_kwh, 2),
+        "projected_monthly_cost": round(projected_monthly_kwh * price, 2),
+        "series": [{"date": day["date"], "kwh": round(day["kwh"], 4)} for day in daily],
+    }
+
+
 router = APIRouter()
 
 
@@ -136,6 +196,7 @@ def _windows(fn, hashrate_ghs: float, divisor: float | None) -> dict:
 async def get_analytics():
     difficulty = await _get_network_difficulty()
     fleet_ghs = _latest_fleet_ghs()
+    config = load_json(CONFIG_FILE, DEFAULT_CONFIG)
 
     records = _load_records()
     leaderboard = sorted(
@@ -159,6 +220,7 @@ async def get_analytics():
         },
         "best_share_series": _best_share_series(7),
         "efficiency": _efficiency_ranking(),
+        "energy": _energy_summary(config.get("electricity_kwh_price", 0)),
         "beat_best": {
             "record": best_share,
             "expected_seconds": expected_seconds(fleet_ghs, best_share or None),
