@@ -4,7 +4,7 @@
 
 **Unified mining dashboard for NMMiner, BitAxe and NerdAxe**
 
-** THIS IS A CLAUDE CODE PROJECT **
+_A personal learning project built with the help of Claude Code._
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
