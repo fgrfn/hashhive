@@ -20,7 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip ruff
+          pip install --upgrade pip
+          pip install ruff==0.16.6
           pip install -r backend/requirements.txt
 
       - name: Lint (ruff)
