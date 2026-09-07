@@ -24,7 +24,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip ruff pytest==9.1.1
+          pip install --upgrade pip
+          pip install ruff==0.16.6 pytest==9.1.1
           pip install -r backend/requirements.lock
 
       - name: Lint (ruff)
