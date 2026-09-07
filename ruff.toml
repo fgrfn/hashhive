@@ -1,0 +1,13 @@
+# Ruff configuration for HashHive.
+#
+# The rule selection is pinned explicitly. Without it Ruff falls back to its
+# built-in defaults, which change between releases -- CI installs Ruff
+# unpinned, so a new default rule set turns the lint job red without a single
+# line of project code changing. Widening this list is a deliberate decision,
+# not a side effect of an upgrade.
+#
+# E4 = imports, E7 = statements, E9 = syntax/IO errors, F = pyflakes.
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
