@@ -58,6 +58,17 @@ export interface AnalyticsResult {
   };
   best_share_series: Array<{ date: string; best: number }>;
   efficiency: Array<{ ip: string; name: string; hashrate_ghs: number; power_w: number; w_per_th: number }>;
+  energy: {
+    has_data: boolean;
+    price_per_kwh: number;
+    kwh_today: number;
+    kwh_7d: number;
+    cost_today: number;
+    cost_7d: number;
+    projected_monthly_kwh: number;
+    projected_monthly_cost: number;
+    series: Array<{ date: string; kwh: number }>;
+  };
   beat_best: { record: number; expected_seconds: number | null; windows: ProbWindows };
   block: { expected_seconds: number | null; windows: ProbWindows };
   leaderboard: Array<{ ip: string; name: string; type: string; best_diff: number; ts: string | null }>;
@@ -272,6 +283,8 @@ export interface AppSettings {
   refresh_interval?: number;
   offline_grace_minutes?: number;
   alert_cooldown_minutes?: number;
+  alert_transition_checks?: number;
+  pool_health?: { failure_checks?: number; recovery_checks?: number };
   thresholds?: {
     temp_max?: number;
     vr_temp_max?: number;

@@ -2,7 +2,7 @@
 
 <img src="assets/logo.png" width="50%" alt="HashHive">
 
-**Unified mining dashboard for NMMiner, BitAxe and NerdAxe**
+**Unified mining dashboard for NMMiner, WroomMiner, AxeHub, BitAxe and NerdAxe**
 
 _A personal learning project built with the help of Claude Code._
 
@@ -19,7 +19,7 @@ _A personal learning project built with the help of Claude Code._
 | | |
 |---|---|
 | 📊 **Dashboard** | Live fleet stats — hashrate, temperature, power, share rate · block-chance odds · live log |
-| ⛏️ **Lottominer** (NMMiner · AxeHub) | Per-device table · full configure modal (pool · WiFi · time · display) · pool push · AxeHub (nerdminer-axehub) devices shown alongside NMMiner |
+| ⛏️ **Lottominer** (NMMiner · WroomMiner · AxeHub) | Per-device table · full NMMiner configure modal (pool · WiFi · time · display) · pool push · WroomMiner and AxeHub devices shown alongside NMMiner |
 | 🔧 **BitAxe / NerdAxe** | Live stats · per-device configure modal (pool · fallback · WiFi · fan · freq/voltage) · pause / resume / restart / identify · bulk actions · inline rename · live device log |
 | 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets · live pool status |
 | 👥 **Groups** | Group devices and run pool-switch / restart / pause actions on a whole group |
@@ -64,8 +64,8 @@ git clone https://github.com/fgrfn/hashhive.git
 cd hashhive
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r backend/requirements.txt
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+pip install -r backend/requirements.lock
+uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8000
 ```
 
 ---
@@ -80,6 +80,13 @@ docker compose up -d
 
 Data (config, logs, device state) persists in the `hashhive-data` volume.  
 Change the port in `docker-compose.yml`: `"9000:8000"`.
+
+Update an existing Compose installation:
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ---
 
@@ -96,7 +103,7 @@ Change the port in `docker-compose.yml`: `"9000:8000"`.
 
 On first start, `dashboard_config.json` is created automatically. Add devices via the **Add device** flow (auto-scan or manual IP) and configure via the **Settings** page:
 
-- Device lists — Lottominer (NMMiner · AxeHub), BitAxe / NerdAxe (each standalone by IP)
+- Device lists — Lottominer (NMMiner · WroomMiner · AxeHub), BitAxe / NerdAxe (each standalone by IP)
 - Alert rules — toggle each detector on/off and edit its threshold (chip temp · VR temp · min hashrate · error rate · RSSI · offline grace)
 - Refresh interval and offline grace period
 - Notification channels (Telegram / Discord / Gotify / ntfy / Pushover) — with per-channel test
@@ -110,7 +117,9 @@ On first start, `dashboard_config.json` is created automatically. Add devices vi
 
 The **Settings → Backup & Data** page lets you:
 
-- **Export / import** the full configuration as JSON, and export the alert log
+- Export a **safe configuration backup** with credentials masked
+- Export a **full backup including credentials** when password authentication is enabled
+- Import configuration JSON and export the alert log
 - **Purge data** by category — devices, pool presets, groups, schedules, wallets, templates, stats & history, alert log, discovery state or notification channels — with a confirmation step. Auth and general preferences are never affected.
 
 ---
@@ -140,10 +149,6 @@ Stop-ScheduledTask    -TaskName "HashHive"
 Unregister-ScheduledTask -TaskName "HashHive" -Confirm:$false
 ```
 
-```bash
-docker pull ghcr.io/fgrfn/hashhive:latest
-```
-
 ---
 
 
@@ -153,6 +158,16 @@ docker pull ghcr.io/fgrfn/hashhive:latest
 - **Frontend** — React 19 · TypeScript · Vite · Zustand
 - **Persistence** — JSON files · daily log rotation · no database required
 - **Notifications** — Telegram · Discord · Gotify · ntfy · Pushover
+
+---
+
+## Security
+
+HashHive controls devices on your local network. Enable password authentication
+under **Settings → Security** whenever the dashboard is reachable by other
+devices, and use HTTPS when traffic leaves a trusted host. Browser responses
+mask notification tokens and webhooks; a credential-bearing full backup is only
+available to an authenticated session.
 
 ---
 

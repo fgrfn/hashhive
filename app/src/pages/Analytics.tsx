@@ -5,7 +5,7 @@ import { BarChartComponent } from '../components/charts';
 import { FONT_MONO, type Theme } from '../tokens';
 import { api, fmtHashrate, fmtBestDiff, fmtProb } from '../api';
 import type { AnalyticsResult, ProbWindows } from '../api';
-import { Award, Target, Trophy, Leaf } from 'lucide-react';
+import { Award, Target, Trophy, Leaf, Zap } from 'lucide-react';
 
 /** Humanize a duration in seconds into a coarse "12 months" / "46 years" string. */
 function humanizeDuration(seconds: number | null | undefined): string {
@@ -54,7 +54,7 @@ export function Analytics() {
     return <div style={{ color: t.textMuted, fontSize: 13 }}>Loading analytics…</div>;
   }
 
-  const { fleet, beat_best, block, leaderboard, summary, best_share_series, efficiency } = data;
+  const { fleet, beat_best, block, leaderboard, summary, best_share_series, efficiency, energy } = data;
 
   const kpis: Array<{ label: string; value: string; color: string }> = [
     { label: 'All-time best', value: fmtBestDiff(summary.all_time_best), color: t.accent },
@@ -113,6 +113,41 @@ export function Analytics() {
           <BarChartComponent t={t} color={t.accent} h={150}
             data={best_share_series.map(s => s.best)}
             labels={best_share_series.map(s => s.date.slice(5))} />
+        </Card>
+      )}
+
+      {energy.has_data && (
+        <Card t={t}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Zap size={16} color={t.honey} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Energy & cost</div>
+              <div style={{ fontSize: 12, color: t.textMuted }}>
+                Integrated AxeOS power samples · gaps over five minutes are excluded.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10 }}>
+            {[
+              ['Today', `${energy.kwh_today.toFixed(3)} kWh`, `€${energy.cost_today.toFixed(2)}`],
+              ['Last 7 days', `${energy.kwh_7d.toFixed(3)} kWh`, `€${energy.cost_7d.toFixed(2)}`],
+              ['30-day projection', `${energy.projected_monthly_kwh.toFixed(1)} kWh`, `€${energy.projected_monthly_cost.toFixed(2)}`],
+              ['Electricity rate', `${energy.price_per_kwh.toFixed(3)} €/kWh`, 'Settings · Display'],
+            ].map(([label, value, detail]) => (
+              <div key={label} style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: 12 }}>
+                <Label t={t}>{label}</Label>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 17, fontWeight: 700, marginTop: 5 }}>{value}</div>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: t.textMuted, marginTop: 3 }}>{detail}</div>
+              </div>
+            ))}
+          </div>
+          {energy.series.some(s => s.kwh > 0) && (
+            <div style={{ marginTop: 14 }}>
+              <BarChartComponent t={t} color={t.honey} h={130}
+                data={energy.series.map(s => s.kwh)}
+                labels={energy.series.map(s => s.date.slice(5))} />
+            </div>
+          )}
         </Card>
       )}
 

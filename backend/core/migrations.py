@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from .config import DEFAULT_CONFIG
+from .config import DEFAULT_CONFIG, merge_config
 from .jsonio import load_json, save_json
 from .logs import _read_day, _today, _write_day
 from .paths import ALERT_HISTORY_FILE, CONFIG_FILE, LOGS_DIR, MAX_ENTRIES_PER_DAY
@@ -44,6 +44,10 @@ def _migrate_config() -> None:
             )
             if not already:
                 devices.append({"ip": master_ip, "name": master_ip})
+        merged = merge_config({}, config)
+        if merged != config:
+            config = merged
+            changed = True
         if changed:
             save_json(CONFIG_FILE, config)
     except Exception:

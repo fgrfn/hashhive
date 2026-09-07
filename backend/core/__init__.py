@@ -27,6 +27,9 @@ from .state import _startup_time, _price_cache, _low_hr_since, _pool_health, _po
 from .jsonio import load_json, save_json
 from .config import (
     DEFAULT_CONFIG,
+    SECRET_MASK,
+    merge_config,
+    public_config,
     LoginRequest,
     PatchDeviceRequest,
     AxeConfigBatchRequest,
@@ -70,6 +73,7 @@ from .auth import (
     _load_sessions,
     _persist_sessions,
     _bootstrap_auth,
+    _revoke_sessions,
 )
 from .ws import _WSManager, _ws_manager
 from .migrations import _migrate_config, _migrate_legacy
@@ -83,7 +87,8 @@ __all__ = [
     "_resolve_version", "APP_VERSION",
     "_startup_time", "_price_cache", "_low_hr_since", "_pool_health", "_pool_last_check",
     "load_json", "save_json",
-    "DEFAULT_CONFIG", "LoginRequest", "PatchDeviceRequest", "AxeConfigBatchRequest",
+    "DEFAULT_CONFIG", "SECRET_MASK", "merge_config", "public_config",
+    "LoginRequest", "PatchDeviceRequest", "AxeConfigBatchRequest",
     "AxeActionBatchRequest", "NmActionBatchRequest",
     "_validate_device_ip",
     "_today", "_log_file", "_read_day", "_write_day", "_append_entry",
@@ -93,7 +98,7 @@ __all__ = [
     "_cleanup_old_stats_dir", "_load_records", "_update_records",
     "_sessions", "_SESSION_TTL", "_login_attempts", "_MAX_ATTEMPTS", "_ATTEMPT_WINDOW",
     "_hash_pw", "_verify_pw", "_session_valid", "_rate_limited", "_record_attempt",
-    "_load_sessions", "_persist_sessions", "_bootstrap_auth",
+    "_load_sessions", "_persist_sessions", "_bootstrap_auth", "_revoke_sessions",
     "_WSManager", "_ws_manager",
     "_migrate_config", "_migrate_legacy",
     "_check_auto_restart",

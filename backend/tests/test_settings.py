@@ -12,7 +12,14 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from main import load_json, save_json, DEFAULT_CONFIG  # noqa: E402
-from core import CONFIG_FILE, _migrate_config  # noqa: E402
+from core import (  # noqa: E402
+    CONFIG_FILE,
+    SECRET_MASK,
+    _hash_pw,
+    _migrate_config,
+    _verify_pw,
+    public_config,
+)
 
 
 def test_load_json_returns_default_when_missing(tmp_path):
@@ -121,3 +128,81 @@ def test_purge_rejects_unknown_and_empty():
             assert False, "expected HTTPException"
         except HTTPException as exc:
             assert exc.status_code == 400
+
+
+def test_public_config_masks_credentials_and_password_hash():
+    cfg = {
+        **DEFAULT_CONFIG,
+        "auth": {"enabled": True, "password_hash": "pbkdf2:secret"},
+        "notifications": {
+            **DEFAULT_CONFIG["notifications"],
+            "telegram_token": "bot-secret",
+            "discord_webhook": "https://discord.example/secret",
+        },
+        "discord_bot": {"enabled": True, "token": "discord-secret"},
+    }
+    shown = public_config(cfg)
+    assert "password_hash" not in shown["auth"]
+    assert shown["notifications"]["telegram_token"] == SECRET_MASK
+    assert shown["notifications"]["discord_webhook"] == SECRET_MASK
+    assert shown["discord_bot"]["token"] == SECRET_MASK
+    assert "pool_presets" not in shown
+    assert cfg["notifications"]["telegram_token"] == "bot-secret"
+
+
+def test_settings_autosave_preserves_password_and_secrets():
+    import asyncio
+    from routers.settings import get_settings, post_settings
+
+    password_hash = _hash_pw("correct-horse")
+    save_json(CONFIG_FILE, {
+        **DEFAULT_CONFIG,
+        "auth": {"enabled": True, "password_hash": password_hash},
+        "notifications": {
+            **DEFAULT_CONFIG["notifications"],
+            "telegram_token": "bot-secret",
+        },
+        "refresh_interval": 30,
+    })
+    browser_copy = asyncio.run(get_settings())
+    browser_copy["refresh_interval"] = 45
+    returned = asyncio.run(post_settings(browser_copy))
+
+    saved = load_json(CONFIG_FILE, {})
+    assert saved["refresh_interval"] == 45
+    assert saved["auth"]["password_hash"] == password_hash
+    assert _verify_pw("correct-horse", saved["auth"]["password_hash"])
+    assert saved["notifications"]["telegram_token"] == "bot-secret"
+    assert returned["refresh_interval"] == 45
+    assert returned["notifications"]["telegram_token"] == SECRET_MASK
+    assert "password_hash" not in returned["auth"]
+
+
+def test_partial_settings_patch_does_not_reset_unrelated_values():
+    import asyncio
+    from routers.settings import post_settings
+
+    save_json(CONFIG_FILE, {
+        **DEFAULT_CONFIG,
+        "refresh_interval": 17,
+        "wallets": [{"id": "wallet-1"}],
+    })
+    returned = asyncio.run(post_settings({"offline_grace_minutes": 9}))
+    saved = load_json(CONFIG_FILE, {})
+    assert saved["refresh_interval"] == 17
+    assert saved["wallets"] == [{"id": "wallet-1"}]
+    assert saved["offline_grace_minutes"] == 9
+    assert returned["offline_grace_minutes"] == 9
+
+
+def test_auth_cannot_be_enabled_without_password():
+    import asyncio
+    from fastapi import HTTPException
+    from routers.settings import post_settings
+
+    save_json(CONFIG_FILE, DEFAULT_CONFIG)
+    try:
+        asyncio.run(post_settings({"auth": {"enabled": True}}))
+        assert False, "expected HTTPException"
+    except HTTPException as exc:
+        assert exc.status_code == 400

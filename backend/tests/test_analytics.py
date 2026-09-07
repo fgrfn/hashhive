@@ -24,6 +24,8 @@ from core import (  # noqa: E402
 from routers.analytics import (  # noqa: E402
     _activity_summary,
     _best_share_series,
+    _energy_from_samples,
+    _energy_summary,
     _efficiency_ranking,
     expected_seconds,
 )
@@ -91,3 +93,26 @@ def test_efficiency_ranking_sorted_by_w_per_th():
     assert [r["ip"] for r in eff] == ["10.0.0.2", "10.0.0.1"]  # 18 W/TH before 29.4
     assert eff[0]["w_per_th"] == 18.0
     assert all(r["ip"] != "10.0.0.3" for r in eff)
+
+
+def test_energy_integration_caps_monitoring_gaps():
+    samples = [
+        {"ts": "2026-01-01T00:00:00+00:00", "pwr": 100},
+        {"ts": "2026-01-01T00:01:00+00:00", "pwr": 100},
+        {"ts": "2026-01-01T01:01:00+00:00", "pwr": 100},
+    ]
+    kwh, hours = _energy_from_samples(samples)
+    assert round(hours, 4) == round(6 / 60, 4)
+    assert round(kwh, 4) == 0.01
+
+
+def test_energy_summary_uses_configured_price():
+    save_json(_stats_file(_TODAY), [
+        {"ts": f"{_TODAY}T00:00:00+00:00", "pwr": 100},
+        {"ts": f"{_TODAY}T01:00:00+00:00", "pwr": 100},
+    ])
+    energy = _energy_summary(0.40)
+    assert energy["has_data"] is True
+    assert energy["kwh_today"] == 0.0083  # one capped five-minute interval
+    assert energy["cost_today"] == 0.0
+    assert energy["projected_monthly_cost"] == 28.8

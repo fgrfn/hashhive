@@ -132,6 +132,37 @@ def _mark_alerted(state_entry: dict, kind: str) -> None:
     state_entry.setdefault("last_alerted", {})[kind] = _now_iso()
 
 
+def _debounced_state_transition(
+    prev: dict,
+    current: bool,
+    key: str,
+    required_checks: int,
+) -> tuple[bool, bool, dict]:
+    """Confirm a boolean transition only after repeated identical observations."""
+    stable_key = f"{key}_stable"
+    candidate_key = f"{key}_candidate"
+    count_key = f"{key}_candidate_count"
+    previous_stable = bool(prev.get(stable_key, prev.get(key, current)))
+    if current == previous_stable:
+        return current, False, {
+            stable_key: current,
+            candidate_key: current,
+            count_key: 0,
+        }
+    count = int(prev.get(count_key, 0)) + 1 if prev.get(candidate_key) == current else 1
+    if count >= max(1, required_checks):
+        return current, True, {
+            stable_key: current,
+            candidate_key: current,
+            count_key: 0,
+        }
+    return previous_stable, False, {
+        stable_key: previous_stable,
+        candidate_key: current,
+        count_key: count,
+    }
+
+
 def _fmt_diff(val) -> str:
     """Format a difficulty value as human-readable string."""
     try:
@@ -164,6 +195,7 @@ async def check_alerts(
     rssi_min: int = int(thresholds.get("rssi_min", -75))
     grace_seconds: float = float(config.get("offline_grace_minutes", 2)) * 60
     cooldown_seconds: float = float(config.get("alert_cooldown_minutes", 30)) * 60
+    transition_checks = max(1, int(config.get("alert_transition_checks", 2) or 2))
 
     # Build a fast lookup: kind (underscore) → enabled bool.
     # A kind is suppressed if it's disabled OR temporarily snoozed (mute until a
@@ -251,11 +283,14 @@ async def check_alerts(
                                     f"Lottominer {ip}: hashrate {hashrate:.2f} GH/s < {hashrate_min:.2f} GH/s")
                     )
                     _mark_alerted(current_state[key], "hashrate_low")
-                prev_pool = prev.get("pool", "")
-                if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
+                pool_stable, pool_changed, pool_state = _debounced_state_transition(
+                    prev, bool(pool), "pool", transition_checks,
+                )
+                current_state[key].update(pool_state)
+                if pool_changed and not pool_stable and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
                     new_alerts.append(_make_alert(key, "pool_lost", "critical", f"Lottominer {ip}: pool connection lost"))
                     _mark_alerted(current_state[key], "pool_lost")
-                elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
+                elif pool_changed and pool_stable and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
                     new_alerts.append(_make_alert(key, "pool_connected", "info", f"Lottominer {ip}: pool connected"))
                     _mark_alerted(current_state[key], "pool_connected")
                 # ── RSSI ──────────────────────────────────────────────────────
@@ -368,20 +403,26 @@ async def check_alerts(
                 _mark_alerted(current_state[key], "fan_failure")
 
             # ── Pool ─────────────────────────────────────────────────────────
-            prev_pool = prev.get("pool", "")
-            if prev_pool and not pool and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
+            pool_stable, pool_changed, pool_state = _debounced_state_transition(
+                prev, bool(pool), "pool", transition_checks,
+            )
+            current_state[key].update(pool_state)
+            if pool_changed and not pool_stable and _should_alert(prev, "pool_lost", cooldown_seconds) and _type_enabled("pool_lost"):
                 new_alerts.append(_make_alert(key, "pool_lost", "critical", f"{name}: pool connection lost"))
                 _mark_alerted(current_state[key], "pool_lost")
-            elif not prev_pool and pool and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
+            elif pool_changed and pool_stable and _should_alert(prev, "pool_connected", cooldown_seconds) and _type_enabled("pool_connected"):
                 new_alerts.append(_make_alert(key, "pool_connected", "info", f"{name}: pool connected"))
                 _mark_alerted(current_state[key], "pool_connected")
 
             # ── Fallback pool ────────────────────────────────────────────────
-            prev_fallback = prev.get("using_fallback", False)
-            if not prev_fallback and using_fallback and _type_enabled("fallback_active"):
+            fallback_stable, fallback_changed, fallback_state = _debounced_state_transition(
+                prev, using_fallback, "using_fallback", transition_checks,
+            )
+            current_state[key].update(fallback_state)
+            if fallback_changed and fallback_stable and _type_enabled("fallback_active"):
                 new_alerts.append(_make_alert(key, "fallback_active", "warning",
                                               f"{name}: switched to fallback pool"))
-            elif prev_fallback and not using_fallback and _type_enabled("fallback_recovered"):
+            elif fallback_changed and not fallback_stable and _type_enabled("fallback_recovered"):
                 new_alerts.append(_make_alert(key, "fallback_recovered", "info",
                                               f"{name}: primary pool restored"))
 

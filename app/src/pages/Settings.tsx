@@ -98,8 +98,11 @@ export function Settings() {
               <SettingRow t={t} label="Offline grace period" desc="Minutes before a device is marked offline.">
                 <Input t={t} value={String(localSettings.offline_grace_minutes || 2)} onChange={v => upd({ offline_grace_minutes: Number(v) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
-              <SettingRow t={t} label="Alert cooldown" desc="Minutes between repeated alerts for same device." last>
+              <SettingRow t={t} label="Alert cooldown" desc="Minutes between repeated alerts for same device.">
                 <Input t={t} value={String(localSettings.alert_cooldown_minutes || 30)} onChange={v => upd({ alert_cooldown_minutes: Number(v) })} mono type="number" style={{ width: 80 }} />
+              </SettingRow>
+              <SettingRow t={t} label="Transition confirmation" desc="Consecutive polls required before pool/fallback state-change alerts." last>
+                <Input t={t} value={String(localSettings.alert_transition_checks || 2)} onChange={v => upd({ alert_transition_checks: Math.max(1, Number(v)) })} mono type="number" style={{ width: 80 }} />
               </SettingRow>
             </Card>
           </div>
@@ -120,7 +123,7 @@ export function Settings() {
               </SettingRow>
             </Card>
             <Card t={t} style={{ marginTop: 14 }}>
-              <SettingRow t={t} label="Electricity price (€/kWh)" desc="Used for profitability calculations." last>
+              <SettingRow t={t} label="Electricity price (€/kWh)" desc="Used for daily, weekly and projected monthly energy costs in Analytics." last>
                 <Input t={t} value={String(localSettings.electricity_kwh_price || 0)} onChange={v => upd({ electricity_kwh_price: Number(v) })} mono type="number" style={{ width: 100 }} />
               </SettingRow>
             </Card>
@@ -219,7 +222,15 @@ export function Settings() {
         )}
 
         {section === 'security' && (
-          <SecuritySection t={t} localSettings={localSettings} updToggle={updToggle} />
+          <SecuritySection
+            t={t}
+            localSettings={localSettings}
+            onSettings={updated => {
+              latestSettings.current = updated;
+              setLocalSettings(updated);
+              setSettings(updated);
+            }}
+          />
         )}
 
         {section === 'backup' && (
@@ -238,7 +249,7 @@ export function Settings() {
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginTop: 18 }}>
-                {[['License', 'MIT'], ['Backend', 'FastAPI + Python'], ['Frontend', 'React 18 + TypeScript']].map(([k, v]) => (
+                {[['License', 'MIT'], ['Backend', 'FastAPI + Python'], ['Frontend', 'React 19 + TypeScript']].map(([k, v]) => (
                   <div key={k}>
                     <Label t={t} style={{ marginBottom: 4 }}>{k}</Label>
                     <div style={{ fontFamily: FONT_MONO, fontSize: 13 }}>{v}</div>

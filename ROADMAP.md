@@ -23,6 +23,15 @@ shift. Open an issue or PR to propose changes.
 - **Alert snooze** — per-type temporary mute (1h/4h/24h).
 - **Device management** — remove devices from the list pages; assign devices to
   groups from the group detail page; clickable device IP opens its web UI.
+- **Group management** — edit name, description, colour and assigned pool; live
+  member and online counts on overview cards.
+- **Multi-coin price ticker** — configurable CoinGecko coins and currency with a
+  server-side cache and stale-data fallback.
+- **WroomMiner support** — native discovery, polling, restart and pool push.
+- **Energy & cost tracking** — integrates AxeOS power samples into daily/weekly
+  kWh, cost, monthly projection and efficiency analytics.
+- **Flapping protection** — pool reachability, device pool connection and
+  fallback transitions require repeated observations before alerting.
 - **Fixes** — NMMiner hostname refresh, `stratum+tcp://` pool scheme, restart
   405, implausible hashrate-spike filtering, MH/s chart scaling for ESP miners,
   continuous (headless) sampling/monitoring, settings save toast.
@@ -30,27 +39,13 @@ shift. Open an issue or PR to propose changes.
 ## Planned
 
 ### Near-term
-- **Energy & cost tracking** — power-over-time × electricity price
-  (`electricity_kwh_price`) → daily/monthly cost, W/TH efficiency trend, charts.
-  (AxeOS reports power; NMMiner/AxeHub have none, so cost is AxeOS-scoped.)
 - **Multi-coin odds & analytics** — Analytics and the block-chance/odds
   estimates currently assume **Bitcoin** network difficulty, but devices can
   mine other coins (NMMiner: BCH, DGB, …). Use the coin each device is actually
   mining (and that coin's network difficulty) instead of hard-coding BTC.
-- **Top-bar price ticker** — the BTC price in the header currently shows no
-  value. Either fix it and extend to the coins in use (per the watch/main coin
-  config), or remove the ticker entirely.
 - **Pool failover (phase 2)** — active auto-switch to the fallback pool on a
   sustained outage (opt-in). *Phase 1 (server-side pool reachability monitoring
   + alerts) shipped.*
-- **Flapping protection (extend)** — apply the offline-grace style debounce to
-  other toggling alerts (e.g. `pool_lost`/`pool_connected`). *Per-type
-  mute/snooze and burst de-dup already shipped.*
-- **Group management fixes** — (1) groups can't be edited after creation (no way
-  to rename / change colour / description / assigned pool); add an edit dialog.
-  (2) the Groups overview card shows `0/0` online and `0` devices even when
-  members are assigned — the list endpoint doesn't populate `total` / `online` /
-  `deviceIps`, so the card reads them as 0.
 
 ### Later
 - **Live shares feed** — a per-poll activity feed derived from accepted/rejected

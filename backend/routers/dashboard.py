@@ -21,6 +21,7 @@ from core import (
     _today,
     _ws_manager,
     load_json,
+    public_config,
 )
 from miners.axehub import fetch_axehub_safe as _fetch_axehub_safe
 from miners.wroomminer import fetch_wroomminer_safe as _fetch_wroomminer_safe
@@ -147,7 +148,7 @@ async def _dashboard_broadcast_loop():
                         "axeos": axeos_data,
                         "unread_alerts": unread,
                         "new_alerts": new_alerts,
-                        "config": config,
+                        "config": public_config(config),
                     })
                     await _ws_manager.broadcast(payload)
         except Exception:
@@ -220,7 +221,7 @@ async def get_dashboard():
         "lottominer": nmminer_data,
         "axeos": axeos_data,
         "unread_alerts": unread,
-        "config": config,
+        "config": public_config(config),
     }
 
 

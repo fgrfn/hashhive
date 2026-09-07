@@ -9,7 +9,7 @@ import { toast } from '../../store/toast';
 import { Download, Upload, Trash2, AlertTriangle } from 'lucide-react';
 
 export function BackupSection({ t }: { t: Theme }) {
-  const { setSettings } = useAppStore();
+  const { settings, setSettings } = useAppStore();
   const [importing, setImporting] = useState(false);
   const [pending, setPending] = useState<Record<string, unknown> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -53,10 +53,17 @@ export function BackupSection({ t }: { t: Theme }) {
         {/* Export */}
         <Card t={t}>
           <Label t={t} style={{ marginBottom: 8 }}>Export configuration</Label>
-          <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>Download all settings, pools, and alert rules as JSON.</div>
-          <a href="/api/settings/backup" download="hashhive-config.json" style={{ ...btnStyle(t, 'primary'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Download size={13} /> Export JSON
-          </a>
+          <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 12 }}>The safe export masks passwords, tokens, and webhooks.</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href="/api/settings/backup" download="hashhive-config.json" style={{ ...btnStyle(t, 'primary'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Download size={13} /> Safe export
+            </a>
+            {settings?.auth?.enabled && (
+              <a href="/api/settings/backup?include_secrets=true" download="hashhive-config-full.json" style={{ ...btnStyle(t), textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Download size={13} /> Full export
+              </a>
+            )}
+          </div>
         </Card>
 
         {/* Import */}
@@ -195,30 +202,54 @@ export function SettingRow({ t, label, desc, children, last }: { t: Theme; label
   );
 }
 
-export function SecuritySection({ t, localSettings, updToggle }: {
+export function SecuritySection({ t, localSettings, onSettings }: {
   t: Theme;
   localSettings: AppSettings;
-  updToggle: (patch: Partial<AppSettings>) => void;
+  onSettings: (settings: AppSettings) => void;
 }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pendingEnable, setPendingEnable] = useState(false);
 
   const authEnabled = localSettings.auth?.enabled ?? false;
+  const showPassword = authEnabled || pendingEnable;
 
   const savePassword = async () => {
     if (!password || password !== confirm) { setPwMsg({ ok: false, text: 'Passwords do not match.' }); return; }
     if (password.length < 8) { setPwMsg({ ok: false, text: 'Minimum 8 characters.' }); return; }
     setPwSaving(true); setPwMsg(null);
     try {
-      await api.settings.save({ ...localSettings, auth: { ...localSettings.auth, enabled: authEnabled, password } });
+      const updated = await api.settings.updateAuth({ enabled: true, password });
+      if (!authEnabled) await api.auth.login(password);
+      onSettings(updated);
+      setPendingEnable(false);
       setPassword(''); setConfirm('');
-      setPwMsg({ ok: true, text: 'Password updated.' });
-      toast('Password updated');
+      setPwMsg({ ok: true, text: authEnabled ? 'Password updated.' : 'Authentication enabled.' });
+      toast(authEnabled ? 'Password updated' : 'Authentication enabled');
     } catch {
       setPwMsg({ ok: false, text: 'Save failed.' });
       toast('Failed to update password', 'error');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const toggleAuth = async (enabled: boolean) => {
+    setPwMsg(null);
+    if (enabled) {
+      setPendingEnable(true);
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const updated = await api.settings.updateAuth({ enabled: false });
+      onSettings(updated);
+      setPendingEnable(false);
+      toast('Authentication disabled');
+    } catch {
+      toast('Failed to disable authentication', 'error');
     } finally {
       setPwSaving(false);
     }
@@ -229,11 +260,13 @@ export function SecuritySection({ t, localSettings, updToggle }: {
       <SectionHeader t={t} title="Security" desc="Password-protect the dashboard when exposed to the internet. Requires HTTPS for full protection." />
       <Card t={t}>
         <SettingRow t={t} label="Enable authentication" desc="Require a password to access the dashboard.">
-          <Toggle t={t} on={authEnabled} onChange={v => updToggle({ auth: { ...localSettings.auth, enabled: v } })} />
+          <Toggle t={t} on={showPassword} onChange={toggleAuth} />
         </SettingRow>
-        {authEnabled && (
+        {showPassword && (
           <div style={{ paddingTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Change password</div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
+              {authEnabled ? 'Change password' : 'Set a password to enable authentication'}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
               <Input t={t} type="password" value={password} onChange={setPassword} placeholder="New password (min 8 chars)" mono={false} />
               <Input t={t} type="password" value={confirm} onChange={setConfirm} placeholder="Confirm new password" mono={false} />
@@ -243,7 +276,7 @@ export function SecuritySection({ t, localSettings, updToggle }: {
                 </div>
               )}
               <button onClick={savePassword} disabled={!password || !confirm || pwSaving} style={{ ...btnStyle(t, 'primary'), opacity: password && confirm && !pwSaving ? 1 : 0.5, alignSelf: 'flex-start' }}>
-                {pwSaving ? 'Saving…' : 'Set password'}
+                {pwSaving ? 'Saving…' : authEnabled ? 'Set password' : 'Set password & enable'}
               </button>
             </div>
             <div style={{ fontSize: 11, color: t.textMuted, marginTop: 16 }}>

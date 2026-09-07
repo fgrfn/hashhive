@@ -74,10 +74,10 @@ export function getNmStatus(d: NMMinerDevice): 'online' | 'offline' | 'warning' 
 }
 
 /** Format a probability (0..1) as a readable chance: percent, or "1 in N" when tiny. */
-export function fmtProb(p: number | null | undefined): string {
+export function fmtProb(p: number | null | undefined, locale?: Intl.LocalesArgument): string {
   if (p == null || !Number.isFinite(p) || p <= 0) return '—';
   if (p >= 0.0001) return `${(p * 100).toFixed(p >= 0.1 ? 1 : 3)}%`;
-  return `1 : ${Math.round(1 / p).toLocaleString()}`;
+  return `1 : ${Math.round(1 / p).toLocaleString(locale)}`;
 }
 
 /** Scale a GH/s series to a readable unit for charting. Tiny ESP-miner values
