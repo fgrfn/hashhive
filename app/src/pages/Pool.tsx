@@ -3,9 +3,9 @@ import { useThemeStore } from '../store/theme';
 import { useAppStore } from '../store/app';
 import { Card, Label, Pill, Toggle, Modal, FormField, EmptyState, SkeletonCard, btnStyle } from '../components/primitives';
 import { FONT_MONO, type Theme } from '../tokens';
-import { api } from '../api';
+import { api, poolPublicDashboardUrl } from '../api';
 import type { PoolPreset, PoolSlot, StratumProtocol, Sv2Channel } from '../api';
-import { Database, Plus, Edit, Trash2, Send, Check } from 'lucide-react';
+import { Database, Plus, Edit, Trash2, Send, Check, ExternalLink } from 'lucide-react';
 import { toast } from '../store/toast';
 
 /** A device a pool can be pushed to, unified across miner families. */
@@ -124,6 +124,7 @@ function PoolLibrary() {
 
 function PoolCard({ t, pool: p, onEdit, onDelete, onPush }: { t: Theme; pool: PoolPreset; onEdit: () => void; onDelete: () => void; onPush: () => void }) {
   const wallet = p.wallet || p.worker || '—';
+  const publicDashboard = poolPublicDashboardUrl(p);
   return (
     <Card t={t}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
@@ -153,6 +154,11 @@ function PoolCard({ t, pool: p, onEdit, onDelete, onPush }: { t: Theme; pool: Po
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={onEdit} style={{ ...btnStyle(t), fontSize: 11 }}><Edit size={11} /> Edit</button>
         <button onClick={onPush} style={{ ...btnStyle(t), fontSize: 11 }}><Send size={11} /> Push to miners</button>
+        {publicDashboard && (
+          <a href={publicDashboard} target="_blank" rel="noreferrer" style={{ ...btnStyle(t), fontSize: 11, textDecoration: 'none' }}>
+            <ExternalLink size={11} /> Pool dashboard
+          </a>
+        )}
         <button onClick={onDelete} style={{ ...btnStyle(t, 'danger'), fontSize: 11, marginLeft: 'auto' }}><Trash2 size={11} /></button>
       </div>
     </Card>

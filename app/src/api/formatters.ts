@@ -1,5 +1,5 @@
 // Pure formatting / selector helpers used across pages and components.
-import type { NMMinerDevice, AxeDevice } from './types';
+import type { NMMinerDevice, AxeDevice, PoolPreset } from './types';
 
 export function getHashrate(d: NMMinerDevice): number {
   return d.GHs5s ?? d.GHs5 ?? d.GHs1m ?? d.GHsav ?? d.GHs ?? d.hashrate ?? 0;
@@ -119,4 +119,24 @@ export function matchesSearch(
     .join(' ')
     .toLowerCase();
   return haystack.includes(q);
+}
+
+/** Return the public miner dashboard for pool presets that expose one.
+ *
+ * Keep this mapping exact and local.  A lookalike host must never receive a
+ * wallet in a generated URL, and worker suffixes are removed before linking.
+ */
+export function poolPublicDashboardUrl(
+  pool: Pick<PoolPreset, 'url' | 'wallet' | 'worker'>,
+): string | null {
+  const endpoint = pool.url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split('/')[0];
+  const host = endpoint.replace(/:\d+$/, '').toLowerCase();
+  if (host !== 'stratum.btcpowlab-pool.com') return null;
+
+  const address = (pool.wallet || pool.worker || '').trim().split('.')[0];
+  const bech32 = /^(?:bc1)[ac-hj-np-z02-9]{11,71}$/i;
+  const base58 = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+  if (!bech32.test(address) && !base58.test(address)) return null;
+
+  return `https://btcpowlab-pool.com/miner/${encodeURIComponent(address)}`;
 }
