@@ -54,6 +54,53 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "[OK] Dependencies installed." -ForegroundColor Green
 
+# Build the web frontend (React/Vite -> frontend/dist). Without this the backend
+# only answers {"status": "... Frontend not found."}.
+Write-Host ""
+Write-Host "Building web frontend..." -ForegroundColor Cyan
+$appDir = Join-Path $PSScriptRoot "app"
+$distIndex = Join-Path $PSScriptRoot "frontend\dist\index.html"
+
+function Get-NodeMajor {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return 0 }
+    try { return [int](node -p "process.versions.node.split('.')[0]" 2>$null) } catch { return 0 }
+}
+
+if (-not (Test-Path -LiteralPath $appDir)) {
+    Write-Host "[WARN] app\ directory not found - skipping frontend build." -ForegroundColor Yellow
+} else {
+    if ((Get-NodeMajor) -lt 20 -or -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Host "Node.js 20+ not found - attempting install via winget..." -ForegroundColor Cyan
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id OpenJS.NodeJS.LTS -e --source winget `
+                --accept-package-agreements --accept-source-agreements
+            # Refresh PATH so node/npm are visible in this session after install.
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("Path", "User")
+        } else {
+            Write-Host "[WARN] winget not available - install Node.js 20+ manually: https://nodejs.org/" -ForegroundColor Yellow
+        }
+    }
+
+    if ((Get-NodeMajor) -lt 20 -or -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Host "[WARN] Node.js 20+ still unavailable - the dashboard UI will NOT be built." -ForegroundColor Yellow
+        Write-Host "       Open a new terminal (so PATH refreshes) or install Node.js 20+," -ForegroundColor Gray
+        Write-Host "       then run:  cd app; npm ci; npm run build" -ForegroundColor Gray
+    } else {
+        Push-Location $appDir
+        npm ci
+        if ($LASTEXITCODE -ne 0) { npm install }
+        npm run build
+        Pop-Location
+        if (Test-Path -LiteralPath $distIndex) {
+            Write-Host "[OK] Frontend built -> frontend\dist" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] Frontend build failed - the dashboard UI won't be available." -ForegroundColor Yellow
+            Write-Host "       Run:  cd app; npm ci; npm run build" -ForegroundColor Gray
+        }
+    }
+}
+
 # Optional scheduled task.
 Write-Host ""
 $answer = Read-Host "Enable autostart through Task Scheduler? [y/N]"

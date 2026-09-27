@@ -56,6 +56,44 @@ echo "Installing dependencies..."
 "$PIP" install --quiet -r "$BACKEND_DIR/requirements.lock"
 echo "✓  Dependencies installed."
 
+# ── Build web frontend (React/Vite → frontend/dist) ────────────────────────────
+# The backend serves the compiled dashboard from frontend/dist. Without this
+# step the app only answers {"status": "... Frontend not found."}.
+APP_DIR="$SCRIPT_DIR/app"
+DIST_DIR="$SCRIPT_DIR/frontend/dist"
+
+# Major version of the installed Node.js, or 0 if none/unusable.
+node_major() {
+    command -v node &>/dev/null && node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0
+}
+
+echo ""
+echo "Building web frontend..."
+if [ ! -d "$APP_DIR" ]; then
+    echo "⚠  app/ directory not found – skipping frontend build."
+else
+    # HashHive's frontend (Vite) needs Node.js 20+. Install it if missing/too old.
+    if [ "$(node_major)" -lt 20 ] || ! command -v npm &>/dev/null; then
+        echo "Node.js 20+ not found – installing via NodeSource..."
+        if command -v apt-get &>/dev/null; then
+            command -v curl &>/dev/null || $APT install -y curl || true
+            curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash - && $APT install -y nodejs || true
+        else
+            echo "⚠  Automatic Node.js install is only supported on apt-based systems."
+        fi
+    fi
+
+    if [ "$(node_major)" -lt 20 ] || ! command -v npm &>/dev/null; then
+        echo "⚠  Node.js 20+ still unavailable – the dashboard UI will NOT be built."
+        echo "   Install Node.js 20+ manually, then run:  cd app && npm ci && npm run build"
+    elif ( cd "$APP_DIR" && { npm ci || npm install; } && npm run build ) && [ -f "$DIST_DIR/index.html" ]; then
+        echo "✓  Frontend built → frontend/dist  (Node $(node -v))"
+    else
+        echo "⚠  Frontend build failed – the dashboard UI won't be available."
+        echo "   Fix Node/npm, then run:  cd app && npm ci && npm run build"
+    fi
+fi
+
 # ── Autostart ────────────────────────────────────────────────────────────────
 echo ""
 read -rp "Enable autostart as systemd service? [y/N] " answer
