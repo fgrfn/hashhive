@@ -182,18 +182,20 @@ async def post_lottominer_device_config(data: dict):
     weather = {k: v for k, v in data.items() if k in _WEATHER_KEYS}
     async with httpx.AsyncClient(timeout=15) as client:
         try:
-            if mining:
-                await client.post(f"http://{device_ip}/api/setting/mining", json=mining)
-            if network:
-                await client.post(f"http://{device_ip}/api/setting/network", json=network)
-            if time_cfg:
-                await client.post(f"http://{device_ip}/api/setting/time", json=time_cfg)
-            if preference:
-                await client.post(f"http://{device_ip}/api/setting/preference", json=preference)
-            if market:
-                await client.post(f"http://{device_ip}/api/setting/market", json=market)
-            if weather:
-                await client.post(f"http://{device_ip}/api/setting/weather", json=weather)
+            sections = (
+                ("mining", mining),
+                ("network", network),
+                ("time", time_cfg),
+                ("preference", preference),
+                ("market", market),
+                ("weather", weather),
+            )
+            for endpoint, payload in sections:
+                if payload:
+                    response = await client.post(
+                        f"http://{device_ip}/api/setting/{endpoint}", json=payload
+                    )
+                    response.raise_for_status()
             hostname = data.get("Hostname") or device_ip
             # Keep HashHive's stored label in sync with the device hostname so the
             # new name shows up after the next refresh (the device itself may only
@@ -222,4 +224,3 @@ async def post_lottominer_device_config(data: dict):
             return {"status": 200}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc))
-

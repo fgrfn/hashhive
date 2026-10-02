@@ -46,11 +46,12 @@ export function Lottominer() {
         LedEnable: config.LedEnable ? 1 : 0,
       });
       toast('Device config saved');
+      setEditDevice(null);
     } catch {
       toast('Failed to save config', 'error');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setEditDevice(null);
   };
 
   const toggleSelect = (ip: string) => {
