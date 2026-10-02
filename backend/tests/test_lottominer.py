@@ -4,7 +4,11 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import httpx
+import pytest
+from fastapi import HTTPException
 
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
@@ -228,6 +232,28 @@ def test_device_config_post_syncs_stored_name_to_hostname():
 
     saved = _asyncio.run(run())
     assert saved["cfg"]["lottominer_devices"][0]["name"] == "garage-nm"
+
+
+def test_device_config_post_reports_device_rejection():
+    """A rejected settings section must not be reported as a successful save."""
+    from routers import lottominer as lm
+
+    request = httpx.Request("POST", "http://192.168.1.50/api/setting/network")
+    response = httpx.Response(500, request=request)
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=response)
+
+    with patch("routers.lottominer.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value = client
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(
+                lm.post_lottominer_device_config(
+                    {"ip": "192.168.1.50", "Hostname": "garage-nm"}
+                )
+            )
+
+    assert exc.value.status_code == 502
+    assert "500 Internal Server Error" in exc.value.detail
 
 
 def test_fanout_restart_sends_json_body():
