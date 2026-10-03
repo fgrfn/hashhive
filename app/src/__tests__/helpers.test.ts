@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtUptime, fmtHashrate, fmtBestDiff, matchesSearch, fmtProb } from '../api';
+import { fmtUptime, fmtHashrate, fmtBestDiff, matchesSearch, fmtProb, poolPublicDashboardUrl } from '../api';
 
 // ─── fmtUptime ───────────────────────────────────────────────────────────────
 
@@ -80,6 +80,35 @@ describe('matchesSearch', () => {
   it('does not match unrelated query', () => expect(matchesSearch(dev, 'zzz')).toBe(false));
   it('matches AxeDevice-style _ip/_name fields', () =>
     expect(matchesSearch({ _ip: '10.0.0.5', _name: 'NerdAxe' }, 'nerd')).toBe(true));
+});
+
+describe('poolPublicDashboardUrl', () => {
+  const address = 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh';
+
+  it('links an exact BTC PoW Lab preset and removes the worker suffix', () => {
+    expect(poolPublicDashboardUrl({
+      url: 'stratum+tcp://stratum.btcpowlab-pool.com:3333',
+      wallet: `${address}.garage`,
+    })).toBe(`https://btcpowlab-pool.com/miner/${address}`);
+  });
+
+  it('does not link lookalike or unrelated pool hosts', () => {
+    expect(poolPublicDashboardUrl({
+      url: 'stratum+tcp://stratum.btcpowlab-pool.com.evil.example:3333',
+      wallet: address,
+    })).toBeNull();
+    expect(poolPublicDashboardUrl({
+      url: 'stratum+tcp://public-pool.io:21496',
+      wallet: address,
+    })).toBeNull();
+  });
+
+  it('does not link missing or malformed wallet values', () => {
+    expect(poolPublicDashboardUrl({
+      url: 'stratum.btcpowlab-pool.com:3333',
+      wallet: 'wallet-name',
+    })).toBeNull();
+  });
 });
 
 // ─── fmtProb ──────────────────────────────────────────────────────────────────
