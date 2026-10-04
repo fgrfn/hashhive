@@ -121,6 +121,19 @@ export function matchesSearch(
   return haystack.includes(q);
 }
 
+/** Exact Stratum hosts mapped to the pool's per-address dashboard URL.
+ *  Only pools whose dashboard is keyed by the payout address are listed. */
+const POOL_DASHBOARDS: Record<string, (address: string) => string> = {
+  'stratum.btcpowlab-pool.com': (a) => `https://btcpowlab-pool.com/miner/${a}`,
+  'public-pool.io': (a) => `https://web.public-pool.io/#/app/${a}`,
+  'solo.ckpool.org': (a) => `https://solostats.ckpool.org/users/${a}`,
+  'eusolo.ckpool.org': (a) => `https://eusolostats.ckpool.org/users/${a}`,
+  'ausolo.ckpool.org': (a) => `https://ausolostats.ckpool.org/users/${a}`,
+  'mine.ocean.xyz': (a) => `https://ocean.xyz/stats/${a}`,
+  'btc.hmpool.io': (a) => `https://hmpool.io/miner.html?address=${a}`,
+  'eu.btc.hmpool.io': (a) => `https://hmpool.io/miner.html?address=${a}`,
+};
+
 /** Return the public miner dashboard for pool presets that expose one.
  *
  * Keep this mapping exact and local.  A lookalike host must never receive a
@@ -131,12 +144,13 @@ export function poolPublicDashboardUrl(
 ): string | null {
   const endpoint = pool.url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split('/')[0];
   const host = endpoint.replace(/:\d+$/, '').toLowerCase();
-  if (host !== 'stratum.btcpowlab-pool.com') return null;
+  const dashboard = Object.prototype.hasOwnProperty.call(POOL_DASHBOARDS, host) ? POOL_DASHBOARDS[host] : undefined;
+  if (!dashboard) return null;
 
   const address = (pool.wallet || pool.worker || '').trim().split('.')[0];
   const bech32 = /^(?:bc1)[ac-hj-np-z02-9]{11,71}$/i;
   const base58 = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
   if (!bech32.test(address) && !base58.test(address)) return null;
 
-  return `https://btcpowlab-pool.com/miner/${encodeURIComponent(address)}`;
+  return dashboard(encodeURIComponent(address));
 }

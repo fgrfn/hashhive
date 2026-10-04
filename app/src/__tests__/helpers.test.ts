@@ -92,21 +92,38 @@ describe('poolPublicDashboardUrl', () => {
     })).toBe(`https://btcpowlab-pool.com/miner/${address}`);
   });
 
-  it('does not link lookalike or unrelated pool hosts', () => {
-    expect(poolPublicDashboardUrl({
-      url: 'stratum+tcp://stratum.btcpowlab-pool.com.evil.example:3333',
-      wallet: address,
-    })).toBeNull();
-    expect(poolPublicDashboardUrl({
-      url: 'stratum+tcp://public-pool.io:21496',
-      wallet: address,
-    })).toBeNull();
+  it.each([
+    ['stratum+tcp://public-pool.io:21496', `https://web.public-pool.io/#/app/${address}`],
+    ['stratum+tcp://solo.ckpool.org:3333', `https://solostats.ckpool.org/users/${address}`],
+    ['eusolo.ckpool.org:3333', `https://eusolostats.ckpool.org/users/${address}`],
+    ['AUSOLO.ckpool.org', `https://ausolostats.ckpool.org/users/${address}`],
+    ['stratum+tcp://mine.ocean.xyz:3334', `https://ocean.xyz/stats/${address}`],
+    ['stratum+tcp://btc.hmpool.io:3334', `https://hmpool.io/miner.html?address=${address}`],
+    ['eu.btc.hmpool.io:3334', `https://hmpool.io/miner.html?address=${address}`],
+  ])('links the supported pool host %s', (url, expected) => {
+    expect(poolPublicDashboardUrl({ url, wallet: `${address}.garage` })).toBe(expected);
+  });
+
+  it.each([
+    'stratum+tcp://stratum.btcpowlab-pool.com.evil.example:3333',
+    'stratum+tcp://public-pool.io.evil.test:21496',
+    'hmpool.io:3334',
+    'ckpool.org:3333',
+    'stratum+tcp://stratum.braiins.com:3333',
+    'constructor',
+    '__proto__',
+  ])('does not link lookalike or unrelated pool host %s', (url) => {
+    expect(poolPublicDashboardUrl({ url, wallet: address })).toBeNull();
   });
 
   it('does not link missing or malformed wallet values', () => {
     expect(poolPublicDashboardUrl({
       url: 'stratum.btcpowlab-pool.com:3333',
       wallet: 'wallet-name',
+    })).toBeNull();
+    expect(poolPublicDashboardUrl({
+      url: 'mine.ocean.xyz:3334',
+      wallet: 'not a wallet',
     })).toBeNull();
   });
 });
