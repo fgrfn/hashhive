@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+* link pool presets to the per-address dashboards of Public Pool, CKPool Solo (solo/eusolo/ausolo), OCEAN and HashedMax, in addition to BTC PoW Lab
+
 ### Security
 
 * preserve password hashes during settings autosave and revoke stale sessions on password recovery

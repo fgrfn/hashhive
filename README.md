@@ -21,7 +21,7 @@ _A personal learning project built with the help of Claude Code._
 | 📊 **Dashboard** | Live fleet stats — hashrate, temperature, power, share rate · block-chance odds · live log |
 | ⛏️ **Lottominer** (NMMiner · WroomMiner · AxeHub) | Per-device table · full NMMiner configure modal (pool · WiFi · time · display) · pool push · WroomMiner and AxeHub devices shown alongside NMMiner |
 | 🔧 **BitAxe / NerdAxe** | Live stats · per-device configure modal (pool · fallback · WiFi · fan · freq/voltage) · pause / resume / restart / identify · bulk actions · inline rename · live device log |
-| 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets · live pool status |
+| 🌐 **Pool** | Push primary + fallback pool to all devices at once · saved pool presets · live pool status · dashboard links for BTC PoW Lab, Public Pool, CKPool Solo, OCEAN and HashedMax |
 | 👥 **Groups** | Group devices and run pool-switch / restart / pause actions on a whole group |
 | 🗓️ **Schedules** | Time-based automation — restart / pause / resume / pool-switch on a cron-like schedule |
 | 📑 **Templates** | Save and apply reusable device configurations |
