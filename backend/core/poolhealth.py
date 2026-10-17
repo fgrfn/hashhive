@@ -26,9 +26,16 @@ def _pool_target(url: str) -> tuple[str, int] | None:
     if not url or not isinstance(url, str):
         return None
     host_port = url.split("://")[-1].strip().strip("/").split("/")[0]
-    if ":" not in host_port:
-        return None
-    host, _, port_s = host_port.rpartition(":")
+    if host_port.startswith("["):
+        closing_bracket = host_port.find("]")
+        if closing_bracket < 0 or host_port[closing_bracket + 1 : closing_bracket + 2] != ":":
+            return None
+        host = host_port[1:closing_bracket]
+        port_s = host_port[closing_bracket + 2 :]
+    else:
+        host, separator, port_s = host_port.rpartition(":")
+        if not separator:
+            return None
     try:
         port = int(port_s)
     except ValueError:
