@@ -147,8 +147,11 @@ def _cleanup_old_stats() -> None:
         return
     cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
     for f in STATS_DIR.glob("*.json"):
+        stem = f.stem
+        if stem.startswith("dev_") or stem.startswith("bestdiff_"):
+            stem = stem.partition("_")[2]
         try:
-            file_date = datetime.strptime(f.stem, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            file_date = datetime.strptime(stem, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             if file_date < cutoff:
                 f.unlink()
         except ValueError:

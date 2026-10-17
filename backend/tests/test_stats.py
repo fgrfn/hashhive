@@ -82,3 +82,30 @@ def test_device_samples_skip_implausible_hashrate():
     data = load_json(_dev_stats_file(_today()), {})
     assert "10.0.0.99" not in data        # spike skipped
     assert "10.0.0.98" in data
+
+
+def test_cleanup_old_stats_removes_all_daily_series_types(tmp_path, monkeypatch):
+    """Retention covers the main, per-device, and best-diff daily files."""
+    import core.stats as cs
+
+    monkeypatch.setattr(cs, "STATS_DIR", tmp_path)
+    old_date = (datetime.now(timezone.utc) - timedelta(days=40)).strftime("%Y-%m-%d")
+    recent_date = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d")
+    old_names = [
+        f"{old_date}.json",
+        f"dev_{old_date}.json",
+        f"bestdiff_{old_date}.json",
+    ]
+    recent_names = [
+        f"{recent_date}.json",
+        f"dev_{recent_date}.json",
+        f"bestdiff_{recent_date}.json",
+    ]
+    for name in old_names + recent_names + ["backup_2020-01-01.json"]:
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+
+    cs._cleanup_old_stats()
+
+    assert not any((tmp_path / name).exists() for name in old_names)
+    assert all((tmp_path / name).exists() for name in recent_names)
+    assert (tmp_path / "backup_2020-01-01.json").exists()
