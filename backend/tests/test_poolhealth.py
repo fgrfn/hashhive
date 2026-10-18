@@ -20,6 +20,12 @@ def test_pool_target_parsing():
     assert poolhealth._pool_target("eu.pool.io:3333") == ("eu.pool.io", 3333)
     assert poolhealth._pool_target("eu.pool.io") is None        # no port
     assert poolhealth._pool_target("eu.pool.io:abc") is None     # bad port
+    assert poolhealth._pool_target("stratum+tcp://[2001:db8::1]:3333") == (
+        "2001:db8::1",
+        3333,
+    )
+    assert poolhealth._pool_target("[2001:db8::1]") is None
+    assert poolhealth._pool_target("[2001:db8::1]:abc") is None
     assert poolhealth._pool_target("") is None
     assert poolhealth._pool_target(None) is None
 
