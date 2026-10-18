@@ -1,12 +1,12 @@
 # CLAUDE.md – HashHive Development Guide
-<!-- Zuletzt aktualisiert: 2026-04-05 -->
+<!-- Zuletzt aktualisiert: 2026-10-18 -->
 
 ## Projektübersicht
 
 **HashHive** ist ein unified Mining-Dashboard für NMMiner, BitAxe und NerdAxe Geräte.
 
 - **Backend:** Python 3.10+ / FastAPI / httpx / asyncio
-- **Frontend:** Vanilla HTML + CSS + JavaScript (kein Framework, kein Build-Step)
+- **Frontend:** React 19 / TypeScript / Vite / Zustand (app/); der Build landet in frontend/dist/
 - **Persistenz:** JSON-Dateien (kein Datenbankserver nötig)
 - **Port:** `http://localhost:8000`
 - **API Base URL im Frontend:** `const API = window.location.origin` (dynamisch, kein hardcoded localhost)
@@ -19,18 +19,16 @@
 hashhive/
 ├── .github/
 │   └── workflows/
-│       ├── secret-scan.yml      # gitleaks bei jedem Push/PR
-│       ├── release-please.yml   # CHANGELOG + version.txt Bump PR bei Push auf main
-│       └── release.yml          # Docker-Build → GHCR + GitHub Release bei v*-Tag
+│       └── ci.yml               # Backend/Frontend/Secrets; Docker-Publish auf main/dev/Tags
 ├── backend/
-│   ├── main.py                  # FastAPI App, alle API-Endpunkte
-│   ├── alerts.py                # Alert-Erkennung & Benachrichtigungen
-│   ├── requirements.txt         # Python-Abhängigkeiten
-│   ├── dashboard_config.json    # Gespeicherte Einstellungen (auto-generiert)
-│   ├── alert_history.json       # Alert-Log (auto-generiert)
-│   └── device_state.json        # Gerätestatus für Alert-Diff (auto-generiert)
-├── frontend/
-│   └── index.html               # Komplettes Dashboard (single file)
+│   ├── main.py                  # FastAPI-App und Router-Registrierung
+│   ├── core/                    # Konfiguration, Persistenz, Auth, Statistiken
+│   ├── routers/                 # HTTP- und WebSocket-Endpunkte
+│   ├── miners/                  # Geräteadapter
+│   └── tests/                   # Backend-Tests
+├── app/
+│   └── src/                     # React-/TypeScript-Dashboard
+├── frontend/dist/               # Generierte Frontend-Dateien (Build-Ausgabe)
 ├── version.txt                  # App-Version (Single Source of Truth)
 ├── release-please-config.json   # release-please Konfiguration
 ├── .release-please-manifest.json # Aktuelle Version für release-please
@@ -39,7 +37,7 @@ hashhive/
 ├── .dockerignore
 ├── setup.ps1                    # Setup-Skript Windows (inkl. Autostart-Option)
 ├── setup.sh                     # Setup-Skript Linux/macOS (inkl. systemd-Option)
-├── claude.md                    # Diese Datei (in .gitignore)
+├── claude.md                    # Diese Entwickleranleitung
 ├── README.md
 ├── .gitignore
 └── LICENSE
@@ -377,23 +375,22 @@ OpenAPI-Spec: `main/http_server/openapi.yaml`
 
 ## Frontend-Architektur
 
-Das gesamte Frontend befindet sich in **einer einzigen Datei**: `frontend/index.html`.
+Das Frontend ist eine React-19-/TypeScript-Anwendung mit Vite und Zustand. Der Quellcode liegt
+unter app/src; app/package.json enthält die npm-Skripte. Für lokale Entwicklung:
 
-- Kein Build-Schritt, kein npm, kein Webpack
-- Vanilla JS mit `fetch()` gegen das lokale Backend
-- Dark Theme mit lila Akzentfarbe (`--accent: #a855f7`)
-- API Base URL: `const API = window.location.origin` (funktioniert bei Zugriff via IP/Domain)
-- Sidebar-Navigation mit 6 Seiten
+```bash
+cd app
+npm ci
+npm run dev
+```
 
-### Seiten
-| Seite | Beschreibung |
-|---|---|
-| Dashboard | Stat-Cards (Hashrate, Online, Max-Temp, Alerts) + kompakte Tabellen + Live-Log |
-| NMMiner | Vollständige Tabelle + ✏ Edit-Button pro Gerät (öffnet Konfig-Modal) |
-| BitAxe / NerdAxe | Vollständige Tabelle mit Bulk-Aktionen, Inline-Rename, Pause/Resume/Restart/Identify |
-| Pool | Primär/Sekundär Pool pushen + Pool Preset Library |
-| Settings | NMMiner Master-IP, AxeOS Devices, Alert-Schwellenwerte, Refresh-Interval, Weekly Summary |
-| Notifications | Telegram/Discord/Gotify + Alert-Verlauf |
+Der Vite-Entwicklungsserver leitet /api und /ws an das Backend auf localhost:8000 weiter.
+Mit npm run lint, npm test und npm run build werden Linter, Tests und Produktionsbuild ausgeführt.
+Der Build erzeugt frontend/dist; FastAPI liefert daraus die Startseite und Assets aus.
+
+Die folgende detaillierte UI-Beschreibung bezieht sich auf die frühere Vanilla-Oberfläche und ist
+nicht mehr maßgeblich. Für aktuelle Komponenten und Seiten app/src/App.tsx und app/src/pages/
+verwenden.
 
 ### Dashboard – Stat-Cards
 | Karte | Quelle |
@@ -557,11 +554,13 @@ Docker setzt: `HASHHIVE_DATA_DIR=/app/backend/data`
 
 | Workflow | Datei | Trigger | Beschreibung |
 |---|---|---|---|
-| Secret Scan | `secret-scan.yml` | Push / PR auf alle Branches | `gitleaks` scannt komplette Git-History auf Tokens, API-Keys, Passwörter |
-| Release Please | `release-please.yml` | Push auf `main` | Analysiert Commits (Conventional Commits); erstellt/aktualisiert Release PR mit `CHANGELOG.md` + `version.txt` Bump |
-| Release | `release.yml` | `v*`-Tag (nach Merge des Release PR) | Docker-Build → Push zu `ghcr.io/fgrfn/hashhive:{version}` + `:latest`; GitHub Release mit auto-generierten Release Notes |
+| CI | `.github/workflows/ci.yml` | Push und Pull Request auf allen Branches | Backend-Lint/Tests, Frontend-Lint/Tests/Build und Secret-Scan |
+| Docker/Release | `.github/workflows/ci.yml` | Push auf main, dev oder versionierte Tags | Baut und veröffentlicht Container-Image; Tags erzeugen außerdem ein GitHub Release |
 
-### Conventional Commits → Version-Bump
+### Historische Release-Please-Notiz (nicht mehr maßgeblich)
+
+Der folgende Release-Please-Ablauf ist veraltet. Aktuelle CI- und Image-Publish-Trigger stehen in
+`.github/workflows/ci.yml`.
 
 | Prefix | Bump |
 |---|---|
@@ -589,9 +588,9 @@ User merged Release PR
 
 - `backend/main.py` liest `version.txt` beim Start: `APP_VERSION = (BASE_DIR.parent / "version.txt").read_text().strip()`
 - FastAPI-App-Titel und `/api/health` Response verwenden `APP_VERSION`
-- `frontend/index.html` fetcht `/api/health` beim Laden, zeigt `HashHive v{version}` in der Sidebar
+- Die API gibt die von `backend/core/version.py` ermittelte Version unter `/api/health` zurück
 - `Dockerfile` kopiert `version.txt` ins Image (`COPY version.txt ./`)
-- `release-please-config.json` + `.release-please-manifest.json` steuern den automatischen Bump
+- Ein versionierter Git-Tag bestimmt die Release-Version; ohne Tag dient `version.txt` als Fallback
 
 ---
 
@@ -621,7 +620,7 @@ docker compose up -d --build
 Dashboard: **http://localhost:8000**
 
 ### Details
-- Ein einziges Image enthält Backend (FastAPI) + Frontend (`/frontend/index.html`)
+- Ein einziges Image enthält Backend (FastAPI) und die gebauten Dateien aus `/app/frontend/dist`
 - Persistente Daten landen im Named Volume `hashhive-data` → `/app/backend/data`
 - Pfad per Env-Variable: `HASHHIVE_DATA_DIR=/app/backend/data`
 - Port in `docker-compose.yml` änderbar: `"8000:8000"` → z.B. `"9000:8000"`
@@ -631,9 +630,8 @@ Dashboard: **http://localhost:8000**
 ## Entwicklungs-Tipps
 
 - **API-Docs**: Swagger UI unter `http://localhost:8000/docs`
-- **CORS** ist offen (`allow_origins=["*"]`) – nur für lokalen Betrieb
 - **JSON-Dateien** werden beim ersten Start automatisch erstellt
-- **Frontend direkt öffnen**: `frontend/index.html` im Browser (API → `localhost:8000`)
+- **Frontend lokal entwickeln**: Vite unter `app/` starten; produktiv liefert FastAPI `frontend/dist` aus
 - **Backend normalisiert** alle NMMiner-Swarm-Formate zu `{devices: [...]}`
 
 ---
