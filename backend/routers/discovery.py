@@ -13,7 +13,7 @@ import socket as _socket
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from core import (
     CONFIG_FILE,
@@ -127,6 +127,22 @@ def _parse_extra_ips(extra_ips: str | None) -> set[str]:
     return out
 
 
+def _validate_subnet_prefix(value: str) -> str:
+    """Validate a user-supplied private IPv4 /24 prefix."""
+    prefix = value.strip().rstrip(".")
+    parts = prefix.split(".")
+    if len(parts) != 3 or any(not part.isdigit() for part in parts):
+        raise HTTPException(status_code=400, detail="Subnet must be an IPv4 /24 prefix, e.g. 192.168.1")
+    try:
+        # Parsing the completed address also rejects octets outside 0..255 and
+        # ambiguous values such as leading-zero decimal octets.
+        first_host = str(ipaddress.IPv4Address(f"{prefix}.1"))
+    except ipaddress.AddressValueError:
+        raise HTTPException(status_code=400, detail="Subnet must be an IPv4 /24 prefix, e.g. 192.168.1")
+    _validate_device_ip(first_host)
+    return ".".join(first_host.split(".")[:3])
+
+
 async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> dict:
     """Run a unified discovery scan and return the result payload.
 
@@ -136,6 +152,7 @@ async def _run_scan(subnet: str | None = None, extra_ips: str | None = None) -> 
     subnet = (subnet or auto_subnet).strip().rstrip(".")
     if not subnet:
         return {"local_ip": "", "found": [], "method": "error", "error": "Could not determine local subnet"}
+    subnet = _validate_subnet_prefix(subnet)
 
     # ARP table (fast, instant) — gives both reachable IPs and their MACs
     arp = _arp_map()
