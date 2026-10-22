@@ -128,9 +128,13 @@ async def get_axeos_config_one(ip: str):
 @router.patch("/api/axeos/config/{ip}")
 async def patch_axeos_config_one(ip: str, data: dict):
     _validate_device_ip(ip)
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.patch(f"http://{ip}/api/system", json=data)
-    return {"ip": ip, "status": resp.status_code}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.patch(f"http://{ip}/api/system", json=data)
+            resp.raise_for_status()
+        return {"ip": ip, "status": resp.status_code}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.post("/api/axeos/action/batch")
