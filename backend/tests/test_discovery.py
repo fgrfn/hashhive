@@ -9,10 +9,14 @@ os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import pytest  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
 from routers.discovery import (  # noqa: E402
     _add_devices_to_config,
     _new_devices,
     _parse_extra_ips,
+    _validate_subnet_prefix,
     reconcile_macs,
 )
 
@@ -64,6 +68,16 @@ def test_new_devices_filters_known():
 def test_parse_extra_ips_validates_private_only():
     parsed = _parse_extra_ips("192.168.1.5, 10.0.0.2 , 8.8.8.8, notanip")
     assert parsed == {"192.168.1.5", "10.0.0.2"}
+
+
+@pytest.mark.parametrize("prefix", ["8.8.8", "192.168", "192.168.1.0/24", "192.168.1.evil", "192.168.999"])
+def test_subnet_override_rejects_public_or_malformed_prefix(prefix):
+    with pytest.raises(HTTPException):
+        _validate_subnet_prefix(prefix)
+
+
+def test_subnet_override_accepts_private_prefix_and_trailing_dot():
+    assert _validate_subnet_prefix(" 192.168.42. ") == "192.168.42"
 
 
 def test_reconcile_macs_updates_changed_ip():
