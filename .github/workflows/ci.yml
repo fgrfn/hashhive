@@ -82,6 +82,45 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  docker-validate:
+    name: Docker build & smoke test
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/nightly/'))
+    needs: [check, frontend, secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --tag hashhive-ci:${{ github.sha }} .
+
+      - name: Start container
+        run: |
+          docker run --detach \
+            --name hashhive-ci \
+            --publish 127.0.0.1:18000:8000 \
+            --env HASHHIVE_DATA_DIR=/tmp/hashhive-data \
+            hashhive-ci:${{ github.sha }}
+
+      - name: Verify health endpoint
+        run: |
+          curl \
+            --fail \
+            --retry 20 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            http://127.0.0.1:18000/api/health
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs hashhive-ci
+
+      - name: Stop container
+        if: always()
+        run: docker rm --force hashhive-ci
+
   docker:
     name: Build & push Docker image
     if: >-
