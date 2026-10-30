@@ -11,6 +11,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import httpx
+import pytest
+
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 (Path(_tmpdir) / "logs").mkdir(parents=True, exist_ok=True)
@@ -23,8 +26,12 @@ import routers.pools as pools  # noqa: E402
 
 
 def _resp(status, payload):
-    return type("R", (), {"status_code": status, "json": lambda self: payload,
-                          "raise_for_status": lambda self: None})()
+    response = httpx.Response(
+        status,
+        request=httpx.Request("POST", "http://miner.local/config"),
+        json=payload,
+    )
+    return response
 
 
 # ── Parser ────────────────────────────────────────────────────────────────────
@@ -66,7 +73,7 @@ def test_host_port_property():
 
 # ── Push routing helpers ──────────────────────────────────────────────────────
 
-def _mock_client(captured: dict, hostname_payload: dict):
+def _mock_client(captured: dict, hostname_payload: dict, *, write_status: int = 200):
     """An AsyncClient stub: GET returns a hostname, PATCH/POST capture the body."""
     client = AsyncMock()
     client.__aenter__ = AsyncMock(return_value=client)
@@ -78,12 +85,12 @@ def _mock_client(captured: dict, hostname_payload: dict):
     async def _patch(url, json=None, **kw):
         captured["url"] = url
         captured["body"] = json
-        return _resp(200, {})
+        return _resp(write_status, {})
 
     async def _post(url, json=None, **kw):
         captured["url"] = url
         captured["body"] = json
-        return _resp(200, {})
+        return _resp(write_status, {})
 
     client.get = AsyncMock(side_effect=_get)
     client.patch = AsyncMock(side_effect=_patch)
@@ -91,9 +98,9 @@ def _mock_client(captured: dict, hostname_payload: dict):
     return client
 
 
-def _push(ip, pool, hostname_payload):
+def _push(ip, pool, hostname_payload, *, write_status: int = 200):
     captured = {}
-    client = _mock_client(captured, hostname_payload)
+    client = _mock_client(captured, hostname_payload, write_status=write_status)
     orig = pools.httpx.AsyncClient
     pools.httpx.AsyncClient = lambda *a, **k: client
     try:
@@ -150,6 +157,37 @@ def test_nmminer_backup_sets_secondary():
     b = cap["body"]
     assert b["SecondaryPool"] == "stratum+tcp://public-pool.io:3333"
     assert "PrimaryPool" not in b
+
+
+@pytest.mark.parametrize(
+    ("config", "ip", "hostname", "expected_detail"),
+    [
+        (
+            {"axeos_devices": [{"ip": "10.0.0.5", "type": "bitaxe"}]},
+            "10.0.0.5",
+            {"hostname": "axe01"},
+            "AxeOS rejected",
+        ),
+        (
+            {"lottominer_devices": [{"ip": "10.0.0.9"}]},
+            "10.0.0.9",
+            {"Hostname": "nm01"},
+            "NMMiner rejected",
+        ),
+    ],
+)
+def test_pool_push_reports_device_rejection(config, ip, hostname, expected_detail):
+    save_json(CONFIG_FILE, config)
+
+    with pytest.raises(pools.HTTPException, match=expected_detail) as exc_info:
+        _push(
+            ip,
+            {"url": "public-pool.io:3333", "wallet": "bc1qW"},
+            hostname,
+            write_status=500,
+        )
+
+    assert exc_info.value.status_code == 502
 
 
 def test_wroomminer_backup_writes_fallback():
