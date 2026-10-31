@@ -240,7 +240,14 @@ async def push_pool_to_device(ip: str, pool: dict):
                     payload.update(_axe_advanced_fields(
                         pool.get("protocol2"), pool.get("tls2"), pool.get("channel2"),
                         pool.get("sv2_pubkey2"), fallback=True))
-            resp = await client.patch(f"http://{ip}/api/system", json=payload)
+            try:
+                resp = await client.patch(f"http://{ip}/api/system", json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail="AxeOS rejected the pool configuration",
+                ) from exc
             return {"ip": ip, "type": "axeos", "slot": slot, "status": resp.status_code}
 
         else:
@@ -269,5 +276,15 @@ async def push_pool_to_device(ip: str, pool: dict):
                     payload["SecondaryPool"] = ep2.stratum_url(force_tls=tls2)
                     payload["SecondaryAddress"] = w2
                     payload["SecondaryPassword"] = password2
-            resp = await client.post(f"http://{ip}/api/setting/mining", json=payload)
+            try:
+                resp = await client.post(
+                    f"http://{ip}/api/setting/mining",
+                    json=payload,
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail="NMMiner rejected the pool configuration",
+                ) from exc
             return {"ip": ip, "type": "lottominer", "slot": slot, "status": resp.status_code}
