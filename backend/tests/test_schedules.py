@@ -74,12 +74,22 @@ def test_normalize_schedule_rejects_invalid_power_limit():
 def test_run_action_restart_dispatches_by_type():
     cfg = _config()
     s = {"action": "restart", "scope": "all"}
-    with patch.object(sched, "axeos_fanout", new=AsyncMock(return_value=[])) as axe, \
-         patch.object(sched, "lottominer_fanout", new=AsyncMock(return_value=[])) as nm:
+    with patch.object(sched, "axeos_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.10", "status": 200}])) as axe, \
+         patch.object(sched, "lottominer_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.20", "status": 200}])) as nm:
         count = asyncio.run(sched._run_schedule_action(s, cfg))
     axe.assert_awaited_once()
     nm.assert_awaited_once()  # restart hits lottominer too
-    assert count >= 1
+    assert count == 2
+
+
+def test_run_action_restart_counts_only_successful_responses():
+    cfg = _config()
+    s = {"action": "restart", "scope": "all"}
+    with patch.object(sched, "axeos_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.10", "status": 500}])), \
+         patch.object(sched, "lottominer_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.20", "status": 0, "error": "offline"}])), \
+         patch.object(sched, "wroomminer_fanout", new=AsyncMock(return_value=[{"ip": "192.168.1.30", "status": 204}])):
+        count = asyncio.run(sched._run_schedule_action(s, cfg))
+    assert count == 1
 
 
 def test_run_action_pool_switch_pushes_preset():
@@ -110,7 +120,7 @@ def test_run_action_power_limit_sets_axeos_frequency():
 
         async def _patch(url, json=None):
             sent.append((url, json))
-            return type("R", (), {"status_code": 200})()
+            return type("R", (), {"status_code": 200, "raise_for_status": lambda self: None})()
         client.patch = _patch
         with patch("routers.schedules.httpx.AsyncClient") as M:
             M.return_value.__aenter__.return_value = client
@@ -119,6 +129,26 @@ def test_run_action_power_limit_sets_axeos_frequency():
     count = asyncio.run(_run())
     assert count == 1
     assert sent == [("http://192.168.1.10/api/system", {"frequency": 400})]
+
+
+def test_run_action_power_limit_does_not_count_http_failure():
+    cfg = _config()
+    s = {"action": "power_limit", "scope": "device", "deviceIps": ["192.168.1.10"], "power": 400}
+
+    async def _run():
+        client = AsyncMock()
+
+        async def _patch(url, json=None):
+            response = type("R", (), {})()
+            response.raise_for_status = lambda: (_ for _ in ()).throw(RuntimeError("500"))
+            return response
+
+        client.patch = _patch
+        with patch("routers.schedules.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = client
+            return await sched._run_schedule_action(s, cfg)
+
+    assert asyncio.run(_run()) == 0
 
 
 def test_run_action_throttle_floor_guards_bad_freq():
