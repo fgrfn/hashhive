@@ -271,6 +271,7 @@ async def lottominer_fanout(action: str, ips: list[str]) -> list[dict]:
                 # application/json Content-Type the POST handler doesn't match and
                 # the device replies 405. Send the documented empty body `{}`.
                 resp = await client.post(f"http://{ip}{path}", json={})
+                resp.raise_for_status()
                 results.append({"ip": ip, "status": resp.status_code})
                 now = datetime.now(timezone.utc).isoformat()
                 _append_entry({

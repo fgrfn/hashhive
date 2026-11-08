@@ -51,6 +51,7 @@ async def axeos_fanout(action: str, ips: list[str]) -> list[dict]:
         async def _act(ip: str):
             try:
                 resp = await client.post(f"http://{ip}/api/system/{action}")
+                resp.raise_for_status()
                 results.append({"ip": ip, "status": resp.status_code})
             except Exception as exc:
                 results.append({"ip": ip, "error": str(exc)})
