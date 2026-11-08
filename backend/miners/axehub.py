@@ -130,6 +130,7 @@ async def axehub_fanout(action: str, ips: list[str]) -> list[dict]:
         try:
             async with httpx.AsyncClient(timeout=8) as client:
                 resp = await client.post(f"http://{ip}{AXEHUB_BASE}{path}", headers=AXEHUB_HEADERS)
+                resp.raise_for_status()
                 results.append({"ip": ip, "status": resp.status_code})
                 now = datetime.now(timezone.utc).isoformat()
                 _append_entry({
