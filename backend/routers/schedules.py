@@ -7,6 +7,7 @@ schedules once a minute and runs the action against the resolved targets.
 
 import asyncio
 import json
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -31,12 +32,16 @@ router = APIRouter()
 
 _ACTIONS = {"pool_switch", "restart", "pause", "resume", "power_limit", "throttle"}
 _DAY_TOKENS = ["mo", "tu", "we", "th", "fr", "sa", "su"]
+_SCOPES = {"all", "group", "device"}
+_CLOCK_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 # fire-once guard: schedule id → "YYYY-MM-DD HH:MM" slot already fired
 _last_fired: dict[str, str] = {}
 
 
 def _normalize_schedule(data: dict, existing: dict | None = None) -> dict:
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Schedule must be a JSON object")
     base = existing or {}
 
     def pick(key, default):
@@ -44,28 +49,48 @@ def _normalize_schedule(data: dict, existing: dict | None = None) -> dict:
 
     action = str(pick("action", "pool_switch"))
     if action not in _ACTIONS:
-        action = "pool_switch"
+        raise HTTPException(status_code=400, detail=f"Unsupported schedule action: {action}")
     days = pick("days", [])
     if not isinstance(days, list):
         days = []
     days = [str(d).lower()[:2] for d in days if str(d).lower()[:2] in _DAY_TOKENS]
     device_ips = pick("deviceIps", [])
     if not isinstance(device_ips, list):
-        device_ips = []
+        raise HTTPException(status_code=400, detail="deviceIps must be a list")
+    name = str(pick("name", "New Schedule")).strip()[:64]
+    if not name:
+        raise HTTPException(status_code=400, detail="Schedule name is required")
+    time_start = str(pick("time_start", "08:00"))
+    time_end = str(pick("time_end", ""))
+    if not _CLOCK_RE.fullmatch(time_start):
+        raise HTTPException(status_code=400, detail="time_start must use HH:MM (00:00-23:59)")
+    if time_end and not _CLOCK_RE.fullmatch(time_end):
+        raise HTTPException(status_code=400, detail="time_end must use HH:MM (00:00-23:59)")
+    scope = str(pick("scope", "all"))
+    if scope not in _SCOPES:
+        raise HTTPException(status_code=400, detail=f"scope must be one of {sorted(_SCOPES)}")
+    power = pick("power", None)
+    if action in ("power_limit", "throttle"):
+        try:
+            power = int(power)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="power must be an integer") from None
+        if power < 100:
+            raise HTTPException(status_code=400, detail="power must be at least 100 MHz")
     return {
         "id": base.get("id") or secrets.token_hex(8),
-        "name": str(pick("name", "New Schedule"))[:64],
+        "name": name,
         "desc": str(pick("desc", ""))[:128],
         "enabled": bool(pick("enabled", True)),
         "action": action,
         "days": days,
-        "time_start": str(pick("time_start", "08:00"))[:5],
-        "time_end": str(pick("time_end", ""))[:5],
-        "scope": str(pick("scope", "all"))[:16],
+        "time_start": time_start,
+        "time_end": time_end,
+        "scope": scope,
         "groupId": str(pick("groupId", ""))[:32],
         "deviceIps": [str(ip) for ip in device_ips],
         "pool_id": str(pick("pool_id", ""))[:64],
-        "power": pick("power", None),
+        "power": power,
         "lastRun": str(base.get("lastRun", "never"))[:32],
         "nextRun": str(pick("nextRun", ""))[:32],
     }

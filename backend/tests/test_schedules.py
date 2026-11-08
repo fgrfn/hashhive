@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import pytest
+from fastapi import HTTPException
+
 _tmpdir = tempfile.mkdtemp()
 os.environ.setdefault("HASHHIVE_DATA_DIR", _tmpdir)
 
@@ -47,6 +50,25 @@ def test_should_fire_day_time_and_once():
     assert sched._schedule_should_fire({**s, "days": ["tu"]}, now, {}) is False  # wrong day
     assert sched._schedule_should_fire({**s, "enabled": False}, now, {}) is False
     assert sched._schedule_should_fire({**s, "time_start": "09:00"}, now, {}) is False
+
+
+@pytest.mark.parametrize("time_start", ["8:00", "24:00", "12:60", "later", ""])
+def test_normalize_schedule_rejects_invalid_start_time(time_start):
+    with pytest.raises(HTTPException, match="time_start") as exc:
+        sched._normalize_schedule({"name": "Night", "time_start": time_start})
+    assert exc.value.status_code == 400
+
+
+def test_normalize_schedule_rejects_unsupported_action_and_scope():
+    with pytest.raises(HTTPException, match="Unsupported schedule action"):
+        sched._normalize_schedule({"name": "Night", "action": "shutdown"})
+    with pytest.raises(HTTPException, match="scope must be"):
+        sched._normalize_schedule({"name": "Night", "scope": "internet"})
+
+
+def test_normalize_schedule_rejects_invalid_power_limit():
+    with pytest.raises(HTTPException, match="at least 100"):
+        sched._normalize_schedule({"name": "Night", "action": "power_limit", "power": 50})
 
 
 def test_run_action_restart_dispatches_by_type():
