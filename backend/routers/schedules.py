@@ -154,6 +154,14 @@ def _split_by_type(ips: list[str], config: dict) -> tuple[list[str], list[str]]:
     return [ip for ip in ips if ip in axe], [ip for ip in ips if ip in nm]
 
 
+def _successful_results(results: list[dict]) -> int:
+    """Count only device responses that completed with a successful HTTP status."""
+    return sum(
+        1 for result in results
+        if not result.get("error") and 200 <= int(result.get("status", 0)) < 400
+    )
+
+
 async def _run_schedule_action(sched: dict, config: dict) -> int:
     """Execute a schedule's action against its targets. Returns affected device count."""
     action = sched.get("action")
@@ -178,15 +186,16 @@ async def _run_schedule_action(sched: dict, config: dict) -> int:
         wroom_ips_set = {_ip_of(d) for d in config.get("wroomminer_devices", [])}
         axehub_ips = [ip for ip in ips if ip in axehub_ips_set] if action == "restart" else []
         wroom_ips = [ip for ip in ips if ip in wroom_ips_set] if action == "restart" else []
+        results: list[dict] = []
         if axe_ips:
-            await axeos_fanout(action, axe_ips)
+            results += await axeos_fanout(action, axe_ips)
         if nm_ips and action == "restart":
-            await lottominer_fanout("restart", nm_ips)
+            results += await lottominer_fanout("restart", nm_ips)
         if wroom_ips:
-            await wroomminer_fanout("restart", wroom_ips)
+            results += await wroomminer_fanout("restart", wroom_ips)
         if axehub_ips:
-            await axehub_fanout("restart", axehub_ips)
-        return len(axe_ips) + (len(nm_ips) + len(wroom_ips) + len(axehub_ips) if action == "restart" else 0)
+            results += await axehub_fanout("restart", axehub_ips)
+        return _successful_results(results)
     if action in ("power_limit", "throttle"):
         # Lower the AxeOS clock to the scheduled frequency (MHz) to cap power /
         # throttle the device. Only AxeOS supports frequency control; NMMiner
@@ -205,7 +214,8 @@ async def _run_schedule_action(sched: dict, config: dict) -> int:
             async def _set_freq(ip: str):
                 nonlocal count
                 try:
-                    await client.patch(f"http://{ip}/api/system", json={"frequency": freq})
+                    response = await client.patch(f"http://{ip}/api/system", json={"frequency": freq})
+                    response.raise_for_status()
                     count += 1
                 except Exception:
                     pass
